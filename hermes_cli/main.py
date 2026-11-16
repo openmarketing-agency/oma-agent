@@ -292,6 +292,7 @@ from hermes_cli.subcommands.webapp import build_webapp_parser
 from hermes_cli.subcommands.gui import build_gui_parser
 from hermes_cli.subcommands.logs import build_logs_parser
 from hermes_cli.subcommands.prompt_size import build_prompt_size_parser
+from hermes_cli.subcommands.request_dump import build_request_dump_parser
 from hermes_cli.subcommands.memory import build_memory_parser
 from hermes_cli.subcommands.acp import build_acp_parser
 from hermes_cli.subcommands.tools import build_tools_parser
@@ -2554,12 +2555,6 @@ def cmd_logs(args):
     )
 
 
-def cmd_console(args):
-    """Open the safe Hermes command console."""
-    from hermes_cli.console_engine import run_console_repl
-
-    return run_console_repl()
-
 
 # Top-level subcommands known WITHOUT plugin discovery (which costs 500ms+ of
 # eager plugin imports). Keep in sync with the add_parser calls in
@@ -2574,7 +2569,7 @@ _BUILTIN_SUBCOMMANDS = frozenset(
         "gui", "desktop", "kanban", "login", "logout", "logs", "lsp", "mcp", "memory", "migrate", "moa",
         "journey", "memory-graph", "learning",
         "model", "monitoring", "pairing", "pause", "peer", "pets", "plugins", "portal", "profile",
-        "project", "proxy", "prompt-size", "resume", "send", "sessions", "setup",
+        "project", "proxy", "prompt-size", "request-dump", "resume", "send", "sessions", "setup",
         "skin", "skills", "slack", "status", "tools", "uninstall", "update",
         "usage", "vault",
         "webhook", "whatsapp", "whatsapp-cloud", "worktree", "chat", "secrets", "security",
@@ -3168,7 +3163,7 @@ def _build_cli_parser():
     build_import_cmd_parser(subparsers, cmd_import=cmd_import)
     build_config_parser(subparsers, cmd_config=cmd_config)
     build_skin_parser(subparsers, cmd_skin=cmd_skin)
-    build_console_parser(subparsers, cmd_console=cmd_console)
+    build_console_parser(subparsers)
     build_pairing_parser(subparsers, cmd_pairing=cmd_pairing)
     build_skills_parser(subparsers, cmd_skills=cmd_skills)
     build_bundles_parser(subparsers)
@@ -3203,6 +3198,7 @@ def _build_cli_parser():
     build_gui_parser(subparsers, cmd_gui=cmd_gui)
     build_logs_parser(subparsers, cmd_logs=cmd_logs)
     build_prompt_size_parser(subparsers, cmd_prompt_size=cmd_prompt_size)
+    build_request_dump_parser(subparsers)
     return parser, subparsers
 
 
