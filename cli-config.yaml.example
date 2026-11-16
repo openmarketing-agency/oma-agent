@@ -1214,6 +1214,19 @@ streaming:
 # also create new skills after completing complex tasks.
 #
 skills:
+  # Skill availability in this profile, on every platform. null/omitted = all;
+  # [] = essential hermes-agent skill only. Exact names from skills_list (plugin:skill
+  # for plugins; exact relative load paths for same-tier duplicate names).
+  enabled: null
+  # Per-platform allowlists intersect enabled; never re-enable an excluded skill.
+  # An omitted/null platform entry adds no restriction; [] permits essentials only.
+  platform_enabled: {}
+  # platform_enabled:
+  #   cli: [github, swe]
+  #   telegram: [arxiv]
+  # disabled and platform_disabled still win, except for essential hermes-agent.
+  # These settings select skills; auto_load only preloads already-selected skills.
+
   # Nudge the agent to create skills after complex tasks.
   # Every N tool-calling iterations, remind the model to consider saving a skill.
   # Set to 0 to disable.
@@ -1232,6 +1245,13 @@ skills:
 # Agent Behavior
 # =============================================================================
 agent:
+  # Profile-wide toolset allowlist for EVERY platform. null preserves platform defaults;
+  # [] enables no toolsets. A list overrides platform_toolsets and implicit MCP/plugin additions.
+  # enabled_toolsets: [terminal, file, skills, web]
+  enabled_toolsets: null
+  # Global suppression still wins over the allowlist (including shared tools in bundles).
+  disabled_toolsets: []
+
   # Maximum tool-calling iterations per conversation (default: 500)
   # Higher = more room for complex tasks, but costs more tokens
   # Recommended: 20-30 for focused tasks, 50-100 for open exploration
@@ -1439,6 +1459,20 @@ gateway:
 # =============================================================================
 # Control which tools the agent has access to.
 # Use `hermes tools` to interactively enable/disable tools per platform.
+
+# Progressive disclosure controls exposure, not which tools are enabled.
+tools:
+  tool_search:
+    enabled: "auto"  # "off" exposes all enabled tools directly.
+    # Keep every tool in these toolsets eager; defer all other enabled tools.
+    # null preserves legacy defaults; [] defers all. Bridge tools stay visible.
+    # Example: eager_toolsets: [terminal, file, clarify]
+    eager_toolsets: null
+    # Without an eager allowlist, additionally defer every tool in these toolsets.
+    # Example: defer_toolsets: [web, browser, image_gen]
+    defer_toolsets: []
+    # eager_toolsets takes precedence. Neither setting enables disabled tools.
+    # Start a new session after changing this configuration.
 
 # =============================================================================
 # Platform Toolsets (per-platform tool configuration)
