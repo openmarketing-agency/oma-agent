@@ -1,5 +1,38 @@
 # GitHub Actions workflows
 
+## OMA fork: active release policy
+
+Only **OMA Docker Release** (`oma-docker-release.yml`) is enabled in
+`openmarketing-agency/oma-agent`. All inherited workflows below are disabled
+through GitHub Actions settings, not deleted, so they can be restored deliberately.
+Their descriptions below document upstream behavior, not this fork's active CI.
+
+The release workflow runs **only on a pushed `v*` tag**, validates a version such
+as `v0.1.0`, builds the standard (non-desktop) image natively for `linux/amd64`
+and `linux/arm64`, and smoke-tests its release identity, agent import and CLI.
+It publishes the tested architecture digests and one versioned manifest to
+**GitHub Packages only**: `ghcr.io/openmarketing-agency/oma-agent:v0.1.0`.
+There is no `latest` alias, Docker Hub push, GitHub Release publication,
+branch/PR trigger, manual dispatch, or deployment step.
+
+Publication uses the repository's automatic `GITHUB_TOKEN` with `packages: write`;
+no Docker Hub secrets or Blacksmith runners are required. The image's install
+stamp and OCI labels record the tag's version and exact source commit.
+
+To release a new version after pushing the intended source to `main`:
+
+```sh
+git tag v0.1.0
+git push origin refs/tags/v0.1.0
+docker pull ghcr.io/openmarketing-agency/oma-agent:v0.1.0
+```
+
+Do not move an existing release tag. Check the workflow run and registry digest
+before treating a pushed tag as a published image. New packages may require
+authentication unless their GitHub Packages visibility is public.
+
+## Inherited upstream workflow reference (disabled in this fork)
+
 This directory has 57 workflow files. Most of them are **reusable workflows**
 (`on: workflow_call`). They never start on their own; an entry-point workflow
 calls them. This README covers what starts each workflow, which jobs it skips
