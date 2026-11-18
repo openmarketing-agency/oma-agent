@@ -235,7 +235,7 @@ def rewrite_relative_links(body: str, meta: dict[str, Any]) -> str:
     pointing to the file in the repo.
     """
     source_dir = "skills" if meta["source_kind"] == "bundled" else "optional-skills"
-    base = f"https://github.com/NousResearch/hermes-agent/blob/main/{source_dir}/{meta['rel_path']}"
+    base = f"https://github.com/openmarketing-agency/oma-agent/blob/main/{source_dir}/{meta['rel_path']}"
 
     def sub_link(m: re.Match) -> str:
         text = m.group(1)
@@ -501,7 +501,7 @@ def build_catalog_md_bundled(entries: list[tuple[dict[str, Any], dict[str, Any]]
         "",
         "# Bundled Skills Catalog",
         "",
-        "Hermes ships with a large built-in skill library copied into `~/.hermes/skills/` on install. Each skill below links to a dedicated page with its full definition, setup, and usage.",
+        "OMA Agent copies the skills below into fresh profiles. Other skills are available from the [Optional Skills Catalog](optional-skills-catalog.md) and are not installed by default.",
         "",
         "Hermes also syncs bundled skills on `hermes update`, but the sync manifest respects local deletions and user edits. If a skill listed here is missing from your profile's `~/.hermes/skills/` tree, it is still shipped with Hermes; restore it with `hermes skills reset <name> --restore`.",
         "",

@@ -13,7 +13,7 @@ pytestmark = pytest.mark.platforms("posix")
 
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
-    / "skills/productivity/google-workspace/scripts/setup.py"
+    / "optional-skills/productivity/google-workspace/scripts/setup.py"
 )
 
 

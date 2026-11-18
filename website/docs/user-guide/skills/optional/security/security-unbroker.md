@@ -21,7 +21,7 @@ Remove your info from data-broker sites, by name or phone.
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `privacy`, `data-broker`, `opt-out`, `ccpa`, `gdpr`, `security`, `doxxing` |
-| Related skills | [`google-workspace`](../../bundled/productivity/productivity-google-workspace.md), [`agentmail`](../../optional/email/email-agentmail.md), [`himalaya`](../../bundled/email/email-himalaya.md), [`scrapling`](../../optional/research/research-scrapling.md), [`osint-investigation`](../../optional/research/research-osint-investigation.md) |
+| Related skills | [`google-workspace`](../../optional/productivity/productivity-google-workspace.md), [`agentmail`](../../optional/email/email-agentmail.md), [`himalaya`](../../optional/email/email-himalaya.md), [`scrapling`](../../optional/research/research-scrapling.md), [`osint-investigation`](../../optional/research/research-osint-investigation.md) |
 
 ## Reference: full SKILL.md
 

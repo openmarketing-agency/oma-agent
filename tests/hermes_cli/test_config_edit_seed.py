@@ -113,15 +113,13 @@ def test_seeded_config_keeps_the_update_backup_default(tmp_path, monkeypatch):
 @pytest.mark.parametrize("entry", ["install", "profile"])
 def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     import hermes_yaml as yaml
-    from agent.skill_utils import ESSENTIAL_SKILLS, get_disabled_skill_names
+    from agent.skill_utils import get_disabled_skill_names
     from agent.skill_commands import build_auto_load_prompt
     from hermes_cli.config_defaults import DEFAULT_CONFIG
     from hermes_cli.config_effective import load_user_config_effective
-    from hermes_cli.config_home import OMA_PLAYBOOK_SKILL
     from hermes_cli.profiles import create_profile
     from hermes_cli.tools_config import _get_platform_tools
     from tools import approval_context
-    from tools.skill_usage import read_skill_name
     from tools.tool_search import BRIDGE_TOOL_NAMES, assemble_tool_defs
 
     root = tmp_path / ".hermes"
@@ -130,9 +128,6 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     monkeypatch.setenv("HERMES_HOME", str(root))
     bundled = Path(__file__).resolve().parents[2] / "skills"
     monkeypatch.setenv("HERMES_BUNDLED_SKILLS", str(bundled))
-    names = sorted({read_skill_name(path, path.parent.name) for path in bundled.rglob("SKILL.md")})
-    assert OMA_PLAYBOOK_SKILL in names
-    expected_skills = {"disabled": names}
 
     if entry == "install":
         source = bundled.parent
@@ -142,7 +137,6 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
             env={**os.environ, "HOME": str(tmp_path)}, check=True, timeout=20,
         )
         home = root
-        expected_skills = {"disabled": [name for name in names if name != OMA_PLAYBOOK_SKILL]}
     else:
         home = create_profile("fresh", no_alias=True, seed_model=False)
     path = home / "config.yaml"
@@ -151,7 +145,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     assert yaml.safe_load(content) == {
         "agent": {"enabled_toolsets": ["file", "terminal", "browser", "web"]},
         "tools": {"tool_search": {"enabled": "on", "eager_toolsets": [], "listing": "off"}},
-        "skills": expected_skills,
+        "skills": {"disabled": []},
         "approvals": {
             "mode": "off",
             "timeout": 300,
@@ -170,7 +164,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     assert build_auto_load_prompt(user_config=config) == ("", [], [])
     for surface in ("cli", "tui", "telegram"):
         assert _get_platform_tools(config, surface) == {"file", "terminal", "browser", "web"}
-    assert get_disabled_skill_names() == set(expected_skills["disabled"]) - ESSENTIAL_SKILLS
+    assert not get_disabled_skill_names()
     assert approval_context._get_approval_mode() == "off"
     assert approval_context._get_approval_timeout() == 300
     assert approval_context._get_cron_approval_mode() == "approve"

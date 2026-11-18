@@ -21,7 +21,7 @@ Debug Python: pdb REPL + debugpy remote (DAP).
 | License | MIT |
 | Platforms | linux, macos |
 | Tags | `debugging`, `python`, `pdb`, `debugpy`, `breakpoints`, `dap`, `post-mortem` |
-| Related skills | [`systematic-debugging`](../../bundled/software-development/software-development-systematic-debugging.md), [`node-inspect-debugger`](../../optional/software-development/software-development-node-inspect-debugger.md) |
+| Related skills | [`systematic-debugging`](../../optional/software-development/software-development-systematic-debugging.md), [`node-inspect-debugger`](../../optional/software-development/software-development-node-inspect-debugger.md) |
 
 ## Reference: full SKILL.md
 

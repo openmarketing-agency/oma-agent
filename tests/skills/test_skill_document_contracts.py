@@ -11,18 +11,18 @@ import pytest
 from agent.skill_utils import parse_frontmatter, skill_matches_platform
 
 REPO = Path(__file__).resolve().parents[2]
-GITHUB = "skills/software-development/github"
+GITHUB = "optional-skills/software-development/github"
 QUESTIONNAIRE = "optional-skills/productivity/decision-questionnaire"
 ACTUAL = "optional-skills/devops/actual-setup"
 DARWINIAN = "optional-skills/research/darwinian-evolver"
-EMAIL = "skills/email/email-inbox-triage"
-MEETING = "skills/productivity/meeting-action-items"
-PRICE = "skills/productivity/product-price-monitor"
-WEEKLY = "skills/productivity/weekly-review-planning"
+EMAIL = "optional-skills/email/email-inbox-triage"
+MEETING = "optional-skills/productivity/meeting-action-items"
+PRICE = "optional-skills/productivity/product-price-monitor"
+WEEKLY = "optional-skills/productivity/weekly-review-planning"
 SOCIAL = "optional-skills/creative/social-media-content-calendar"
 MCP = "optional-skills/mcp/mcp-oauth-remote-gateway"
 OSS_FORENSICS = "optional-skills/security/oss-forensics"
-CLAUDE_CODE = "skills/autonomous-ai-agents/claude-code"
+CLAUDE_CODE = "optional-skills/autonomous-ai-agents/claude-code"
 
 
 def _document(skill):

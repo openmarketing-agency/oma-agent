@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[2] / "skills" / "creative" / "p5js" / "scripts" / "export-frames.js"
+SCRIPT = Path(__file__).resolve().parents[2] / "optional-skills" / "creative" / "p5js" / "scripts" / "export-frames.js"
 NODE = shutil.which("node")
 
 pytestmark = pytest.mark.skipif(NODE is None, reason="node is not installed")

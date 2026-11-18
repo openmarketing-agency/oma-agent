@@ -27,6 +27,15 @@ To uninstall:
 hermes skills uninstall <skill-name>
 ```
 
+## apple
+
+| Skill | Description |
+|-------|-------------|
+| [**apple-notes**](../user-guide/skills/optional/apple/apple-apple-notes.md) | Manage Apple Notes via memo CLI: create, search, edit. |
+| [**apple-reminders**](../user-guide/skills/optional/apple/apple-apple-reminders.md) | Apple Reminders via remindctl: add, list, complete. |
+| [**findmy**](../user-guide/skills/optional/apple/apple-findmy.md) | Track Apple devices/AirTags via FindMy.app on macOS. |
+| [**imessage**](../user-guide/skills/optional/apple/apple-imessage.md) | Send and receive iMessages/SMS via the imsg CLI on macOS. |
+
 ## autonomous-ai-agents
 
 | Skill | Description |
@@ -34,6 +43,8 @@ hermes skills uninstall <skill-name>
 | [**agent-merge-conflict-arbiter**](../user-guide/skills/optional/autonomous-ai-agents/autonomous-ai-agents-agent-merge-conflict-arbiter.md) | Neutral arbiter for merge conflicts between two agents. |
 | [**antigravity-cli**](../user-guide/skills/optional/autonomous-ai-agents/autonomous-ai-agents-antigravity-cli.md) | Operate the Antigravity CLI (agy): plugins, auth, sandbox. |
 | [**blackbox**](../user-guide/skills/optional/autonomous-ai-agents/autonomous-ai-agents-blackbox.md) | Delegate coding tasks to the Blackbox AI multi-model CLI. |
+| [**claude-code**](../user-guide/skills/optional/autonomous-ai-agents/autonomous-ai-agents-claude-code.md) | Delegate coding to Claude Code CLI (features, PRs). |
+| [**codex**](../user-guide/skills/optional/autonomous-ai-agents/autonomous-ai-agents-codex.md) | Delegate coding to OpenAI Codex CLI (features, PRs). |
 | [**dynamic-workflow**](../user-guide/skills/optional/autonomous-ai-agents/autonomous-ai-agents-dynamic-workflow.md) | Plan-in-code fan-outs, adversarial verification, waves. |
 | [**grok**](../user-guide/skills/optional/autonomous-ai-agents/autonomous-ai-agents-grok.md) | Delegate coding to xAI Grok Build CLI (features, PRs). |
 | [**opencode**](../user-guide/skills/optional/autonomous-ai-agents/autonomous-ai-agents-opencode.md) | Delegate coding to OpenCode CLI (features, PR review). |
@@ -60,12 +71,16 @@ hermes skills uninstall <skill-name>
 | [**ai-presenter-video**](../user-guide/skills/optional/creative/creative-ai-presenter-video.md) | Make a verified AI presenter video from script + image. |
 | [**anatomy**](../user-guide/skills/optional/creative/creative-anatomy.md) | Explain an idea as an interactive isometric machine figure. |
 | [**archify**](../user-guide/skills/optional/creative/creative-archify.md) | Validated interactive HTML diagrams, upstream-maintained. |
+| [**architecture-diagram**](../user-guide/skills/optional/creative/creative-architecture-diagram.md) | Dark-themed SVG architecture/cloud/infra diagrams as HTML. |
 | [**ascii-art**](../user-guide/skills/optional/creative/creative-ascii-art.md) | ASCII art: pyfiglet, cowsay, boxes, image-to-ascii. |
+| [**ascii-video**](../user-guide/skills/optional/creative/creative-ascii-video.md) | ASCII video: convert video/audio to colored ASCII MP4/GIF. |
 | [**auteur**](../user-guide/skills/optional/creative/creative-auteur.md) | Design and build cinematic, award-level web pages. |
 | [**baoyu-article-illustrator**](../user-guide/skills/optional/creative/creative-baoyu-article-illustrator.md) | Article illustrations: type × style × palette consistency. |
 | [**baoyu-comic**](../user-guide/skills/optional/creative/creative-baoyu-comic.md) | Knowledge comics (知识漫画): educational, biography, tutorial. |
+| [**baoyu-infographic**](../user-guide/skills/optional/creative/creative-baoyu-infographic.md) | Infographics: 21 layouts x 21 styles (信息图, 可视化). |
 | [**brag**](../user-guide/skills/optional/creative/creative-brag.md) | Project launch video via Hyperframes, upstream-maintained. |
 | [**brag-slim**](../user-guide/skills/optional/creative/creative-brag-slim.md) | Launch video from a project or URL, upstream-maintained. |
+| [**claude-design**](../user-guide/skills/optional/creative/creative-claude-design.md) | Design one-off HTML artifacts (landing, deck, prototype). |
 | [**comfyui**](../user-guide/skills/optional/creative/creative-comfyui.md) | Generate images, video, and audio via diffusion workflows. |
 | [**concept-diagrams**](../user-guide/skills/optional/creative/creative-concept-diagrams.md) | Generate flat, minimal educational SVG visuals as HTML. |
 | [**creative-ideation**](../user-guide/skills/optional/creative/creative-creative-ideation.md) | Generate ideas via named methods from creative practice. |
@@ -74,17 +89,22 @@ hermes skills uninstall <skill-name>
 | [**dream-loop**](../user-guide/skills/optional/creative/creative-dream-loop.md) | Build stunning 3D scenes via a concept-art fidelity loop. |
 | [**excalidraw**](../user-guide/skills/optional/creative/creative-excalidraw.md) | Hand-drawn Excalidraw JSON diagrams (arch, flow, seq). |
 | [**heartmula**](../user-guide/skills/optional/creative/creative-heartmula.md) | HeartMuLa: Suno-like song generation from lyrics + tags. |
+| [**humanizer**](../user-guide/skills/optional/creative/creative-humanizer.md) | Humanize text: strip AI-isms and add real voice. |
 | [**hyperframes**](../user-guide/skills/optional/creative/creative-hyperframes.md) | Render MP4/WebM videos from HTML compositions. |
 | [**impeccable**](../user-guide/skills/optional/creative/creative-impeccable.md) | Frontend design guidance, upstream-maintained (impeccable). |
 | [**ip-as-logo**](../user-guide/skills/optional/creative/creative-ip-as-logo.md) | Design minimal cute IP mascot marks readable at 32px. |
 | [**kanban-video-orchestrator**](../user-guide/skills/optional/creative/creative-kanban-video-orchestrator.md) | Plan and run multi-agent video production pipelines. |
+| [**manim-video**](../user-guide/skills/optional/creative/creative-manim-video.md) | Manim CE animations: 3Blue1Brown math/algo videos. |
 | [**meme-generation**](../user-guide/skills/optional/creative/creative-meme-generation.md) | Create meme PNGs from templates with Pillow text overlay. |
 | [**mono-color**](../user-guide/skills/optional/creative/creative-mono-color.md) | Generate one- or two-ink editorial print poster images. |
+| [**p5js**](../user-guide/skills/optional/creative/creative-p5js.md) | p5.js sketches: gen art, shaders, interactive, 3D. |
 | [**pixel-art**](../user-guide/skills/optional/creative/creative-pixel-art.md) | Pixel art w/ era palettes (NES, Game Boy, PICO-8). |
+| [**popular-web-designs**](../user-guide/skills/optional/creative/creative-popular-web-designs.md) | 54 real design systems (Stripe, Linear, Vercel) as HTML/CSS. |
 | [**pretext**](../user-guide/skills/optional/creative/creative-pretext.md) | Build creative browser demos with DOM-free text layout. |
 | [**simple-english**](../user-guide/skills/optional/creative/creative-simple-english.md) | Rewrite text to ASD-STE100 Simplified Technical English. |
 | [**sketch**](../user-guide/skills/optional/creative/creative-sketch.md) | Throwaway HTML mockups: 2-3 design variants to compare. |
 | [**social-media-content-calendar**](../user-guide/skills/optional/creative/creative-social-media-content-calendar.md) | Plan multi-platform social campaigns: briefs to posting. |
+| [**songwriting-and-ai-music**](../user-guide/skills/optional/creative/creative-songwriting-and-ai-music.md) | Songwriting craft and Suno AI music prompts. |
 | [**system-atlas**](../user-guide/skills/optional/creative/creative-system-atlas.md) | Build explorable isometric architecture atlases as HTML. |
 | [**tldraw-offline**](../user-guide/skills/optional/creative/creative-tldraw-offline.md) | Drive and script tldraw offline canvases with an agent. |
 | [**unreal-mcp**](../user-guide/skills/optional/creative/creative-unreal-mcp.md) | Automate Unreal Engine editor scenes, actors, and renders. |
@@ -104,6 +124,7 @@ hermes skills uninstall <skill-name>
 | [**hermes-s6-container-supervision**](../user-guide/skills/optional/devops/devops-hermes-s6-container-supervision.md) | Modify or debug s6 services in the Hermes Docker image. |
 | [**inference-sh-cli**](../user-guide/skills/optional/devops/devops-inference-sh-cli.md) | Run 150+ AI apps (image, video, LLM) via inference.sh CLI. |
 | [**pinggy-tunnel**](../user-guide/skills/optional/devops/devops-pinggy-tunnel.md) | Zero-install localhost tunnels over SSH via Pinggy. |
+| [**sdlc-review**](../user-guide/skills/optional/devops/devops-sdlc-review.md) | Review Kanban handoffs and route verified outcomes. |
 | [**setup-wizard-generator**](../user-guide/skills/optional/devops/devops-setup-wizard-generator.md) | Generate a bash wizard guiding a human through manual setup. |
 | [**watchers**](../user-guide/skills/optional/devops/devops-watchers.md) | Poll RSS, JSON APIs, and GitHub with watermark dedup. |
 
@@ -118,6 +139,8 @@ hermes skills uninstall <skill-name>
 | Skill | Description |
 |-------|-------------|
 | [**agentmail**](../user-guide/skills/optional/email/email-agentmail.md) | Use when an agent needs AgentMail CLI email inboxes. |
+| [**email-inbox-triage**](../user-guide/skills/optional/email/email-email-inbox-triage.md) | Triage an inbox: prioritize threads, draft replies safely. |
+| [**himalaya**](../user-guide/skills/optional/email/email-himalaya.md) | Himalaya CLI: IMAP/SMTP email from terminal. |
 
 ## finance
 
@@ -161,6 +184,7 @@ hermes skills uninstall <skill-name>
 |-------|-------------|
 | [**gif-search**](../user-guide/skills/optional/media/media-gif-search.md) | Search/download GIFs from Tenor via curl + jq. |
 | [**songsee**](../user-guide/skills/optional/media/media-songsee.md) | Audio spectrograms/features (mel, chroma, MFCC) via CLI. |
+| [**youtube-content**](../user-guide/skills/optional/media/media-youtube-content.md) | YouTube transcripts to summaries, threads, blogs. |
 
 ## mlops
 
@@ -190,6 +214,12 @@ hermes skills uninstall <skill-name>
 | [**torchtitan**](../user-guide/skills/optional/mlops/mlops-torchtitan.md) | Pretrain LLMs at scale with PyTorch 4D parallelism. |
 | [**unsloth**](../user-guide/skills/optional/mlops/mlops-training-unsloth.md) | Unsloth: 2-5x faster LoRA/QLoRA fine-tuning, less VRAM. |
 
+## note-taking
+
+| Skill | Description |
+|-------|-------------|
+| [**obsidian**](../user-guide/skills/optional/note-taking/note-taking-obsidian.md) | Read, search, create, and edit notes in the Obsidian vault. |
+
 ## payments
 
 | Skill | Description |
@@ -204,24 +234,36 @@ hermes skills uninstall <skill-name>
 | [**box**](../user-guide/skills/optional/productivity/productivity-box.md) | Box manages cloud files, sharing, search, and metadata. |
 | [**canvas**](../user-guide/skills/optional/productivity/productivity-canvas.md) | Fetch Canvas LMS courses and assignments via API token. |
 | [**decision-questionnaire**](../user-guide/skills/optional/productivity/productivity-decision-questionnaire.md) | Turn an unanswerable decision into a questionnaire doc. |
+| [**document-to-action-items**](../user-guide/skills/optional/productivity/productivity-document-to-action-items.md) | Extract cited obligations, deadlines, tasks from documents. |
+| [**google-workspace**](../user-guide/skills/optional/productivity/productivity-google-workspace.md) | Gmail, Calendar, Drive, Docs, Sheets via gws CLI or Python. |
 | [**here-now**](../user-guide/skills/optional/productivity/productivity-here-now.md) | Publish sites to &#123;slug&#125;.here.now and store files in Drives. |
 | [**live-dashboard**](../user-guide/skills/optional/productivity/productivity-live-dashboard.md) | Build self-updating dashboards from live sources. |
+| [**maps**](../user-guide/skills/optional/productivity/productivity-maps.md) | Geocode, POIs, routes, timezones via OpenStreetMap/OSRM. |
+| [**meeting-action-items**](../user-guide/skills/optional/productivity/productivity-meeting-action-items.md) | Turn meeting notes into cited decisions, owners, tickets. |
 | [**memento-flashcards**](../user-guide/skills/optional/productivity/productivity-memento-flashcards.md) | Spaced-repetition flashcards: create, review, quiz, export. |
+| [**microsoft-office**](../user-guide/skills/optional/productivity/productivity-microsoft-office.md) | Create, read, and edit Word, PowerPoint, and Excel files. |
+| [**pdf**](../user-guide/skills/optional/productivity/productivity-pdf.md) | PDF files: create, read, merge, fill, OCR, edit text. |
+| [**product-price-monitor**](../user-guide/skills/optional/productivity/productivity-product-price-monitor.md) | Watch product, flight, or listing prices; alert on target. |
 | [**property-listings**](../user-guide/skills/optional/productivity/productivity-property-listings.md) | Present property and rental listings as desktop cards. |
 | [**shop**](../user-guide/skills/optional/productivity/productivity-shop.md) | Shop catalog search, checkout, order tracking, returns. |
 | [**siyuan**](../user-guide/skills/optional/productivity/productivity-siyuan.md) | Query and edit a SiYuan knowledge base via its API. |
+| [**teams-meeting-pipeline**](../user-guide/skills/optional/productivity/productivity-teams-meeting-pipeline.md) | Teams meeting summaries, job replay, Graph subscriptions. |
 | [**telephony**](../user-guide/skills/optional/productivity/productivity-telephony.md) | Provision Twilio numbers, SMS/MMS, and AI outbound calls. |
+| [**weekly-review-planning**](../user-guide/skills/optional/productivity/productivity-weekly-review-planning.md) | Weekly reset: commitments, stalled work, next-week plan. |
 
 ## research
 
 | Skill | Description |
 |-------|-------------|
+| [**arxiv**](../user-guide/skills/optional/research/research-arxiv.md) | Search arXiv papers by keyword, author, category, or ID. |
 | [**bioinformatics**](../user-guide/skills/optional/research/research-bioinformatics.md) | Gateway to 400+ genomics and computational biology skills. |
 | [**blogwatcher**](../user-guide/skills/optional/research/research-blogwatcher.md) | Monitor blogs and RSS/Atom feeds via blogwatcher-cli tool. |
+| [**competitor-news-monitor**](../user-guide/skills/optional/research/research-competitor-news-monitor.md) | Watch named companies for material news; cited digests. |
 | [**darwinian-evolver**](../user-guide/skills/optional/research/research-darwinian-evolver.md) | Evolve prompts/regex/SQL/code with Imbue's evolution loop. |
 | [**domain-intel**](../user-guide/skills/optional/research/research-domain-intel.md) | Passive recon of subdomains, SSL certs, WHOIS, and DNS. |
 | [**drug-discovery**](../user-guide/skills/optional/research/research-drug-discovery.md) | Drug discovery: ChEMBL search, drug-likeness, interactions. |
 | [**gitnexus-explorer**](../user-guide/skills/optional/research/research-gitnexus-explorer.md) | Serve an interactive codebase knowledge graph web UI. |
+| [**grounded-citations**](../user-guide/skills/optional/research/research-grounded-citations.md) | Ground answers and documents in cited, verifiable sources. |
 | [**llm-wiki**](../user-guide/skills/optional/research/research-llm-wiki.md) | Karpathy's LLM Wiki: build/query interlinked markdown KB. |
 | [**osint-investigation**](../user-guide/skills/optional/research/research-osint-investigation.md) | Follow the money via public records and sanctions data. |
 | [**parallel-cli**](../user-guide/skills/optional/research/research-parallel-cli.md) | Agent-native web search, deep research, and enrichment. |
@@ -252,6 +294,7 @@ hermes skills uninstall <skill-name>
 | Skill | Description |
 |-------|-------------|
 | [**reddit-reading**](../user-guide/skills/optional/social-media/social-media-reddit-reading.md) | Read Reddit: subreddits, search, threads, users. No browser. |
+| [**xurl**](../user-guide/skills/optional/social-media/social-media-xurl.md) | X/Twitter via xurl CLI: raw post search, posting, DM, media. |
 
 ## software-development
 
@@ -259,14 +302,28 @@ hermes skills uninstall <skill-name>
 |-------|-------------|
 | [**ast-grep**](../user-guide/skills/optional/software-development/software-development-ast-grep.md) | AST-aware structural code search and rewrite via ast-grep. |
 | [**code-wiki**](../user-guide/skills/optional/software-development/software-development-code-wiki.md) | Generate wiki docs + Mermaid diagrams for any codebase. |
+| [**codebase-inspection**](../user-guide/skills/optional/software-development/software-development-codebase-inspection.md) | Inspect codebases w/ pygount: LOC, languages, ratios. |
+| [**dogfood**](../user-guide/skills/optional/software-development/software-development-dogfood.md) | Exploratory QA of web apps: find bugs, evidence, reports. |
+| [**github**](../user-guide/skills/optional/software-development/software-development-github.md) | GitHub via gh CLI: PRs, issues, reviews, repos, auth. |
 | [**grill-me**](../user-guide/skills/optional/software-development/software-development-grill-me.md) | Adversarial plan interview before implementation. |
 | [**hermes-agent-skill-authoring**](../user-guide/skills/optional/software-development/software-development-hermes-agent-skill-authoring.md) | Author in-repo SKILL.md files: frontmatter and structure. |
 | [**inspecting-hermes-desktop-dom**](../user-guide/skills/optional/software-development/software-development-inspecting-hermes-desktop-dom.md) | Read the live Hermes desktop DOM/CSS over CDP. |
 | [**node-inspect-debugger**](../user-guide/skills/optional/software-development/software-development-node-inspect-debugger.md) | Debug Node.js via --inspect + Chrome DevTools Protocol CLI. |
 | [**pr-lens**](../user-guide/skills/optional/software-development/software-development-pr-lens.md) | Draw code changes as animated architecture/data-flow SVGs. |
 | [**python-debugpy**](../user-guide/skills/optional/software-development/software-development-python-debugpy.md) | Debug Python: pdb REPL + debugpy remote (DAP). |
+| [**requesting-code-review**](../user-guide/skills/optional/software-development/software-development-requesting-code-review.md) | Pre-commit review: security scan, quality gates, auto-fix. |
 | [**rest-graphql-debug**](../user-guide/skills/optional/software-development/software-development-rest-graphql-debug.md) | Debug REST/GraphQL APIs: status codes, auth, schemas, repro. |
+| [**simplify-code**](../user-guide/skills/optional/software-development/software-development-simplify-code.md) | Parallel 4-agent cleanup of recent code changes. |
+| [**spike**](../user-guide/skills/optional/software-development/software-development-spike.md) | Throwaway experiments to validate an idea before build. |
 | [**subagent-driven-development**](../user-guide/skills/optional/software-development/software-development-subagent-driven-development.md) | Execute plans via delegate_task subagents (2-stage review). |
+| [**systematic-debugging**](../user-guide/skills/optional/software-development/software-development-systematic-debugging.md) | 4-phase root cause debugging: understand bugs before fixing. |
+| [**test-driven-development**](../user-guide/skills/optional/software-development/software-development-test-driven-development.md) | TDD: enforce RED-GREEN-REFACTOR, tests before code. |
+
+## web
+
+| Skill | Description |
+|-------|-------------|
+| [**blocked-page-recovery**](../user-guide/skills/optional/web/web-blocked-page-recovery.md) | Use when a fetch fails: 403/429, paywall, WAF, bot wall. |
 
 ## web-development
 

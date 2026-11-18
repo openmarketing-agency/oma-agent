@@ -21,7 +21,7 @@ Explain an idea as an interactive isometric machine figure.
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `isometric`, `svg`, `webgl`, `3d`, `diagram`, `explainer`, `illustration`, `docs`, `html`, `react` |
-| Related skills | [`concept-diagrams`](../../optional/creative/creative-concept-diagrams.md), [`system-atlas`](../../optional/creative/creative-system-atlas.md), [`architecture-diagram`](../../bundled/creative/creative-architecture-diagram.md) |
+| Related skills | [`concept-diagrams`](../../optional/creative/creative-concept-diagrams.md), [`system-atlas`](../../optional/creative/creative-system-atlas.md), [`architecture-diagram`](../../optional/creative/creative-architecture-diagram.md) |
 
 ## Reference: full SKILL.md
 

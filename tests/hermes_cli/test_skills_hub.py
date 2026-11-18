@@ -680,8 +680,8 @@ def _stub_search(monkeypatch, results):
 
 
 @pytest.mark.parametrize("identifier", [
-    "computer-use", "NousResearch/hermes-agent/skills/productivity/pdf",
-    "skills-sh/nousresearch/hermes-agent/google-workspace", "blender-bpy-enhanced"])
+    "computer-use", "NousResearch/hermes-agent/skills/autonomous-ai-agents/computer-use",
+    "skills-sh/nousresearch/hermes-agent/computer-use", "blender-bpy-enhanced"])
 def test_install_by_name_resolves_to_the_skill_it_names(monkeypatch, tmp_path, identifier):
     """`hermes skills install <bundled skill>` failed every time: the name resolved to a stranger's
     same-named hub skill or an ambiguity table, and this repo's own copy was rescanned as community
@@ -746,7 +746,25 @@ def test_install_by_name_resolves_to_the_skill_it_names(monkeypatch, tmp_path, i
     assert (stranger / "SKILL.md").read_text().endswith("stranger\n")
 
 
-def test_built_in_restore_survives_leftovers_and_records_every_outcome_as_bundled(monkeypatch, tmp_path):
+@pytest.fixture
+def restore_bundled_source(monkeypatch, tmp_path):
+    """Test restore independently from the distribution's chosen skill inventory."""
+    from tools import skills_sync
+
+    bundled = tmp_path / "bundled"
+    for category, name in (("note-taking", "obsidian"), ("research", "arxiv")):
+        package = bundled / category / name
+        package.mkdir(parents=True)
+        (package / "SKILL.md").write_text(f"---\nname: {name}\ndescription: Test skill.\n---\n")
+    scripts = bundled / "research" / "arxiv" / "scripts"
+    scripts.mkdir()
+    (scripts / "search_arxiv.py").write_text("# bundled helper\n")
+    monkeypatch.setattr(skills_sync, "_get_bundled_dir", lambda: bundled)
+
+
+def test_built_in_restore_survives_leftovers_and_records_every_outcome_as_bundled(
+    monkeypatch, tmp_path, restore_bundled_source,
+):
     """Post-fix telemetry still showed `llm-wiki` (bundled then) failing as source=hub, filesystem_error: the
     restore copied with copytree onto a dest dir left behind without its SKILL.md (EEXIST on every
     retry), refused a skill already present behind a symlinked category the loader follows, and a
@@ -780,7 +798,7 @@ def test_built_in_restore_survives_leftovers_and_records_every_outcome_as_bundle
     assert rows == [("bundled", "success"), ("bundled", "failed")]
 
 
-def test_built_in_restore_into_a_leftover_dir_never_writes_through_links_or_over_user_files(tmp_path):
+def test_built_in_restore_into_a_leftover_dir_never_writes_through_links_or_over_user_files(tmp_path, restore_bundled_source):
     """The leftover-tolerant restore copied with dirs_exist_ok: it followed a symlinked file out of
     skills/ (clobbering the target), overwrote a user-edited file, and called a dir holding another
     skill's SKILL.md the built-in "already available"."""

@@ -1,22 +1,16 @@
-"""Invariant: every skill a cron blueprint loads ships as a bundled skill."""
+"""The weekly review blueprint's procedure is available from the optional catalog."""
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 
+def test_weekly_review_is_installable_from_the_optional_catalog(monkeypatch):
+    from cron.blueprint_catalog import get_blueprint
+    from tools.skills_hub_official import OptionalSkillSource
 
-def _skill_dir_exists(name: str) -> bool:
-    return bool(
-        list(REPO_ROOT.glob(f"skills/*/{name}/SKILL.md"))
-        + list(REPO_ROOT.glob(f"skills/*/*/{name}/SKILL.md"))
-    )
-
-
-def test_every_blueprint_skill_resolves_in_repo():
-    """Invariant: any skill a blueprint loads must exist as a bundled skill."""
-    from cron.blueprint_catalog import CATALOG
-
-    for bp in CATALOG:
-        for skill_name in bp.skills:
-            assert _skill_dir_exists(skill_name), (
-                f"blueprint {bp.key!r} loads nonexistent skill {skill_name!r}"
-            )
+    repo = Path(__file__).resolve().parents[2]
+    monkeypatch.setenv("HERMES_OPTIONAL_SKILLS", str(repo / "optional-skills"))
+    blueprint = get_blueprint("weekly-review")
+    assert blueprint is not None
+    (name,) = blueprint.skills
+    bundle = OptionalSkillSource().fetch(f"official/productivity/{name}")
+    assert bundle is not None and bundle.name == name
+    assert "SKILL.md" in bundle.files

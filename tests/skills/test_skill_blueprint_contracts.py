@@ -23,10 +23,13 @@ def test_task_blueprint_loads_procedure(key, skill):
         assert skill in fill_blueprint(blueprint, {})["prompt"]
 
 
-def test_every_blueprint_skill_is_bundled():
-    bundled = {path.parent.name for path in (REPO / "skills").rglob("SKILL.md")}
+def test_every_blueprint_skill_is_shipped_or_installable():
+    shipped = {
+        path.parent.name for root in ("skills", "optional-skills")
+        for path in (REPO / root).rglob("SKILL.md")
+    }
     for blueprint in CATALOG:
-        assert set(blueprint.skills) <= bundled, blueprint.key
+        assert set(blueprint.skills) <= shipped, blueprint.key
 
 
 @pytest.mark.parametrize("hours", next(

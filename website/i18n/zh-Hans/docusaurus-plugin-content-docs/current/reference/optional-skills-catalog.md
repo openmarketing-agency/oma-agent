@@ -212,6 +212,40 @@ hermes skills uninstall <skill-name>
 
 ---
 
+## 从内置目录迁移的技能
+
+| 技能 | 描述 |
+|---|---|
+| [**apple-notes**](/user-guide/skills/optional/apple/apple-apple-notes) | 通过 memo CLI 管理 Apple Notes：创建、搜索、编辑。 |
+| [**apple-reminders**](/user-guide/skills/optional/apple/apple-apple-reminders) | 通过 remindctl 操作 Apple Reminders：添加、列出、完成。 |
+| [**findmy**](/user-guide/skills/optional/apple/apple-findmy) | 在 macOS 上通过 FindMy.app 追踪 Apple 设备/AirTag。 |
+| [**imessage**](/user-guide/skills/optional/apple/apple-imessage) | 在 macOS 上通过 imsg CLI 发送和接收 iMessage/SMS。 |
+| [**claude-code**](/user-guide/skills/optional/autonomous-ai-agents/autonomous-ai-agents-claude-code) | 将编码任务委托给 Claude Code CLI（功能开发、PR）。 |
+| [**codex**](/user-guide/skills/optional/autonomous-ai-agents/autonomous-ai-agents-codex) | 将编码任务委托给 OpenAI Codex CLI（功能开发、PR）。 |
+| [**architecture-diagram**](/user-guide/skills/optional/creative/creative-architecture-diagram) | 以 HTML 形式生成深色主题的 SVG 架构/云/基础设施图。 |
+| [**ascii-video**](/user-guide/skills/optional/creative/creative-ascii-video) | ASCII 视频：将视频/音频转换为彩色 ASCII MP4/GIF。 |
+| [**baoyu-infographic**](/user-guide/skills/optional/creative/creative-baoyu-infographic) | 信息图（可视化）：21 种布局 × 21 种风格。 |
+| [**claude-design**](/user-guide/skills/optional/creative/creative-claude-design) | 设计一次性 HTML 制品（落地页、幻灯片、原型）。 |
+| [**humanizer**](/user-guide/skills/optional/creative/creative-humanizer) | 人性化文本：去除 AI 腔，加入真实语气。 |
+| [**manim-video**](/user-guide/skills/optional/creative/creative-manim-video) | Manim CE 动画：3Blue1Brown 风格数学/算法视频。 |
+| [**p5js**](/user-guide/skills/optional/creative/creative-p5js) | p5.js 草图：生成艺术、着色器、交互、3D。 |
+| [**popular-web-designs**](/user-guide/skills/optional/creative/creative-popular-web-designs) | 54 种真实设计系统（Stripe、Linear、Vercel）的 HTML/CSS 实现。 |
+| [**songwriting-and-ai-music**](/user-guide/skills/optional/creative/creative-songwriting-and-ai-music) | 歌曲创作技巧与 Suno AI 音乐 prompt（提示词）。 |
+| [**himalaya**](/user-guide/skills/optional/email/email-himalaya) | Himalaya CLI：在终端中收发 IMAP/SMTP 邮件。 |
+| [**youtube-content**](/user-guide/skills/optional/media/media-youtube-content) | 将 YouTube 字幕转换为摘要、推文串、博客文章。 |
+| [**obsidian**](/user-guide/skills/optional/note-taking/note-taking-obsidian) | 在 Obsidian 知识库中读取、搜索、创建和编辑笔记。 |
+| [**google-workspace**](/user-guide/skills/optional/productivity/productivity-google-workspace) | 通过 gws CLI 或 Python 操作 Gmail、Calendar、Drive、Docs、Sheets。 |
+| [**maps**](/user-guide/skills/optional/productivity/productivity-maps) | 通过 OpenStreetMap/OSRM 进行地理编码、POI 查询、路线规划、时区查询。 |
+| [**teams-meeting-pipeline**](/user-guide/skills/optional/productivity/productivity-teams-meeting-pipeline) | 通过 Hermes CLI 操作 Teams 会议摘要流水线——汇总会议、检查流水线状态、重放任务、管理 Microsoft Graph 订阅。 |
+| [**arxiv**](/user-guide/skills/optional/research/research-arxiv) | 按关键词、作者、分类或 ID 搜索 arXiv 论文。 |
+| [**xurl**](/user-guide/skills/optional/social-media/social-media-xurl) | 通过 xurl CLI 操作 X/Twitter：发帖、搜索、私信、媒体、v2 API。 |
+| [**codebase-inspection**](/user-guide/skills/optional/software-development/software-development-codebase-inspection) | 使用 pygount 检查代码库：代码行数、语言、占比。 |
+| [**dogfood**](/user-guide/skills/optional/software-development/software-development-dogfood) | Web 应用探索性 QA：发现 bug、收集证据、生成报告。 |
+| [**requesting-code-review**](/user-guide/skills/optional/software-development/software-development-requesting-code-review) | 提交前审查：安全扫描、质量门控、自动修复。 |
+| [**spike**](/user-guide/skills/optional/software-development/software-development-spike) | 一次性实验，在正式构建前验证想法。 |
+| [**systematic-debugging**](/user-guide/skills/optional/software-development/software-development-systematic-debugging) | 四阶段根因调试：先理解 bug，再修复。 |
+| [**test-driven-development**](/user-guide/skills/optional/software-development/software-development-test-driven-development) | TDD：强制执行红-绿-重构流程，先写测试再写代码。 |
+
 ## 贡献可选技能
 
 向仓库添加新的可选技能：

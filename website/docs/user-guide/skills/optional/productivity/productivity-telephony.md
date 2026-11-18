@@ -21,7 +21,7 @@ Provision Twilio numbers, SMS/MMS, and AI outbound calls.
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `telephony`, `phone`, `sms`, `mms`, `voice`, `twilio`, `bland.ai`, `vapi`, `calling`, `texting` |
-| Related skills | [`maps`](../../bundled/productivity/productivity-maps.md), [`google-workspace`](../../bundled/productivity/productivity-google-workspace.md), [`agentmail`](../../optional/email/email-agentmail.md) |
+| Related skills | [`maps`](../../optional/productivity/productivity-maps.md), [`google-workspace`](../../optional/productivity/productivity-google-workspace.md), [`agentmail`](../../optional/email/email-agentmail.md) |
 
 ## Reference: full SKILL.md
 

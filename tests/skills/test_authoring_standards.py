@@ -71,11 +71,12 @@ def _all_names():
         ALL_SKILL_NAMES = names
     return ALL_SKILL_NAMES
 
-def test_at_least_the_expected_population():
-    # sanity: the globs actually find the trees (not a count snapshot)
-    paths = _skill_paths()
-    assert any("optional-skills" in str(p) for p in paths)
-    assert any(str(p.parent).startswith(str(REPO / "skills")) for p in paths)
+def test_oma_bundled_skills_exclude_the_optional_catalog():
+    bundled = {p.parent.name for p in (REPO / "skills").rglob("SKILL.md")}
+    optional = {p.parent.name for p in (REPO / "optional-skills").rglob("SKILL.md")}
+    assert bundled == {"computer-use", "hermes-agent", "oma-playbooks"}
+    assert {"pdf", "weekly-review-planning"} <= optional
+    assert not bundled & optional
 
 @pytest.mark.parametrize("p", _params())
 def test_required_frontmatter_fields(p):
