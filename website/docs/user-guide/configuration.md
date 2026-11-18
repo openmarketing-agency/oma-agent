@@ -43,6 +43,11 @@ New public installs record the source tag, commit, and R2 base URL alongside the
 description, provisioning state, and agent versions in
 `$HERMES_HOME/playbooks/<id>/installation.yaml`.
 
+OMA Agent `v0.1.2` introduces direct R2 downloads for playbooks and skills.
+The OMA Agent tag versions the runtime; the tag in `latest.yaml` versions the
+playbook and skill bundle. The bundle can be published and fetched independently
+of a runtime release. Fetching a newer bundle does not update installed profiles.
+
 OMA starter configs skip interactive approval prompts, auto-approve flagged
 commands in cron, single-query, and unattended sessions, and skip the MCP reload
 and destructive slash-command confirmations. Any admitted member can answer
