@@ -219,7 +219,7 @@ def refusal_from(data: dict) -> Optional[Exception]:
         return None
     return kind(message_from(data) or "the gateway refused the create; nothing was created")
 
-def provision_profile(request: ProfileCreateRequest) -> ProvisionResult:
+def provision_profile(request: ProfileCreateRequest, *, initialize: Optional[Callable[[Path], None]] = None) -> ProvisionResult:
     """Create the profile, then apply every requested step in order.
 
     Raises what ``create_profile`` raises (``ValueError`` / ``FileExistsError`` /
@@ -233,6 +233,7 @@ def provision_profile(request: ProfileCreateRequest) -> ProvisionResult:
             clone_config=request.clone_config, no_skills=request.no_skills,
             description=request.description, clone_channels=request.clone_channels,
             sync_imports=request.sync_imports, soul=request.soul, seed_model=request.mirror_credentials,
+            initialize=initialize,
         )
     result = ProvisionResult(path=path)
 
@@ -244,7 +245,7 @@ def provision_profile(request: ProfileCreateRequest) -> ProvisionResult:
             result.warnings.append(f"{label}: {exc}")
             return default
 
-    if request.fresh:
+    if request.fresh and initialize is None:  # a staged initializer owns skill/plugin provisioning
         problems: list[str] = []
         result.skills_seeded = step("bundled skills", lambda: profiles.seed_profile_skills(
             path, quiet=request.quiet, problems=problems))

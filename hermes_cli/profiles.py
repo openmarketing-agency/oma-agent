@@ -14,7 +14,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from agent.file_safety import HOME_CREDENTIAL_DIRS
 from hermes_cli.archive_safe import archive_root_dirs, make_targz, normalize_archive_parts, safe_extract_targz
@@ -1341,6 +1341,7 @@ def create_profile(
     name: str, clone_from: Optional[str] = None, clone_all: bool = False, clone_config: bool = False,
     no_alias: bool = False, no_skills: bool = False, description: Optional[str] = None,
     clone_channels: bool = False, sync_imports: bool = False, soul: Optional[str] = None, seed_model: bool = True,
+    initialize: Callable[[Path], None] | None = None,
 ) -> Path:
     """Create a new profile directory and return its path.
 
@@ -1352,8 +1353,8 @@ def create_profile(
     was left behind with ``channel_platforms_configured(source_dir)``).
     ``no_skills`` creates an empty profile and writes a marker so ``hermes update`` skips
     re-seeding its skills; it is mutually exclusive with the clone options, which copy skills.
-    ``sync_imports`` (``--clone`` only; ``--clone-all`` copies the file anyway) also copies the
-    ``import-agent`` sync manifest so the clone can keep pulling the same external agent trees.
+    ``sync_imports`` also copies the ``import-agent`` sync manifest for clones.
+    ``initialize`` adds provisioned files to the staging tree before it becomes visible.
     ``seed_model=False``: a fresh profile gets no launch model block (it may hold an inline api_key)."""
     if no_skills and (clone_from is not None or clone_config or clone_all):
         raise ValueError(
@@ -1393,10 +1394,7 @@ def create_profile(
         if refusal:
             raise ValueError(refusal)
     clear_named_profile_deleted(profile_dir)
-    # Build in a hidden sibling and publish with one rename: a running multiplexer rescans profiles/
-    # on every create and every 30 s, and ``_iter_named_profile_dirs`` only lists valid ids (no leading
-    # dot), so it can never adopt the half-copied tree and start adapters on credentials the strip
-    # below has not removed yet.
+    # Stage out of sight of the multiplexer until clone stripping and initialization finish.
     from hermes_cli.profiles_initialization import clone_staging_dir, discard_unpublished_vault_key, finish_profile_layout
     staging = clone_staging_dir(profile_dir)
     clone_key = None  # the keychain entry made for this clone's vault, if any
@@ -1411,6 +1409,8 @@ def create_profile(
             if stripped:
                 logger.info("profile %s: cloned without messaging channels %s", canon, stripped)
         finish_profile_layout(staging, no_skills=no_skills, clone_all=clone_all, description=description, soul=soul)
+        if initialize is not None:
+            initialize(staging)
         os.rename(staging, profile_dir)
     except BaseException:
         discard_unpublished_vault_key(clone_key)

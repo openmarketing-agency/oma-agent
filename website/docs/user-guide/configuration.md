@@ -24,13 +24,20 @@ A fresh OMA install or a profile created without cloning starts with a minimal
 the upfront tool listing is off. The tool-search bridge itself stays visible.
 
 No skills are auto-loaded by default. The file lists bundled skill names under
-`skills.disabled`. Bundled skills
+`skills.disabled`. The [OMA playbook manager](./skills/bundled/autonomous-ai-agents/autonomous-ai-agents-oma-playbooks.md)
+is enabled for on-demand use by the default OMA Agent and disabled in new named
+profiles. Bundled skills
 remain installed unless you opt out of seeding; remove a name from the list to
 enable it. The essential `hermes-agent` skill remains available regardless of this
 list. The starter file also carries the generated schema version, but does not copy
 boilerplate from `cli-config.yaml.example`. Model/provider settings can be written
 by setup or inherited by a new profile that shares launch credentials. Existing
 configs and cloned tool/skill selections are not replaced by these defaults.
+
+The playbook's source `config.yaml` stays in the source checkout. New installs
+write `$HERMES_HOME/playbooks/<id>/installation.yaml` with the playbook
+description, provisioning state, and installed agent versions. They do not copy
+the source manifest into the installation directory.
 
 OMA starter configs skip interactive approval prompts, auto-approve flagged
 commands in cron, single-query, and unattended sessions, and skip the MCP reload

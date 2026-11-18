@@ -9,8 +9,9 @@ wiring and stays a link.
 
 import pytest
 
-from hermes_cli.config import DEFAULT_SOUL_MD, _ensure_default_soul_md
+from hermes_cli.config import _ensure_default_soul_md
 from hermes_cli.config_home import initialize_home
+from hermes_cli.default_soul import DEFAULT_ROOT_SOUL_MD
 
 _SUBDIRS = ("cron", "sessions", "logs", "memories")
 
@@ -25,7 +26,7 @@ def test_initialize_home_replaces_unwritable_soul_symlink(tmp_path, target):
     initialize_home(home, _SUBDIRS, set())
 
     assert not soul.is_symlink()
-    assert soul.read_text(encoding="utf-8") == DEFAULT_SOUL_MD
+    assert soul.read_text(encoding="utf-8") == DEFAULT_ROOT_SOUL_MD
     assert not [p for p in home.iterdir() if p.name.startswith(".SOUL.md.")]
 
 

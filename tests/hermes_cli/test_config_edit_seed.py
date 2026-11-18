@@ -117,6 +117,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     from agent.skill_commands import build_auto_load_prompt
     from hermes_cli.config_defaults import DEFAULT_CONFIG
     from hermes_cli.config_effective import load_user_config_effective
+    from hermes_cli.config_home import OMA_PLAYBOOK_SKILL
     from hermes_cli.profiles import create_profile
     from hermes_cli.tools_config import _get_platform_tools
     from tools import approval_context
@@ -130,6 +131,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     bundled = Path(__file__).resolve().parents[2] / "skills"
     monkeypatch.setenv("HERMES_BUNDLED_SKILLS", str(bundled))
     names = sorted({read_skill_name(path, path.parent.name) for path in bundled.rglob("SKILL.md")})
+    assert OMA_PLAYBOOK_SKILL in names
     expected_skills = {"disabled": names}
 
     if entry == "install":
@@ -140,6 +142,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
             env={**os.environ, "HOME": str(tmp_path)}, check=True, timeout=20,
         )
         home = root
+        expected_skills = {"disabled": [name for name in names if name != OMA_PLAYBOOK_SKILL]}
     else:
         home = create_profile("fresh", no_alias=True, seed_model=False)
     path = home / "config.yaml"
