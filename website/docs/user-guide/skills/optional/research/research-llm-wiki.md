@@ -21,7 +21,7 @@ Karpathy's LLM Wiki: build/query interlinked markdown KB.
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `wiki`, `knowledge-base`, `research`, `notes`, `markdown`, `rag-alternative` |
-| Related skills | [`obsidian`](../../bundled/note-taking/note-taking-obsidian.md), [`arxiv`](../../bundled/research/research-arxiv.md) |
+| Related skills | [`obsidian`](../../optional/note-taking/note-taking-obsidian.md), [`arxiv`](../../optional/research/research-arxiv.md) |
 
 ## Reference: full SKILL.md
 

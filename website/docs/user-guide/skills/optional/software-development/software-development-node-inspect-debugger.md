@@ -21,7 +21,7 @@ Debug Node.js via --inspect + Chrome DevTools Protocol CLI.
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `debugging`, `nodejs`, `node-inspect`, `cdp`, `breakpoints`, `ui-tui` |
-| Related skills | [`systematic-debugging`](../../bundled/software-development/software-development-systematic-debugging.md), [`python-debugpy`](../../optional/software-development/software-development-python-debugpy.md) |
+| Related skills | [`systematic-debugging`](../../optional/software-development/software-development-systematic-debugging.md), [`python-debugpy`](../../optional/software-development/software-development-python-debugpy.md) |
 
 ## Reference: full SKILL.md
 

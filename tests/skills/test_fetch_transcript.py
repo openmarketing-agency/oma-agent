@@ -1,9 +1,9 @@
-"""Tests for skills/media/youtube-content/scripts/fetch_transcript.py (issue #22243)."""
+"""Tests for optional-skills/media/youtube-content/scripts/fetch_transcript.py (issue #22243)."""
 
 import sys
 from pathlib import Path
 
-SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "skills" / "media" / "youtube-content" / "scripts"
+SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "optional-skills" / "media" / "youtube-content" / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 import fetch_transcript

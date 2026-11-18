@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-SKILL_DIR = Path(__file__).resolve().parents[2] / "skills" / "research" / "grounded-citations"
+SKILL_DIR = Path(__file__).resolve().parents[2] / "optional-skills" / "research" / "grounded-citations"
 SCRIPT = SKILL_DIR / "scripts" / "sources.py"
 
 

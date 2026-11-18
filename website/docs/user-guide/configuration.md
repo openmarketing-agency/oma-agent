@@ -23,21 +23,22 @@ A fresh OMA install or a profile created without cloning starts with a minimal
 `agent.enabled_toolsets`. Tool search is on, all selected tools are deferred, and
 the upfront tool listing is off. The tool-search bridge itself stays visible.
 
-No skills are auto-loaded by default. The file lists bundled skill names under
-`skills.disabled`. The [OMA playbook manager](./skills/bundled/autonomous-ai-agents/autonomous-ai-agents-oma-playbooks.md)
-is enabled for on-demand use by the default OMA Agent and disabled in new named
-profiles. Bundled skills
-remain installed unless you opt out of seeding; remove a name from the list to
-enable it. The essential `hermes-agent` skill remains available regardless of this
-list. The starter file also carries the generated schema version, but does not copy
-boilerplate from `cli-config.yaml.example`. Model/provider settings can be written
+No skills are auto-loaded by default. Both the default profile and fresh named
+profiles start with `skills.disabled: []`, so bundled skills are available on
+demand on supported platforms. Bundled skills remain installed unless you opt
+out of seeding. The starter file includes the generated schema version but not
+the boilerplate from `cli-config.yaml.example`. Model/provider settings can be written
 by setup or inherited by a new profile that shares launch credentials. Existing
 configs and cloned tool/skill selections are not replaced by these defaults.
 
-The playbook's source `config.yaml` stays in the source checkout. New installs
-write `$HERMES_HOME/playbooks/<id>/installation.yaml` with the playbook
-description, provisioning state, and installed agent versions. They do not copy
-the source manifest into the installation directory.
+The playbook manager uses the latest stable release from the public
+[`openmarketing-agency/openmarketing.agency`](https://github.com/openmarketing-agency/openmarketing.agency)
+repository, or its highest stable `v*` tag if no release is published or the
+release lookup is rate-limited. `check` inspects the current tag and cache status;
+`fetch` caches just `playbooks/` and `skills/` under
+`$HERMES_HOME/cache/openmarketing.agency/<commit>/` without creating profiles.
+New installs record the source tag and commit, description, provisioning state,
+and agent versions in `$HERMES_HOME/playbooks/<id>/installation.yaml`.
 
 OMA starter configs skip interactive approval prompts, auto-approve flagged
 commands in cron, single-query, and unattended sessions, and skip the MCP reload

@@ -21,7 +21,7 @@ Read the live Hermes desktop DOM/CSS over CDP.
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `desktop`, `electron`, `cdp`, `dom`, `ui-verification`, `self-inspection` |
-| Related skills | [`node-inspect-debugger`](../../optional/software-development/software-development-node-inspect-debugger.md), [`systematic-debugging`](../../bundled/software-development/software-development-systematic-debugging.md), [`dogfood`](../../bundled/software-development/software-development-dogfood.md) |
+| Related skills | [`node-inspect-debugger`](../../optional/software-development/software-development-node-inspect-debugger.md), [`systematic-debugging`](../../optional/software-development/software-development-systematic-debugging.md), [`dogfood`](../../optional/software-development/software-development-dogfood.md) |
 
 ## Reference: full SKILL.md
 

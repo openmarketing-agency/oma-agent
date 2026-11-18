@@ -1,6 +1,12 @@
 """Exercise OMA playbook provisioning with native profile operations in an isolated home."""
 
+import io
 import json
+import subprocess
+import tarfile
+import urllib.error
+import urllib.request
+from email.message import Message
 from pathlib import Path
 
 import pytest
@@ -33,6 +39,109 @@ def checkout(tmp_path, monkeypatch):
                                        encoding="utf-8")
         (skill / "support.txt").write_text("Support file.", encoding="utf-8")
     return home, repo
+
+
+@pytest.mark.parametrize("latest_status", [200, 404, 403])
+def test_public_catalog_plan_and_install_use_one_tagged_snapshot(checkout, monkeypatch, capsys, latest_status):
+    from hermes_cli.oma_playbooks.__main__ import main
+    from hermes_cli.oma_playbooks.source import read_mapping
+
+    home, repo = checkout
+    commit = "a" * 40
+    newer_commit = "d" * 40
+    tag = "v1.2.0" if latest_status == 200 else "v1.10.0"
+    release_url = "https://api.github.com/repos/openmarketing-agency/openmarketing.agency/releases/latest"
+    archive_url = f"https://codeload.github.com/openmarketing-agency/openmarketing.agency/tar.gz/{commit}"
+    newer_url = archive_url.rsplit("/", 1)[0] + "/" + newer_commit
+    latest_changed = False
+    broken_archive = False
+    (repo / "README.md").write_text("Not a source tree.", encoding="utf-8")
+
+    def snapshot(sha):
+        with io.BytesIO() as data:
+            with tarfile.open(fileobj=data, mode="w:gz") as archive:
+                root = f"openmarketing.agency-{sha}"
+                archive.add(repo, arcname=root)
+                if broken_archive:
+                    archive.addfile(tarfile.TarInfo(f"{root}/skills/../../escaped"))
+            return data.getvalue()
+
+    requests = []
+
+    def fetch(request, *, timeout):
+        url = request.full_url
+        requests.append(url)
+        assert not request.has_header("Authorization")
+        if url == release_url:
+            if latest_changed:
+                return io.BytesIO(b'{"tag_name":"v1.11.0","draft":false,"prerelease":false}')
+            if latest_status != 200:
+                headers = Message()
+                headers["X-RateLimit-Remaining"] = "0"
+                raise urllib.error.HTTPError(url, latest_status, "test", headers, None)
+            return io.BytesIO(b'{"tag_name":"v1.2.0","draft":false,"prerelease":false}')
+        assert url in (archive_url, newer_url)
+        return io.BytesIO(snapshot(url.rsplit("/", 1)[1]))
+
+    real_run = subprocess.run
+
+    def run(args, *positional, **kwargs):
+        if "ls-remote" not in args:
+            return real_run(args, *positional, **kwargs)
+        assert "https://github.com/openmarketing-agency/openmarketing.agency.git" in args
+        annotated = "b" * 40
+        older = commit if latest_status == 200 else "c" * 40
+        refs = (f"{older}\trefs/tags/v1.2.0\n{annotated}\trefs/tags/v1.10.0\n"
+                f"{commit}\trefs/tags/v1.10.0^{{}}\n{annotated}\trefs/tags/v2.0.0-rc.1\n")
+        if latest_changed:
+            refs += f"{newer_commit}\trefs/tags/v1.11.0\n"
+        return subprocess.CompletedProcess(args, 0, refs, "")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fetch)
+    monkeypatch.setattr(subprocess, "run", run)
+    assert main(["check"]) == 0
+    assert json.loads(capsys.readouterr().out)["cached"] is False
+    assert requests == [release_url]
+    assert not (home / "cache" / "openmarketing.agency").exists()
+    requests.clear()
+    assert main(["catalog"]) == 0
+    source = {"repository": "openmarketing-agency/openmarketing.agency", "tag": tag, "commit": commit}
+    assert requests == [release_url, archive_url]
+    assert json.loads(capsys.readouterr().out)[0]["source"] == source
+    requests.clear()
+    assert main(["fetch", "--tag", tag]) == 0
+    cached = json.loads(capsys.readouterr().out)
+    assert cached["downloaded"] is False
+    assert {entry.name for entry in Path(cached["cache_path"]).iterdir()} == {"playbooks", "skills"}
+    assert not (home / "profiles").exists()
+    assert main(["plan", "demo", "--tag", tag]) == 0
+    assert json.loads(capsys.readouterr().out)["source"] == source
+    assert main(["install", "demo", "--tag", tag, "--version", "0.2.0"]) == 0
+    assert json.loads(capsys.readouterr().out)["source"] == source
+    assert requests == []
+    assert read_mapping(home / "playbooks" / "demo" / "installation.yaml")["source"] == source
+    skills = home / "profiles" / "demo__orchestrator" / "skills"
+    for name in ("shared", "local"):
+        assert (skills / name / "support.txt").read_text(encoding="utf-8") == "Support file."
+    assert main(["status", "demo"]) == 0
+    assert json.loads(capsys.readouterr().out)["source"] == source
+    assert requests == []
+
+    latest_changed = True
+    assert main(["check"]) == 0
+    checked = json.loads(capsys.readouterr().out)
+    assert checked["source"]["tag"] == "v1.11.0" and checked["cached"] is False
+    broken_archive = True
+    assert main(["fetch"]) == 1
+    assert "Unsafe archive member" in capsys.readouterr().err
+    cache = home / "cache" / "openmarketing.agency"
+    assert {entry.name for entry in cache.iterdir()} == {commit}
+    broken_archive = False
+    assert main(["fetch"]) == 0
+    refreshed = json.loads(capsys.readouterr().out)
+    assert refreshed["downloaded"] is True and refreshed["source"]["commit"] == newer_commit
+    assert Path(refreshed["cache_path"]) == cache / newer_commit
+    assert read_mapping(home / "playbooks" / "demo" / "installation.yaml")["source"] == source
 
 
 def test_install_saves_playbook_metadata_in_the_ledger_only(checkout):
