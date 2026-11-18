@@ -168,7 +168,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="Also build the packaged desktop app.")
     parser.add_argument("--interactive", action="store_true",
                         help="Allow prompts; installers pass no flag and stay unattended.")
-    parser.add_argument("--finish-update", action="store_true",
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--seed-config", action="store_true", help="Seed a missing local config and exit.")
+    mode.add_argument("--finish-update", action="store_true",
                         help="Complete a source UPDATE tail instead of an install: the "
                              "same launchers/products/maintenance with update wording.")
     args = parser.parse_args([argument for argument in argv if argument != _PREPARED])
@@ -183,6 +185,11 @@ def main(argv: list[str] | None = None) -> int:
         from pm.environments import activate_dependencies
 
         activate_dependencies(root)
+        if args.seed_config:
+            from hermes_cli.config_home import seed_install_config
+
+            seed_install_config()
+            return 0
         if args.finish_update:
             # A source update that never reached its own completion -- a
             # pre-handoff release cannot flip during `hermes update`, so its
@@ -209,7 +216,8 @@ def main(argv: list[str] | None = None) -> int:
     # every flag that decides WHICH tail runs has to survive into it. Losing
     # --finish-update here silently reports an update as an install.
     passthrough = (["--desktop"] if args.desktop else []) + \
-                  (["--finish-update"] if args.finish_update else [])
+                  (["--finish-update"] if args.finish_update else []) + \
+                  (["--seed-config"] if args.seed_config else [])
     command = _bootstrap_command(root, passthrough)
     from hermes_cli.update_lock import checkout_lock_fds
 

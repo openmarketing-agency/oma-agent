@@ -273,8 +273,8 @@ def provision_profile(request: ProfileCreateRequest) -> ProvisionResult:
         result.mcp_written = step("MCP servers", lambda: write_profile_mcp_servers(path, list(request.mcp_servers)),
                                   default=0)
     if request.keep_skills:
-        result.skills_disabled = step("skill selection", lambda: disable_unselected_skills(path, request.keep_skills),
-                                      default=0)
+        result.skills_disabled = step("skill selection", lambda: disable_unselected_skills(
+            path, request.keep_skills, enable_kept=request.fresh), default=0)
     if result.mirrored["auth"] is not True:
         # From the outcome, not the flags: a profile with no auth.json of its own reads the root's
         # (``--clone-all`` brings its own copy; ``mirror_credentials=False`` still reads the root's).
@@ -302,7 +302,7 @@ def _pin_model(path: Path, request: ProfileCreateRequest, result: ProvisionResul
     return True
 
 
-def disable_unselected_skills(profile_dir: Path, keep: tuple[str, ...]) -> int:
+def disable_unselected_skills(profile_dir: Path, keep: tuple[str, ...], *, enable_kept: bool = False) -> int:
     """Disable every installed skill in ``profile_dir`` not in ``keep``; returns how many were newly disabled."""
     from hermes_cli.config import load_config
     from hermes_cli.config_backend import CONFIG_MUTATION_LOCK
@@ -314,14 +314,13 @@ def disable_unselected_skills(profile_dir: Path, keep: tuple[str, ...]) -> int:
         installed = [md.parent.name for md in skills_root.rglob("SKILL.md")] if skills_root.is_dir() else []
         cfg = load_config()
         disabled = get_disabled_skills(cfg)
-        newly = 0
-        for name in installed:
-            if name not in keep_set and name not in disabled:
-                disabled.add(name)
-                newly += 1
-        if newly:
-            save_disabled_skills(cfg, disabled)
-    return newly
+        newly_disabled = set(installed) - keep_set - disabled
+        selection = disabled | newly_disabled
+        if enable_kept:  # Explicit selection overrides the fresh profile's starter denylist.
+            selection -= keep_set.intersection(installed)
+        if selection != disabled:
+            save_disabled_skills(cfg, selection)
+    return len(newly_disabled)
 
 
 def write_profile_model(profile_dir: Path, provider: str, model: str, validate_in: Optional[Path] = None,

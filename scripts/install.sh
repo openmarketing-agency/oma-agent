@@ -1156,8 +1156,12 @@ stage_config() {
         cp "$INSTALL_DIR/.env.example" "$HERMES_HOME/.env" 2>/dev/null || touch "$HERMES_HOME/.env"
     fi
     chmod 600 "$HERMES_HOME/.env"
-    if [ ! -f "$HERMES_HOME/config.yaml" ] && [ -f "$INSTALL_DIR/cli-config.yaml.example" ]; then
-        cp "$INSTALL_DIR/cli-config.yaml.example" "$HERMES_HOME/config.yaml"
+    if [ ! -f "$HERMES_HOME/config.yaml" ]; then
+        local boot_py
+        bootstrap_python
+        (cd "$INSTALL_DIR" && run_logged "Preparing starter settings" \
+            "$boot_py" -I -B -X utf8 hermes_cli/source_completion.py --source "$INSTALL_DIR" --seed-config) \
+            || fail "config preparation failed" config_failed
     fi
     log_success "config prepared in $HERMES_HOME"
 }
