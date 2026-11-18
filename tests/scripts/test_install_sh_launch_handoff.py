@@ -90,6 +90,31 @@ def test_products_and_desktop_stages_share_the_completion_tail(tmp_path: Path, s
 
 
 @pytest.mark.platforms("posix")
+def test_config_stage_delegates_only_when_config_is_missing(tmp_path):
+    install = tmp_path / "source tree"
+    calls = tmp_path / "calls.json"
+    home = tmp_path / "home"
+    (install / "hermes_cli").mkdir(parents=True)
+    (install / "hermes_cli" / "source_completion.py").write_text(
+        "import json, os, sys\nfrom pathlib import Path\n"
+        "Path(os.environ['CALLS']).write_text(json.dumps(sys.argv[1:]))\n", encoding="utf-8")
+    command = ["bash", "-c", 'source "$1" --manifest >/dev/null; INSTALL_DIR="$2"; '
+               'bootstrap_python() { boot_py="$PYTHON_FOR_TEST"; }; stage_config',
+               "test", str(ROOT / "scripts/install.sh"), str(install)]
+    env = {**os.environ, "HOME": str(tmp_path), "HERMES_HOME": str(home),
+           "HERMES_RUNTIME_DIR": str(tmp_path / "store"), "CALLS": str(calls), "PYTHON_FOR_TEST": sys.executable}
+    subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=20, check=True)
+    assert json.loads(calls.read_text()) == ["--source", str(install), "--seed-config"]
+
+    config = home / "config.yaml"
+    config.write_text("# Existing settings\nmodel: custom\n", encoding="utf-8")
+    calls.unlink()
+    subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=20, check=True)
+    assert not calls.exists()
+    assert config.read_text() == "# Existing settings\nmodel: custom\n"
+
+
+@pytest.mark.platforms("posix")
 def test_desktop_flag_does_not_add_a_stage(tmp_path):
     """--include-desktop selects the desktop product inside `products`; the manifest is one ladder."""
     def manifest(*flags):

@@ -47,22 +47,21 @@ class TestEnsureHermesHome:
     def test_creates_default_soul_md_if_missing(self, tmp_path):
         with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
             ensure_hermes_home()
-            soul_path = tmp_path / "SOUL.md"
-            assert soul_path.exists()
-            assert soul_path.read_text(encoding="utf-8").strip() != ""
+            expected = Path(__file__).resolve().parents[2] / "docker" / "SOUL.md"
+            assert (tmp_path / "SOUL.md").read_text(encoding="utf-8").strip() == expected.read_text(encoding="utf-8").strip()
 
 
     def test_upgrades_legacy_template_soul_md(self, tmp_path):
         # Older installers seeded a comment-only scaffold that shadowed the
         # runtime default. A SOUL.md still matching that scaffold carries no
         # user persona and should be upgraded in place to DEFAULT_SOUL_MD.
-        from hermes_cli.default_soul import DEFAULT_SOUL_MD, _LEGACY_TEMPLATE_SOULS
+        from hermes_cli.default_soul import DEFAULT_ROOT_SOUL_MD, _LEGACY_TEMPLATE_SOULS
 
         with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
             soul_path = tmp_path / "SOUL.md"
             soul_path.write_text(_LEGACY_TEMPLATE_SOULS[0] + "\n", encoding="utf-8")
             ensure_hermes_home()
-            assert soul_path.read_text(encoding="utf-8") == DEFAULT_SOUL_MD
+            assert soul_path.read_text(encoding="utf-8") == DEFAULT_ROOT_SOUL_MD
 
     # The pre-#95681 DEFAULT_SOUL_MD text, hardcoded (not read from the
     # module) so this fixture keeps testing the OLD text regardless of any
@@ -84,15 +83,15 @@ class TestEnsureHermesHome:
         # and its #95681 rewrite got the old text auto-written on first run —
         # not user-authored, so it's just as safe to upgrade in place as the
         # comment-only scaffolds above. Regression test for that upgrade path.
-        from hermes_cli.default_soul import DEFAULT_SOUL_MD
+        from hermes_cli.default_soul import DEFAULT_ROOT_SOUL_MD
 
-        assert self._PRE_REWRITE_DEFAULT_SOUL != DEFAULT_SOUL_MD  # sanity: fixture predates the rewrite
+        assert self._PRE_REWRITE_DEFAULT_SOUL != DEFAULT_ROOT_SOUL_MD  # sanity: fixture predates the rewrite
 
         with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
             soul_path = tmp_path / "SOUL.md"
             soul_path.write_text(self._PRE_REWRITE_DEFAULT_SOUL, encoding="utf-8")
             ensure_hermes_home()
-            assert soul_path.read_text(encoding="utf-8") == DEFAULT_SOUL_MD
+            assert soul_path.read_text(encoding="utf-8") == DEFAULT_ROOT_SOUL_MD
 
     def test_does_not_upgrade_user_customized_soul_md(self, tmp_path):
         # A SOUL.md that merely starts with the old default but was edited by

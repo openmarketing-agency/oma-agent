@@ -32,7 +32,7 @@ import hermes_yaml as yaml
 from hermes_cli.cli_output import line_input
 from hermes_cli.colors import Colors, color
 from hermes_cli import managed_scope
-from hermes_cli.default_soul import DEFAULT_SOUL_MD, is_legacy_template_soul
+from hermes_cli.default_soul import is_legacy_template_soul, starter_soul
 from hermes_cli.left_core_migration import profile_env_names as _left_core_profile_env
 from hermes_cli.secret_prompt import masked_secret_prompt
 # Managed-mode, container and HERMES_UID/GID policy live in hermes_constants (import-safe);
@@ -510,25 +510,8 @@ def _secure_file(path):
         pass
 
 
-def seed_config_file(config_path: Path, template: Optional[Path] = None) -> bool:
-    """Create a missing config.yaml the way the installers do: copy cli-config.yaml.example (the display keys
-    there are commented out), else write stripped DEFAULT_CONFIG. Never DEFAULT_CONFIG verbatim -- the gateway
-    merges no defaults, so every written display key becomes a global that beats each platform's own default
-    (#121230). Shared by ``hermes config edit`` and ``hermes doctor --fix`` so the seeders cannot drift.
-    Returns True when the template was copied (the fallback, like save_config, writes get_config_path())."""
-    template = template or get_project_root() / "cli-config.yaml.example"
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    if template.exists():
-        shutil.copy2(template, config_path)
-        _secure_file(config_path)
-        return True
-    save_config(DEFAULT_CONFIG)
-    return False
-
-
 def _ensure_default_soul_md(home: Path) -> None:
-    """Seed DEFAULT_SOUL_MD on first run; upgrade a legacy comment-only scaffold in place.
-    A SOUL.md the user actually customized is never touched."""
+    """Seed the profile persona; preserve customized SOUL.md files."""
     soul_path = home / "SOUL.md"
     if soul_path.exists():
         try:
@@ -537,8 +520,9 @@ def _ensure_default_soul_md(home: Path) -> None:
             return
         if not is_legacy_template_soul(existing):
             return
+    text = starter_soul(home)
     try:
-        soul_path.write_text(DEFAULT_SOUL_MD, encoding="utf-8")
+        soul_path.write_text(text, encoding="utf-8")
     except OSError:
         if not soul_path.is_symlink():
             raise
@@ -551,7 +535,7 @@ def _ensure_default_soul_md(home: Path) -> None:
         fd, tmp_name = tempfile.mkstemp(prefix=".SOUL.md.", suffix=".seed", dir=str(home))
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                handle.write(DEFAULT_SOUL_MD)
+                handle.write(text)
             os.replace(tmp_name, soul_path)
         except OSError:
             with suppress(OSError):
@@ -2760,6 +2744,8 @@ def edit_config():
                       "Use `hermes config set <key> <value>` instead.")
     config_path = get_config_path()
     if not config_path.exists():  # config-reader: ok — file tooling, gated on supports_file_tooling()
+        from hermes_cli.config_home import seed_config_file
+
         seed_config_file(config_path)
         print(f"Created {config_path}")
 

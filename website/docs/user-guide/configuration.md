@@ -16,6 +16,35 @@ All settings are stored in the `~/.hermes/` directory for easy access.
 Run `hermes setup --portal` — one OAuth gets you a model provider and all four Tool Gateway tools without hand-editing YAML. Portal subscribers also get 10% off token-billed providers. See [Nous Portal](../integrations/nous-portal.md).
 :::
 
+## OMA starter configuration
+
+A fresh OMA install or a profile created without cloning starts with a minimal
+`config.yaml`. It enables only `file`, `terminal`, `browser`, and `web` under
+`agent.enabled_toolsets`. Tool search is on, all selected tools are deferred, and
+the upfront tool listing is off. The tool-search bridge itself stays visible.
+
+No skills are auto-loaded by default. The file lists bundled skill names under
+`skills.disabled`. The [OMA playbook manager](./skills/bundled/autonomous-ai-agents/autonomous-ai-agents-oma-playbooks.md)
+is enabled for on-demand use by the default OMA Agent and disabled in new named
+profiles. Bundled skills
+remain installed unless you opt out of seeding; remove a name from the list to
+enable it. The essential `hermes-agent` skill remains available regardless of this
+list. The starter file also carries the generated schema version, but does not copy
+boilerplate from `cli-config.yaml.example`. Model/provider settings can be written
+by setup or inherited by a new profile that shares launch credentials. Existing
+configs and cloned tool/skill selections are not replaced by these defaults.
+
+The playbook's source `config.yaml` stays in the source checkout. New installs
+write `$HERMES_HOME/playbooks/<id>/installation.yaml` with the playbook
+description, provisioning state, and installed agent versions. They do not copy
+the source manifest into the installation directory.
+
+OMA starter configs skip interactive approval prompts, auto-approve flagged
+commands in cron, single-query, and unattended sessions, and skip the MCP reload
+and destructive slash-command confirmations. Any admitted member can answer
+remaining prompts (`approvers: ["*"]`); the timeout is still 300 seconds.
+Explicit deny rules and built-in hard blocks still apply.
+
 ## Directory Structure
 
 ```text
@@ -3259,14 +3288,14 @@ approvals:
 
 | Mode | Behavior |
 |------|----------|
-| `smart` (default) | Use an auxiliary LLM to assess whether a flagged command is actually dangerous. Low-risk commands are auto-approved for that command only. Genuinely risky commands are denied; uncertain decisions escalate to the user. |
+| `smart` (runtime fallback when unset) | Use an auxiliary LLM to assess whether a flagged command is actually dangerous. Low-risk commands are auto-approved for that command only. Genuinely risky commands are denied; uncertain decisions escalate to the user. |
 | `manual` | Prompt the user before executing any flagged command. In the CLI, shows an interactive approval dialog. In messaging, queues a pending approval request. |
-| `off` | Skip all approval checks. Equivalent to `HERMES_YOLO_MODE=true`. **Use with caution.** |
+| `off` | Skip interactive approval prompts. Equivalent to `HERMES_YOLO_MODE=true`. **Use with caution.** |
 
 Smart mode is particularly useful for reducing approval fatigue — it lets the agent work more autonomously on safe operations while still catching genuinely destructive commands.
 
 :::warning
-Setting `approvals.mode: off` disables all safety checks for terminal commands. Only use this in trusted, sandboxed environments.
+Setting `approvals.mode: off` lets flagged commands run without interactive approval. Explicit deny rules and built-in hard blocks still apply. Only use this in trusted, sandboxed environments.
 :::
 
 ### Denial circuit breaker
@@ -3519,4 +3548,4 @@ dashboard:
 - `ssh_isolated_idle_grace_s` (default `900`) — a Desktop-owned `hermes serve --isolated` backend reached over SSH is detached from the SSH session on purpose, so a laptop that sleeps mid-connection cannot tear it down; each dark-wake reconnect used to leave another backend holding `state.db`. The backend now retires itself once no client WebSocket has been connected for this long and no agent turn is running (a turn keeps it alive; an unreadable turn state keeps it alive too). Set high if you rely on a detached backend finishing long work after the laptop sleeps. Such backends also send a slow WebSocket ping (60 s, 10 min timeout) so a half-open tunnel is noticed. Independently of this grace, a backend retires (between turns) once the Desktop's ownership lock on the remote host names a newer spawn of the same connection, so a reconnect storm cannot stack detached backends; this covers POSIX and native Windows SSH hosts.
 - `ws_orphan_reap_grace_s` — how long a WS-detached session waits before the orphan reaper collects it. Raise alongside the keepalive values if clients reconnect slowly. Periodic session maintenance also completes cleanup for closed sockets and re-arms a missing orphan timer, so a detached chat cannot keep its ownership lease solely because its initial cleanup or timer was lost. Reconnecting cancels that timer; active delegated work and healthy running turns remain protected by the normal orphan-reaper checks. (`HERMES_TUI_WS_ORPHAN_REAP_GRACE_S` remains as an internal override.)
 - `ws_orphan_activity_stale_s` (default `600`) — how long a detached **running** turn's activity clock (the same clock the `agent.turn_liveness` watchdog samples: API waits, stream tokens, tool heartbeats) must be idle before the orphan reaper interrupts it. A client-absent turn that is still actively producing keeps running to completion detached — closing the laptop, backgrounding the mobile app, or a desktop update no longer cancels healthy long turns; only a genuinely wedged turn is interrupted. Set `0` to interrupt at the grace window regardless of activity (old behavior).
-- `startup_orphan_sweep` (default `true`) — the WS-orphan reap timer above is in-process, so a gateway restart (update, crash, systemd) before it fires leaves the session row open forever — phantom "active" work in `/resume` and dashboards. On every gateway boot — both the stdio TUI (`entry.main`) and the desktop/dashboard WebSocket sidecar (`handle_ws`) — rows with source `tui` / `desktop` / `subagent` / `unknown` (a row the token-accounting guard had to materialize itself) whose start time **and** newest message are both older than the session TTL (`HERMES_TUI_SESSION_TTL_S`, default 6 hours) are closed with `end_reason: startup_orphan_reap`. Messaging-platform sessions (Telegram, Discord, …) are never touched, live in-memory sessions (a client that already resumed) are excluded, and swept sessions remain resumable.
+- `startup_orphan_sweep` (default `true`) — the WS-orphan reap timer above is in-process, so a gateway restart (update, crash, systemd) before it fires leaves the session row open forever — phantom "active" work in `/resume` and dashboards. On every gateway boot — both the stdio TUI (`entry.main`) and the desktop/dashboard WebSocket sidecar (`handle_ws`) — rows with source `tui` / `desktop` / `subagent` or `unknown` (a row the token-accounting guard had to materialize itself) whose start time **and** newest message are both older than the session TTL (`HERMES_TUI_SESSION_TTL_S`, default 6 hours) are closed with `end_reason: startup_orphan_reap`. Messaging-platform sessions (Telegram, Discord, …) are never touched, live in-memory sessions (a client that already resumed) are excluded, and swept sessions remain resumable.

@@ -75,7 +75,8 @@ hermes profile use default
 hermes profile create <name> [options]
 ```
 
-Creates a new profile.
+Creates a new profile. Without a clone option it uses the
+[OMA starter configuration](../user-guide/configuration.md#oma-starter-configuration).
 
 | Argument / Option | Description |
 |-------------------|-------------|

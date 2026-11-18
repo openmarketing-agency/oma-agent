@@ -109,6 +109,28 @@ def test_only_a_fresh_profile_gets_bundled_skills(launch):
     assert (cloned.skills_seeded, full.skills_seeded) == (None, None)
 
 
+def test_explicit_skill_selection_overrides_the_starter_denylist(launch, monkeypatch):
+    from hermes_yaml import safe_load
+
+    bundled = launch.parent / "bundled"
+    monkeypatch.setenv("HERMES_BUNDLED_SKILLS", str(bundled))
+    for name in ("keep-me", "skip-me"):
+        skill = bundled / name / "SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text(f"---\nname: {name}\ndescription: Test skill.\n---\n")
+
+    def seed(path, quiet=True, problems=None):
+        import shutil
+        shutil.copytree(bundled, path / "skills", dirs_exist_ok=True)
+        return {"copied": ["keep-me", "skip-me"]}
+
+    monkeypatch.setattr(profiles, "seed_profile_skills", seed)
+    result = provision_profile(ProfileCreateRequest(name="work", keep_skills=("keep-me",)))
+    assert not result.warnings
+    config = safe_load((result.path / "config.yaml").read_text())
+    assert config["skills"]["disabled"] == ["skip-me"]
+
+
 def test_a_rejected_model_pick_is_reported_and_the_create_still_succeeds(launch, monkeypatch):
     from hermes_cli.model_switch import ModelSwitchResult
     monkeypatch.setattr("hermes_cli.model_switch.switch_model",

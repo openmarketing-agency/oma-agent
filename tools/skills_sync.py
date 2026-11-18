@@ -77,6 +77,11 @@ def _get_bundled_dir() -> Path:  # HERMES_BUNDLED_SKILLS env first, then repo-re
     return get_bundled_skills_dir(Path(project_root_str()) / "skills")
 
 
+def bundled_skill_names() -> list[str]:
+    """Canonical names of shipped skills, including skills for other platforms."""
+    return sorted({name for name, _ in _discover_bundled_skills(_get_bundled_dir())})
+
+
 def _get_optional_dir() -> Path:
     from hermes_cli._startup_fast import project_root_str
     return get_optional_skills_dir(Path(project_root_str()) / "optional-skills")

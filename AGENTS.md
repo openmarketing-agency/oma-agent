@@ -23,10 +23,6 @@ Two invariants shape almost every design decision and are the lens for reviewing
   every API call, so the bar for a new *core* tool is high. New capability should arrive as a
   CLI command + skill, a service-gated tool, or a plugin — not as core surface.
 
-A change to the stock system prompt or `tools[]` fails `tests/ci/test_prompt_surface.py` until
-`scripts/ci/prompt_surface.py render` is committed with it, and that snapshot
-(`tests/fixtures/prompt_surface/`) needs a hermes-agent-core approval to merge.
-
 ## Contribution rubric
 
 The project's intent layer, for contributors and for the triage sweeper (which may only close on

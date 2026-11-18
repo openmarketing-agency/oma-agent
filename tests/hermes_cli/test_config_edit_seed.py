@@ -2,19 +2,19 @@
 alone (#121230). The gateway loader merges no DEFAULT_CONFIG, so any written global ``display.<key>`` beats every
 platform tier (e.g. Telegram/Slack tool_progress ``off`` -> ``all``, QQBot show_reasoning ``False`` -> ``True``)."""
 import os
-import shutil
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
 from tests.gateway.test_display_config import assert_keeps_platform_display_defaults
 
 
-def _config_edit(tmp_path, monkeypatch, cfg, *, template):
+def _config_edit(tmp_path, monkeypatch, cfg):
     """`hermes config edit` on a home with no config.yaml (seeds via seed_config_file, like `doctor --fix`)."""
     monkeypatch.setenv("EDITOR", "true")
     monkeypatch.setattr(cfg.subprocess, "run", lambda *a, **k: None)
-    if not template:
-        monkeypatch.setattr(cfg, "get_project_root", lambda: tmp_path / "no-checkout")
     cfg.edit_config()
 
 
@@ -47,20 +47,15 @@ def _doctor_fix(tmp_path, monkeypatch, cfg):
     from hermes_cli import doctor
     from hermes_cli.doctor_config import _check_config_file
 
-    root = tmp_path / "checkout"  # only the template, so a stray cli-config.yaml cannot short-circuit the seed
-    root.mkdir()
-    shutil.copy2(cfg.get_project_root() / "cli-config.yaml.example", root / "cli-config.yaml.example")
     home = cfg.get_hermes_home()
     monkeypatch.setattr(doctor, "HERMES_HOME", home)
-    monkeypatch.setattr(doctor, "PROJECT_ROOT", root)
     assert _check_config_file(True).fixed == 1
     if os.name == "posix":
         assert (home / "config.yaml").stat().st_mode & 0o777 == 0o600
 
 
 SEEDERS = {
-    "config-edit-template": lambda *a: _config_edit(*a, template=True),
-    "config-edit-no-template": lambda *a: _config_edit(*a, template=False),
+    "config-edit": _config_edit,
     "setup-agent-enter": _setup_agent_enter,
     "apply-default-agent-settings": _apply_default_agent_settings,
     "blank-slate": _blank_slate,
@@ -100,17 +95,101 @@ def test_config_edit_refusal_without_a_config_file_exits_nonzero(tmp_path, monke
     assert not (tmp_path / "config.yaml").exists()
 
 
-def test_template_seeded_config_keeps_the_update_backup_default(tmp_path, monkeypatch):
+def test_seeded_config_keeps_the_update_backup_default(tmp_path, monkeypatch):
     from argparse import Namespace
 
-    import hermes_cli.config as cfg
     from hermes_cli.config_defaults import DEFAULT_CONFIG
+    from hermes_cli.config_home import seed_config_file
     from hermes_cli.update_cmd_maint import _resolve_pre_update_backup_mode
 
     home = tmp_path / "home"
     monkeypatch.setenv("HERMES_HOME", str(home))
-    assert cfg.seed_config_file(home / "config.yaml")
+    assert seed_config_file(home / "config.yaml")
 
     assert _resolve_pre_update_backup_mode(Namespace(no_backup=False, backup=False)) == \
         DEFAULT_CONFIG["updates"]["pre_update_backup"]
+
+
+@pytest.mark.parametrize("entry", ["install", "profile"])
+def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
+    import hermes_yaml as yaml
+    from agent.skill_utils import ESSENTIAL_SKILLS, get_disabled_skill_names
+    from agent.skill_commands import build_auto_load_prompt
+    from hermes_cli.config_defaults import DEFAULT_CONFIG
+    from hermes_cli.config_effective import load_user_config_effective
+    from hermes_cli.config_home import OMA_PLAYBOOK_SKILL
+    from hermes_cli.profiles import create_profile
+    from hermes_cli.tools_config import _get_platform_tools
+    from tools import approval_context
+    from tools.skill_usage import read_skill_name
+    from tools.tool_search import BRIDGE_TOOL_NAMES, assemble_tool_defs
+
+    root = tmp_path / ".hermes"
+    root.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setenv("HERMES_HOME", str(root))
+    bundled = Path(__file__).resolve().parents[2] / "skills"
+    monkeypatch.setenv("HERMES_BUNDLED_SKILLS", str(bundled))
+    names = sorted({read_skill_name(path, path.parent.name) for path in bundled.rglob("SKILL.md")})
+    assert OMA_PLAYBOOK_SKILL in names
+    expected_skills = {"disabled": names}
+
+    if entry == "install":
+        source = bundled.parent
+        subprocess.run(
+            [sys.executable, "-I", "-B", str(source / "hermes_cli/source_completion.py"),
+             "--source", str(source), "--seed-config", "--prepared"],
+            env={**os.environ, "HOME": str(tmp_path)}, check=True, timeout=20,
+        )
+        home = root
+        expected_skills = {"disabled": [name for name in names if name != OMA_PLAYBOOK_SKILL]}
+    else:
+        home = create_profile("fresh", no_alias=True, seed_model=False)
+    path = home / "config.yaml"
+    content = path.read_text(encoding="utf-8")
+    assert "#" not in content
+    assert yaml.safe_load(content) == {
+        "agent": {"enabled_toolsets": ["file", "terminal", "browser", "web"]},
+        "tools": {"tool_search": {"enabled": "on", "eager_toolsets": [], "listing": "off"}},
+        "skills": expected_skills,
+        "approvals": {
+            "mode": "off",
+            "timeout": 300,
+            "cron_mode": "approve",
+            "single_query_mode": "approve",
+            "unattended_mode": "approve",
+            "approvers": ["*"],
+            "mcp_reload_confirm": False,
+            "destructive_slash_confirm": False,
+        },
+        "_config_version": DEFAULT_CONFIG["_config_version"],
+    }
+
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    config = load_user_config_effective(path)
+    assert build_auto_load_prompt(user_config=config) == ("", [], [])
+    for surface in ("cli", "tui", "telegram"):
+        assert _get_platform_tools(config, surface) == {"file", "terminal", "browser", "web"}
+    assert get_disabled_skill_names() == set(expected_skills["disabled"]) - ESSENTIAL_SKILLS
+    assert approval_context._get_approval_mode() == "off"
+    assert approval_context._get_approval_timeout() == 300
+    assert approval_context._get_cron_approval_mode() == "approve"
+    assert approval_context._get_single_query_approval_mode() == "approve"
+    assert approval_context._get_unattended_approval_mode() == "approve"
+    available = [{"type": "function", "function": {"name": "read_file"}}]
+    result = assemble_tool_defs(available)
+    assert result.activated and result.deferred_count == len(available)
+    assert result.listing_form == "none"
+    assert {tool["function"]["name"] for tool in result.tool_defs} == BRIDGE_TOOL_NAMES
+
+
+def test_installer_leaves_existing_config_bytes_untouched(tmp_path, monkeypatch):
+    from hermes_cli.config_home import seed_install_config
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    path = tmp_path / "config.yaml"
+    existing = b"# local settings\nagent:\n  enabled_toolsets: [kanban]\n"
+    path.write_bytes(existing)
+    seed_install_config()
+    assert path.read_bytes() == existing
 

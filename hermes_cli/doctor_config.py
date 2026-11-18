@@ -358,7 +358,7 @@ def _validate_auxiliary_config(config_path, issues: list) -> None:
 def _check_config_file(should_fix: bool, f: Finding) -> None:
     """config.yaml presence; model/provider validation."""
     from hermes_cli.config_backend import config_exists, get_config_backend
-    from hermes_cli.doctor import HERMES_HOME, PROJECT_ROOT, _DHH
+    from hermes_cli.doctor import HERMES_HOME, _DHH
     config_path = HERMES_HOME / 'config.yaml'
     backend = get_config_backend()
     if not backend.supports_file_tooling() and not _check_config_backend(backend, HERMES_HOME, f):
@@ -371,10 +371,10 @@ def _check_config_file(should_fix: bool, f: Finding) -> None:
         with warn_on_error("Could not validate auxiliary task routing"):
             _validate_auxiliary_config(config_path, f.issues)
     elif should_fix:
-        from hermes_cli.config import seed_config_file
-        from_template = seed_config_file(config_path, PROJECT_ROOT / 'cli-config.yaml.example')
-        check_ok(f"Created {_DHH}/config.yaml from {'cli-config.yaml.example' if from_template else 'defaults'}")
-        f.fixed += 1
+        from hermes_cli.config_home import seed_config_file
+        if seed_config_file(config_path):
+            check_ok(f"Created {_DHH}/config.yaml with starter settings")
+            f.fixed += 1
     else:
         check_warn("config.yaml not found", "(using defaults)")
 

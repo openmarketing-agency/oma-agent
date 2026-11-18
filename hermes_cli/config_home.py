@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from hermes_dir_acl import make_user_dir
 
+OMA_PLAYBOOK_SKILL = "oma-playbooks"
+
 
 class HomeInitializationError(RuntimeError):
     """The home skeleton is unavailable, not an invalid YAML document."""
@@ -78,6 +80,55 @@ def initialize_home(home: Path, subdirs: tuple[str, ...], ensured: set[str]) -> 
     # Plugin discovery rebinds the resolved home. Do not repeat chmod through
     # that spelling after the operator-owned symlink boundary has been lost.
     ensured.update((str(home), str(home.resolve())))
+
+
+def seed_config_file(config_path: Path, *, model_seed: dict | None = None, default_profile: bool = False) -> bool:
+    """Write the OMA starter policy only if the target has no config."""
+    from hermes_cli.config import _secure_file, atomic_config_write
+    from hermes_cli.config_backend import config_exists
+    from hermes_cli.config_defaults import DEFAULT_CONFIG
+    from hermes_cli.config_version_stamp import note_first_stamp
+    from tools.skills_sync import bundled_skill_names
+
+    if config_exists(config_path) or config_path.is_symlink():
+        return False
+
+    skills = {"disabled": [name for name in bundled_skill_names() if not (
+        default_profile and name == OMA_PLAYBOOK_SKILL)]}
+    config = {
+        "agent": {"enabled_toolsets": ["file", "terminal", "browser", "web"]},
+        "tools": {"tool_search": {"enabled": "on", "eager_toolsets": [], "listing": "off"}},
+        "skills": skills,
+        "approvals": {
+            "mode": "off",
+            "timeout": 300,
+            "cron_mode": "approve",
+            "single_query_mode": "approve",
+            "unattended_mode": "approve",
+            "approvers": ["*"],
+            "mcp_reload_confirm": False,
+            "destructive_slash_confirm": False,
+        },
+        "_config_version": DEFAULT_CONFIG["_config_version"],
+        **(model_seed or {}),
+    }
+    note_first_stamp(config_path.parent, {}, config)
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    atomic_config_write(config_path, config)
+    _secure_file(config_path)
+    return True
+
+
+def seed_install_config() -> None:
+    """Seed a fresh file-backed install, without creating a shadow file in remote mode."""
+    from hermes_cli.config import get_config_path
+    from hermes_cli.config_backend import supports_file_tooling
+    from hermes_cli.env_loader import selected_config_backend_name
+    from hermes_constants import get_default_hermes_root
+
+    path = get_config_path()
+    if selected_config_backend_name(path.parent) != "remote" and supports_file_tooling():
+        seed_config_file(path, default_profile=path.parent.resolve() == get_default_hermes_root().resolve())
 
 
 def config_load_issue(exc: Exception):

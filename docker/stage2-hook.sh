@@ -444,7 +444,11 @@ seed_one() {
 # .env receives a generated API_SERVER_KEY below: seed it owner-only so it is
 # never 0644 under the ambient umask even if the later chmod 600 fails.
 (umask 077 && seed_one ".env" ".env.example")
-seed_one "config.yaml" "cli-config.yaml.example"
+if [ ! -f "$HERMES_HOME/config.yaml" ] && ! refuse_symlinked_path "seed" "$HERMES_HOME/config.yaml"; then
+    (cd "$INSTALL_DIR" && umask 077 && as_hermes "$INSTALL_DIR/.venv/bin/python" -c \
+        'from hermes_cli.config_home import seed_install_config; seed_install_config()') \
+        || echo "[stage2] Warning: could not seed starter settings"
+fi
 seed_one "SOUL.md" "docker/SOUL.md"
 
 # --- Ensure a gateway api_server key exists (loopback control plane) ---

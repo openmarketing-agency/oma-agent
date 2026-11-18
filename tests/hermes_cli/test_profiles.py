@@ -156,10 +156,19 @@ class TestCreateProfile:
         assert mode == 0o600
 
 
+    def test_fresh_profile_uses_starter_soul_instead_of_inheriting_it(self, profile_env):
+        from hermes_cli.default_soul import DEFAULT_SOUL_MD
+
+        root_soul = profile_env / ".hermes" / "SOUL.md"
+        root_soul.write_text("My custom persona.", encoding="utf-8")
+        profile_dir = create_profile("coder", no_alias=True)
+        assert (profile_dir / "SOUL.md").read_text(encoding="utf-8") == DEFAULT_SOUL_MD
+        assert root_soul.read_text(encoding="utf-8") == "My custom persona."
+
     def test_fresh_profile_inherits_a_usable_model(self, profile_env):
         """A profile created without a clone source still resolves a provider.
 
-        Without this it gets no config.yaml at all, so its very first turn dies
+        Without this its starter config has no model, so its very first turn dies
         with "No LLM provider configured" — created, but unable to run. Fresh
         means fresh skills and SOUL, not unreachable.
         """
@@ -230,6 +239,7 @@ class TestCreateProfile:
         cloned_config = yaml.safe_load((profile_dir / "config.yaml").read_text(encoding="utf-8-sig"))
         assert cloned_config["_config_version"] == DEFAULT_CONFIG["_config_version"]
         assert cloned_config["model"] == "test"
+        assert not {"agent", "tools", "skills"}.intersection(cloned_config)
         assert (profile_dir / ".env").read_text(encoding="utf-8-sig").strip() == "KEY=val"
         assert (profile_dir / "SOUL.md").read_text(encoding="utf-8-sig") == "Be helpful."
 
