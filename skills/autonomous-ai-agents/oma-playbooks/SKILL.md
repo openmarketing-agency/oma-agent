@@ -1,8 +1,8 @@
 ---
 name: oma-playbooks
 description: Manage playbooks, agent setup, and installed versions.
-version: 0.1.0
-author: Saurav Niraula (sauravniraula), Hermes Agent
+version: 0.2.0
+author: Open Marketing Agency (OMA)
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
@@ -22,7 +22,9 @@ You are the default OMA Agent: talk to the user, help them choose a playbook, an
 
 ## Prerequisites
 
-Run from the `default` OMA Agent profile with the OMA Agent `hermes` launcher on `PATH` and Python 3 available. For source operations, use a trusted local checkout of `openmarketing-agency/openmarketing.agency`; the root contains `playbooks/` and shared `skills/`. Use the supplied checkout or locate the existing checkout in the workspace. If none is available, request a path or fetch the official checkout when authorized. Do not use a similarly named folder or an untrusted third-party checkout.
+Run from the `default` OMA Agent profile with the OMA Agent `hermes` launcher on `PATH` and Python 3 available. Public source operations require Git and access to GitHub, but no GitHub credentials or local checkout. The source is `openmarketing-agency/openmarketing.agency`.
+
+## How to Run
 
 Use the `terminal` tool to run the bundled `scripts/playbook.py`. Resolve its absolute path relative to this installed skill (`skills/autonomous-ai-agents/oma-playbooks/` under the current profile home); `hermes config path` identifies that profile. Use `python3` on macOS/Linux and `python` on Windows. Quote paths containing spaces, and do not change `HERMES_HOME` or use a playbook profile to run the manager.
 
@@ -32,27 +34,31 @@ Pass these arguments to `scripts/playbook.py` using `terminal`:
 
 | Arguments | What they do |
 |---|---|
-| `catalog --repo "<checkout>"` | Read the available source playbooks. |
-| `plan <id> --repo "<checkout>" --version <version>` | Validate the source roster and show agent versions, skill dependencies, and declared jobs. |
-| `install <id> --repo "<checkout>" --version <version>` | Provision new profiles and record the installed versions. |
-| `list` | List all local installation records; no source checkout needed. |
+| `check` | Check the latest public tag and whether it is cached, without downloading its archive. |
+| `fetch` | Cache the latest playbooks and skills without installing profiles. |
+| `catalog` | List playbooks from the latest public version, fetching it if needed. |
+| `plan <id> --tag <tag> --version <version>` | Validate the roster and show agent versions, skill dependencies, and declared jobs. |
+| `install <id> --tag <tag> --version <version>` | Provision new profiles and record the installed versions. |
+| `list` | List local installation records without accessing GitHub. |
 | `status <id>` | Show a single record and which of its profiles still exist. |
 
-`--version` is an exact assertion about the checked-out manifest, not an instruction to switch Git revisions. Use the version shown by `catalog` or the exact version requested by the user.
+The default is GitHub's latest published stable release. If no release is published or GitHub rate-limits the lookup, use the highest stable `vMAJOR.MINOR.PATCH` tag. `--tag` selects an explicit repository tag; `--version` asserts the playbook's own manifest version. Keep both values from `catalog` when planning and installing. Use `--repo <checkout>` instead of `--tag` only for an explicitly selected trusted local checkout.
+
+The cache lives at `$HERMES_HOME/cache/openmarketing.agency/<commit>/`. The helper downloads GitHub's archive but keeps only `playbooks/` and `skills/`. It reuses unchanged commits and retains older snapshots so that checked versions stay available. A cache refresh never updates already installed agents.
 
 ## Procedure
 
-1. **Separate available from installed.** Read `list`, then `catalog` when a source checkout is available. Give users the playbook ID, description, and version; distinguish an available definition from a provisioned team. Do not install anything on a list or status request.
+1. **Separate available from installed.** Read `list`, then `catalog` for the latest source. Give users the playbook ID, description, version, and source tag; distinguish an available definition from a provisioned team. Do not install anything on a list or status request.
 2. **Validate the selected team.** Run `plan` and check `playbooks/<id>/config.yaml` for the version, canonical orchestrator, and roster. Each listed ID must match `agents/<agent-id>/config.yaml` and its adjacent `SOUL.md`. Names such as `seo__researcher` are already Hermes profile names: never add a second prefix. Confirm each agent's `oma_skills` resolves uniquely by `SKILL.md` name in the repo's shared `skills/` or the owning `playbooks/<id>/skills/`. An empty list installs no OMA skill dependencies. Do not copy unrelated source skills.
 3. **Install on request.** Run `install` with the verified ID and version. The helper uses native profile creation to publish each agent with its authored config, persona, and complete selected skill packages before it becomes visible. It strips source-only OMA metadata from runtime configs and adds a local scratch path to the installed SOUL. No launch credentials are copied, and declared cron jobs are recorded but neither registered nor started by installation. Do not clone `default`, seed tasks, or start an orchestrator turn as part of the install.
-4. **Use the record, not session memory.** The installation record lives at `$HERMES_HOME/playbooks/<id>/installation.yaml`. It contains the playbook version, source manifest, orchestrator, timestamps, and each agent's profile ID, source version, OMA skills, declared jobs, scratch path, and provisioning state. Each profile gets a subdirectory named `tmp` under `agents/<agent-id>/` in that playbook directory. Use the full path from the installed SOUL for temporary files; the directory is not automatically cleaned or a security sandbox. Never put credentials, environment contents, or full agent configs into the ledger.
+4. **Use the record, not session memory.** `$HERMES_HOME/playbooks/<id>/installation.yaml` stores the playbook description and version, source repository/tag/commit for GitHub installs, and each agent's profile ID, version, skills, declared jobs, scratch path, and state. The source manifest stays in the cache. Each agent gets a scratch directory named `tmp` beneath its own `agents/<agent-id>/` directory in the installed playbook. Use the full path from its installed SOUL. Never put credentials or full agent configs in the ledger.
 5. **Report what is ready.** Run `status <id>` after installation. Check that the record is `installed`, every agent is marked `installed`, and the present roster matches the manifest. Report missing profiles and a partial install as such. Model configuration, connected accounts, cron registration, Kanban bootstrap, and mission activation are separate from installed profiles.
 
 ## Pitfalls
 
 - A same-version install does not overwrite the recorded profiles. A different version or incomplete record is not an upgrade request; report it and leave it intact. Never delete or overwrite a matching profile just to retry.
 - An interrupted install can leave an `installing` record and some published profiles. Compare its roster with `status` and `hermes profile list` before discussing recovery. Do not create a replacement installation or remove its record or lock without authorization.
-- This skill is preloaded on fresh root installations, not fresh named profiles. It is not the playbook orchestration skill used inside worker teams.
+- This skill is available on demand in the default profile; it is not preloaded. It is not the playbook orchestration skill used inside worker teams.
 
 ## Verification
 

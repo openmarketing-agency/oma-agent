@@ -11,6 +11,7 @@ from hermes_cli.config import atomic_config_replace
 from hermes_cli.config_backend import require_file_tooling
 from hermes_cli.config_defaults import DEFAULT_CONFIG
 from hermes_cli.config_home import OMA_PLAYBOOK_SKILL
+from hermes_cli.oma_playbooks.releases import Release
 from hermes_cli.oma_playbooks.source import Agent, Playbook, checked_id, read_mapping
 from hermes_cli.profile_provision import ProfileCreateRequest, provision_profile
 from hermes_cli.profiles import get_profile_dir, profile_exists
@@ -154,7 +155,7 @@ def _publish_profiles(playbook: Playbook, policies: dict[str, dict], record: dic
         atomic_yaml_write(path, record)
 
 
-def install(home: Path, playbook: Playbook) -> dict:
+def install(home: Path, playbook: Playbook, *, release: Release | None = None) -> dict:
     require_file_tooling("OMA playbook installation")
     registry = _registry(home)
     path = _record_path(registry, playbook.id)
@@ -167,6 +168,8 @@ def install(home: Path, playbook: Playbook) -> dict:
         policies = _check_profiles(home, playbook)
         path.parent.mkdir(mode=0o700)
         record = _new_record(playbook)
+        if release is not None:
+            record["source"] = release.provenance()
         atomic_yaml_write(path, record)
         _publish_profiles(playbook, policies, record, path)
         record["state"] = "installed"
