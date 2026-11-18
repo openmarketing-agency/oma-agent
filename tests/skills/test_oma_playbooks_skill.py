@@ -3,9 +3,9 @@
 import io
 import json
 import subprocess
-import tarfile
 import urllib.error
 import urllib.request
+import zipfile
 from email.message import Message
 from pathlib import Path
 
@@ -41,29 +41,30 @@ def checkout(tmp_path, monkeypatch):
     return home, repo
 
 
-@pytest.mark.parametrize("latest_status", [200, 404, 403])
-def test_public_catalog_plan_and_install_use_one_tagged_snapshot(checkout, monkeypatch, capsys, latest_status):
+def test_public_catalog_plan_and_install_use_one_r2_snapshot(checkout, monkeypatch, capsys):
     from hermes_cli.oma_playbooks.__main__ import main
     from hermes_cli.oma_playbooks.source import read_mapping
 
     home, repo = checkout
     commit = "a" * 40
     newer_commit = "d" * 40
-    tag = "v1.2.0" if latest_status == 200 else "v1.10.0"
-    release_url = "https://api.github.com/repos/openmarketing-agency/openmarketing.agency/releases/latest"
-    archive_url = f"https://codeload.github.com/openmarketing-agency/openmarketing.agency/tar.gz/{commit}"
-    newer_url = archive_url.rsplit("/", 1)[0] + "/" + newer_commit
+    tag = "v1.2.0"
+    storage = "https://pub-d3419a6b761b48b38897cf50a5056136.r2.dev"
+    release_url = f"{storage}/latest.yaml"
+    tagged_release_url = f"{storage}/{tag}/release.yaml"
+    archive_urls = [f"{storage}/{tag}/{tree}.zip" for tree in ("playbooks", "skills")]
+    newer_urls = [f"{storage}/v1.11.0/{tree}.zip" for tree in ("playbooks", "skills")]
     latest_changed = False
-    broken_archive = False
-    (repo / "README.md").write_text("Not a source tree.", encoding="utf-8")
+    broken_archive = None
 
-    def snapshot(sha):
+    def snapshot(tree, sha):
         with io.BytesIO() as data:
-            with tarfile.open(fileobj=data, mode="w:gz") as archive:
-                root = f"openmarketing.agency-{sha}"
-                archive.add(repo, arcname=root)
-                if broken_archive:
-                    archive.addfile(tarfile.TarInfo(f"{root}/skills/../../escaped"))
+            with zipfile.ZipFile(data, "w") as archive:
+                archive.comment = sha.encode("ascii")
+                for path in (repo / tree).rglob("*"):
+                    archive.write(path, path.relative_to(repo).as_posix())
+                if tree == "skills" and broken_archive == "traversal":
+                    archive.writestr("skills/../../escaped", "must not escape")
             return data.getvalue()
 
     requests = []
@@ -72,76 +73,111 @@ def test_public_catalog_plan_and_install_use_one_tagged_snapshot(checkout, monke
         url = request.full_url
         requests.append(url)
         assert not request.has_header("Authorization")
-        if url == release_url:
-            if latest_changed:
-                return io.BytesIO(b'{"tag_name":"v1.11.0","draft":false,"prerelease":false}')
-            if latest_status != 200:
-                headers = Message()
-                headers["X-RateLimit-Remaining"] = "0"
-                raise urllib.error.HTTPError(url, latest_status, "test", headers, None)
-            return io.BytesIO(b'{"tag_name":"v1.2.0","draft":false,"prerelease":false}')
-        assert url in (archive_url, newer_url)
-        return io.BytesIO(snapshot(url.rsplit("/", 1)[1]))
+        if url in (release_url, tagged_release_url):
+            selected_tag, sha = ("v1.11.0", newer_commit) if url == release_url and latest_changed else (tag, commit)
+            assert request.get_header("Accept") == "application/yaml"
+            return io.BytesIO(f'tag: "{selected_tag}"\ncommit: "{sha}"\n'.encode())
+        assert url in archive_urls + newer_urls
+        tree = url.rsplit("/", 1)[1].removesuffix(".zip")
+        sha = newer_commit if url in newer_urls else commit
+        if tree == "skills" and broken_archive == "missing":
+            raise urllib.error.HTTPError(url, 404, "test", Message(), None)
+        if tree == "skills" and broken_archive == "wrong commit":
+            sha = commit
+        return io.BytesIO(snapshot(tree, sha))
 
     real_run = subprocess.run
 
     def run(args, *positional, **kwargs):
-        if "ls-remote" not in args:
-            return real_run(args, *positional, **kwargs)
-        assert "https://github.com/openmarketing-agency/openmarketing.agency.git" in args
-        annotated = "b" * 40
-        older = commit if latest_status == 200 else "c" * 40
-        refs = (f"{older}\trefs/tags/v1.2.0\n{annotated}\trefs/tags/v1.10.0\n"
-                f"{commit}\trefs/tags/v1.10.0^{{}}\n{annotated}\trefs/tags/v2.0.0-rc.1\n")
-        if latest_changed:
-            refs += f"{newer_commit}\trefs/tags/v1.11.0\n"
-        return subprocess.CompletedProcess(args, 0, refs, "")
+        assert "ls-remote" not in args
+        return real_run(args, *positional, **kwargs)
 
     monkeypatch.setattr(urllib.request, "urlopen", fetch)
     monkeypatch.setattr(subprocess, "run", run)
     assert main(["check"]) == 0
     assert json.loads(capsys.readouterr().out)["cached"] is False
     assert requests == [release_url]
-    assert not (home / "cache" / "openmarketing.agency").exists()
+    cache = home / "cache" / "oma-playbooks-r2"
+    assert not cache.exists()
+    legacy_snapshot = home / "cache" / "openmarketing.agency" / commit
+    for tree in ("playbooks", "skills"):
+        (legacy_snapshot / tree).mkdir(parents=True)
     requests.clear()
     assert main(["catalog"]) == 0
-    source = {"repository": "openmarketing-agency/openmarketing.agency", "tag": tag, "commit": commit}
-    assert requests == [release_url, archive_url]
+    source = {"repository": "openmarketing-agency/openmarketing.agency", "tag": tag, "commit": commit,
+              "base_url": storage}
+    assert requests == [release_url, *archive_urls]
     assert json.loads(capsys.readouterr().out)[0]["source"] == source
     requests.clear()
     assert main(["fetch", "--tag", tag]) == 0
     cached = json.loads(capsys.readouterr().out)
     assert cached["downloaded"] is False
+    assert Path(cached["cache_path"]) == cache / commit
     assert {entry.name for entry in Path(cached["cache_path"]).iterdir()} == {"playbooks", "skills"}
     assert not (home / "profiles").exists()
     assert main(["plan", "demo", "--tag", tag]) == 0
     assert json.loads(capsys.readouterr().out)["source"] == source
     assert main(["install", "demo", "--tag", tag, "--version", "0.2.0"]) == 0
     assert json.loads(capsys.readouterr().out)["source"] == source
-    assert requests == []
+    assert requests == [tagged_release_url] * 3
     assert read_mapping(home / "playbooks" / "demo" / "installation.yaml")["source"] == source
     skills = home / "profiles" / "demo__orchestrator" / "skills"
     for name in ("shared", "local"):
         assert (skills / name / "support.txt").read_text(encoding="utf-8") == "Support file."
     assert main(["status", "demo"]) == 0
     assert json.loads(capsys.readouterr().out)["source"] == source
-    assert requests == []
+    assert requests == [tagged_release_url] * 3
 
     latest_changed = True
     assert main(["check"]) == 0
     checked = json.loads(capsys.readouterr().out)
     assert checked["source"]["tag"] == "v1.11.0" and checked["cached"] is False
-    broken_archive = True
-    assert main(["fetch"]) == 1
-    assert "Unsafe archive member" in capsys.readouterr().err
-    cache = home / "cache" / "openmarketing.agency"
-    assert {entry.name for entry in cache.iterdir()} == {commit}
-    broken_archive = False
+    for broken_archive, message in (("missing", "skills.zip"), ("wrong commit", "does not match commit"),
+                                    ("traversal", "Unsafe archive member")):
+        assert main(["fetch"]) == 1
+        assert message in capsys.readouterr().err
+        assert {entry.name for entry in cache.iterdir()} == {commit}
+    broken_archive = None
     assert main(["fetch"]) == 0
     refreshed = json.loads(capsys.readouterr().out)
     assert refreshed["downloaded"] is True and refreshed["source"]["commit"] == newer_commit
     assert Path(refreshed["cache_path"]) == cache / newer_commit
     assert read_mapping(home / "playbooks" / "demo" / "installation.yaml")["source"] == source
+
+
+def test_r2_discovery_bootstraps_only_on_missing_latest(monkeypatch):
+    from hermes_cli.oma_playbooks.releases import resolve_release
+
+    storage = "https://pub-d3419a6b761b48b38897cf50a5056136.r2.dev"
+    status = 404
+    requests = []
+
+    def fetch(request, *, timeout):
+        requests.append(request.full_url)
+        raise urllib.error.HTTPError(request.full_url, status, "test", Message(), None)
+
+    monkeypatch.setattr(urllib.request, "urlopen", fetch)
+    assert resolve_release().tag == "v0.1.1"
+    assert resolve_release("v0.1.1").commit == "80be8c56d59d0680efbe5a72e1baffd45caa55ae"
+    assert requests == [f"{storage}/latest.yaml"]
+    with pytest.raises(ValueError, match=r"v0\.1\.0/release\.yaml.*404"):
+        resolve_release("v0.1.0")
+    status = 403
+    with pytest.raises(ValueError, match=r"latest\.yaml.*403"):
+        resolve_release()
+
+
+@pytest.mark.parametrize(("tag", "payload"), [
+    (None, b'tag: v1.2.3\ncommit: not-a-commit\n'),
+    ("v1.2.4", b'tag: v1.2.3\ncommit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n'),
+    (None, b'tag: [\n'),
+])
+def test_r2_discovery_rejects_invalid_manifest(monkeypatch, tag, payload):
+    from hermes_cli.oma_playbooks.releases import resolve_release
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *args, **kwargs: io.BytesIO(payload))
+    with pytest.raises(ValueError, match="Invalid OMA release manifest"):
+        resolve_release(tag)
 
 
 def test_install_saves_playbook_metadata_in_the_ledger_only(checkout):

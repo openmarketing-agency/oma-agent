@@ -53,17 +53,17 @@ def main(argv=None) -> int:
     commands.add_parser("list", help="List local installation records")
     commands.add_parser("status", help="Inspect a local installation record").add_argument("id")
     for name, help_text in {
-        "check": "Check the latest public OMA tag and its cache status",
-        "fetch": "Cache public OMA playbooks and skills without installing profiles",
+        "check": "Look up the R2 release and its cache status without downloading ZIPs",
+        "fetch": "Cache public OMA playbooks and skills from R2 without installing profiles",
         "catalog": "List available OMA playbooks",
         "plan": "Validate a playbook and show what would be installed",
         "install": "Provision a playbook from the public OMA release",
     }.items():
         command = commands.add_parser(name, help=help_text)
         options = command.add_mutually_exclusive_group()
-        options.add_argument("--tag", help="Use this stable repository tag instead of the latest release")
+        options.add_argument("--tag", help="Use this stable R2 release tag instead of the latest release")
         if name in {"catalog", "plan", "install"}:
-            options.add_argument("--repo", type=Path, help="Use an explicit trusted local checkout instead of GitHub")
+            options.add_argument("--repo", type=Path, help="Use an explicit trusted local checkout instead of the public source")
         if name in {"plan", "install"}:
             command.add_argument("id")
             command.add_argument("--version", help="Require this exact source manifest version")

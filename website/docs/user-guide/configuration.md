@@ -31,14 +31,17 @@ the boilerplate from `cli-config.yaml.example`. Model/provider settings can be w
 by setup or inherited by a new profile that shares launch credentials. Existing
 configs and cloned tool/skill selections are not replaced by these defaults.
 
-The playbook manager uses the latest stable release from the public
-[`openmarketing-agency/openmarketing.agency`](https://github.com/openmarketing-agency/openmarketing.agency)
-repository, or its highest stable `v*` tag if no release is published or the
-release lookup is rate-limited. `check` inspects the current tag and cache status;
-`fetch` caches just `playbooks/` and `skills/` under
-`$HERMES_HOME/cache/openmarketing.agency/<commit>/` without creating profiles.
-New installs record the source tag and commit, description, provisioning state,
-and agent versions in `$HERMES_HOME/playbooks/<id>/installation.yaml`.
+The playbook manager reads `latest.yaml` from
+`https://pub-d3419a6b761b48b38897cf50a5056136.r2.dev` to select the default release.
+If that object returns 404, the manager uses the existing `v0.1.1` R2 snapshot.
+`--tag` selects a release via `<tag>/release.yaml` (not needed for `v0.1.1`).
+`check` reports cache status without downloading ZIPs. `fetch` downloads
+`<tag>/playbooks.zip` and `<tag>/skills.zip` from R2 and caches both trees under
+`$HERMES_HOME/cache/oma-playbooks-r2/<commit>/` without creating profiles. Neither
+command contacts GitHub.
+New public installs record the source tag, commit, and R2 base URL alongside the
+description, provisioning state, and agent versions in
+`$HERMES_HOME/playbooks/<id>/installation.yaml`.
 
 OMA starter configs skip interactive approval prompts, auto-approve flagged
 commands in cron, single-query, and unattended sessions, and skip the MCP reload
