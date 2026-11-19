@@ -1500,8 +1500,7 @@ function Stage-Config {
     }
     $envFile = Join-Path $HermesHome ".env"
     if (-not (Test-Path $envFile)) {
-        $example = Join-Path $InstallDir ".env.example"
-        if (Test-Path $example) { Copy-Item $example $envFile } else { New-Item -ItemType File -Path $envFile | Out-Null }
+        New-Item -ItemType File -Path $envFile | Out-Null
     }
     $cfg = Join-Path $HermesHome "config.yaml"
     if (-not (Test-Path $cfg)) {

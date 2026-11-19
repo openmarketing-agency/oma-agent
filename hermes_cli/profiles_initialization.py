@@ -49,8 +49,9 @@ def prepare_imported_tree(staged: Path) -> None:
 def finish_profile_layout(profile_dir: Path, *, no_skills: bool, clone_all: bool,
                            description: Optional[str], soul: Optional[str] = None) -> None:
     """Seed files a fresh profile owns from day one; runs on the staging tree before publish."""
+    from hermes_cli.config_home import seed_empty_env_file
     from hermes_cli.profiles import (
-        _seed_file_if_missing, _PLACEHOLDER_ENV, NO_BUNDLED_SKILLS_MARKER,
+        _seed_file_if_missing, NO_BUNDLED_SKILLS_MARKER,
         _migrate_profile_config_if_outdated, write_profile_meta,
     )
     if soul is not None:
@@ -60,7 +61,7 @@ def finish_profile_layout(profile_dir: Path, *, no_skills: bool, clone_all: bool
     # profile-scoped env writes (dashboard Channels/Keys pages, `hermes -p <name> auth add`)
     # had no file until first write and the profile silently inherited shell API keys —
     # read by users as "the new profile reads the root .env". Skipped when a clone copied one.
-    _seed_file_if_missing(profile_dir / ".env", _PLACEHOLDER_ENV, 0o600)
+    seed_empty_env_file(profile_dir / ".env")
     # A clone's copy2/copytree carries the source config.yaml's mode, world bits included.
     from hermes_cli.config_backend import drop_other_access
     drop_other_access(profile_dir / "config.yaml")

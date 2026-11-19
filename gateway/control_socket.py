@@ -2,7 +2,7 @@
 versioned JSON verbs (``identify``, ``status``, ``resolve-profile``, ``session-ticket``, ...). A connectable socket with a well-formed ``identify``
 answer IS liveness — no PID-reuse heuristics. Never a TCP port: filesystem/pipe ACLs are the auth
 boundary. POSIX: ``$HERMES_HOME/gateway.sock`` (or a temp-dir socket + ``gateway.sock.path`` pointer
-file when the home path exceeds ``sun_path`` or its filesystem refuses sockets); Windows: named pipe ``\\\\.\\pipe\\hermes-gateway-<hash>``.
+file when the home cannot host an owner-only socket); Windows: named pipe ``\\\\.\\pipe\\hermes-gateway-<hash>``.
 Wire contract: ONE request per connection — one JSON line in, one out, then the server closes.
 Consumers PREFER the socket and fall back to the state-file/scan layer when it doesn't answer.
 """
@@ -244,8 +244,8 @@ class GatewayControlServer:
         try:
             bind_path = await self._bind_posix(bind_path, pointer_file)
         except OSError as exc:
-            # A home that fits sun_path can still refuse the socket (Docker Desktop bind mounts,
-            # #123761): listen on the same private temp-dir socket + pointer an over-long home uses.
+            # A bind mount can reject the socket or fail to preserve its permissions.
+            # Use the same private temp-dir socket + pointer as an over-long home.
             if pointer_file is not None or exc.errno not in _SOCKET_UNSUPPORTED_ERRNOS:
                 raise
             logger.warning("Control socket cannot be created in %s (%s); listening in a private temp directory",
@@ -287,11 +287,37 @@ class GatewayControlServer:
         # Restrictive umask so the socket is never world-connectable, even for the instant before chmod.
         old_umask = os.umask(0o177)
         try:
-            self._server = await asyncio.start_unix_server(self._handle_connection, path=str(bind_path))
+            server = await asyncio.start_unix_server(
+                self._handle_connection, path=str(bind_path), start_serving=False,
+            )
         finally:
             os.umask(old_umask)
-        with contextlib.suppress(OSError):
-            os.chmod(bind_path, 0o600)
+        bound_info = None
+        try:
+            bound_info = bind_path.lstat()
+            if not stat.S_ISSOCK(bound_info.st_mode) or bound_info.st_uid != os.getuid():  # windows-footgun: ok — POSIX listener
+                raise PermissionError("control socket is not owned by the gateway user")
+            try:
+                os.chmod(bind_path, 0o600)
+            except OSError as exc:
+                # Colima/virtiofs accepts bind but returns EINVAL for chmod on the socket.
+                if exc.errno != errno.EINVAL:
+                    raise
+            info = bind_path.lstat()
+            if not os.path.samestat(info, bound_info):
+                raise PermissionError("control socket was replaced during startup")
+            if stat.S_IMODE(info.st_mode) != 0o600:
+                raise OSError(errno.EOPNOTSUPP, "filesystem cannot secure the control socket")
+            await server.start_serving()
+        except BaseException:
+            server.close()
+            # asyncio on Python 3.11/3.12 does not remove the bound node on close.
+            with contextlib.suppress(FileNotFoundError):
+                if bound_info is not None and os.path.samestat(bind_path.lstat(), bound_info):
+                    bind_path.unlink()
+            await server.wait_closed()
+            raise
+        self._server = server
         return bind_path
 
     async def _start_windows(self) -> bool:

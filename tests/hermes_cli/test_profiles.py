@@ -138,7 +138,7 @@ class TestCreateProfile:
     """Tests for create_profile()."""
 
 
-    def test_seeds_placeholder_env_file(self, profile_env):
+    def test_seeds_empty_env_file(self, profile_env):
         """Fresh profiles get their own .env (owner-only) so channel/env
         writes are profile-scoped from day one instead of falling through
         to the shell environment / root install."""
@@ -146,12 +146,7 @@ class TestCreateProfile:
         profile_dir = create_profile("coder", no_alias=True)
         env_path = profile_dir / ".env"
         assert env_path.exists()
-        content = env_path.read_text(encoding="utf-8-sig")
-        # Placeholder only — no credentials leak in from anywhere.
-        assert all(
-            line.startswith("#") or not line.strip()
-            for line in content.splitlines()
-        )
+        assert env_path.read_bytes() == b""
         mode = stat.S_IMODE(env_path.stat().st_mode)
         assert mode == 0o600
 
@@ -524,9 +519,9 @@ class TestNoSkillsOptOut:
 class TestBackfillProfileEnvs:
     """Tests for backfill_profile_envs() — the `hermes update` pass that
     gives pre-#44792 profiles (created before .env seeding) their own
-    .env: the placeholder header, never a copy of the default's secrets."""
+    .env: empty, never a copy of the default's secrets."""
 
-    def test_seeds_placeholder_never_the_default_env(self, profile_env):
+    def test_seeds_empty_file_never_the_default_env(self, profile_env):
         import stat
         tmp_path = profile_env
         (tmp_path / ".hermes" / ".env").write_text("OPENROUTER_API_KEY=root-key\n", encoding="utf-8")
@@ -540,22 +535,18 @@ class TestBackfillProfileEnvs:
 
         assert sorted(backfilled) == ["old1", "old2"]
         for p in (p1, p2):
-            assert "root-key" not in (p / ".env").read_text(encoding="utf-8-sig")
+            assert (p / ".env").read_bytes() == b""
             assert stat.S_IMODE((p / ".env").stat().st_mode) == 0o600
 
 
-    def test_placeholder_when_default_has_no_env(self, profile_env):
+    def test_backfills_when_default_has_no_env(self, profile_env):
         p = create_profile("noroot", no_alias=True)
         (p / ".env").unlink()
 
         backfilled = backfill_profile_envs(quiet=True)
 
         assert backfilled == ["noroot"]
-        content = (p / ".env").read_text(encoding="utf-8-sig")
-        assert all(
-            line.startswith("#") or not line.strip()
-            for line in content.splitlines()
-        )
+        assert (p / ".env").read_bytes() == b""
 
     def test_no_profiles_root_is_noop(self, profile_env):
         assert backfill_profile_envs(quiet=True) == []

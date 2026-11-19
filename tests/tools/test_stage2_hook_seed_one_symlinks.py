@@ -175,44 +175,6 @@ def test_auth_seed_survives_failing_chmod(stage2_text: str, tmp_path: Path) -> N
     assert auth.stat().st_mode & 0o777 == 0o600
 
 
-def _env_seed_line(text: str) -> str:
-    m = re.search(r'(?m)^.*seed_one "\.env" "\.env\.example".*$', text)
-    assert m, "stage2-hook.sh must keep the .env first-boot seed"
-    return m.group(0)
-
-
-@pytest.mark.platforms("posix")
-def test_env_seed_is_owner_only_under_ambient_umask(stage2_text: str, tmp_path: Path) -> None:
-    """The first-boot .env copy (which later receives API_SERVER_KEY) must be
-    0600 straight from the seed, not 0644 until a best-effort chmod (#126950)."""
-    sh = shutil.which("sh")
-    if sh is None:
-        pytest.skip("sh not available")
-    home = tmp_path / "home"
-    install_dir = tmp_path / "install"
-    home.mkdir()
-    install_dir.mkdir()
-    example = install_dir / ".env.example"
-    example.write_text("# example\n")
-    example.chmod(0o644)
-    script = (
-        "set -eu\n"
-        "umask 022\n"
-        f'HERMES_HOME="{home}"\n'
-        f'INSTALL_DIR="{install_dir}"\n'
-        "as_hermes() { \"$@\"; }\n"
-        f"{_path_guard_functions(stage2_text)}\n"
-        f"{_seed_one_function(stage2_text)}\n"
-        f"{_env_seed_line(stage2_text)}\n"
-    )
-    script_path = tmp_path / "harness.sh"
-    script_path.write_text(script)
-    proc = subprocess.run([sh, str(script_path)], capture_output=True, text=True, check=False)
-    assert proc.returncode == 0, proc.stderr
-    assert (home / ".env").read_text() == "# example\n"
-    assert (home / ".env").stat().st_mode & 0o777 == 0o600
-
-
 def _gateway_state_seed_block(text: str) -> str:
     m = re.search(
         r'(?m)^if \[ ! -f "\$HERMES_HOME/gateway_state\.json" \] && \\\n'
