@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from hermes_cli.config_defaults import DEFAULT_DISPLAY_SKIN
 from hermes_constants import get_hermes_home
 
 logger = logging.getLogger(__name__)
@@ -342,7 +343,7 @@ _BUILTIN_SKINS: dict[str, dict[str, Any]] = {
     }}
 
 _active_skin: Optional[SkinConfig] = None
-_active_skin_name: str = "default"
+_active_skin_name: str = DEFAULT_DISPLAY_SKIN
 # Routed multiplex profiles: (name, skin) per home key. ``display.skin`` and ``<home>/skins/*.yaml``
 # are per profile, and the relay display name / TUI skin payload are read under each profile's
 # override — one module slot would be last-writer-wins across profiles. Unscoped keeps the module slot.
@@ -463,15 +464,20 @@ def get_active_skin_name() -> str:
     home_key = _routed_home_key()
     if home_key is not None:
         entry = _active_skin_by_home.get(home_key)
-        return entry[0] if entry else "default"
+        return entry[0] if entry else configured_skin_name(_profile_config())
     return _active_skin_name
+
+
+def configured_skin_name(config: dict) -> str:
+    """Resolve a profile skin with the same default for raw and merged config."""
+    display = config.get("display")
+    name = display.get("skin") if isinstance(display, dict) else None
+    return name.strip() if isinstance(name, str) and name.strip() else DEFAULT_DISPLAY_SKIN
 
 
 def init_skin_from_config(config: dict) -> None:
     """Initialize the active skin from CLI config at startup."""
-    display = config.get("display") or {}
-    skin_name = display.get("skin", "default") if isinstance(display, dict) else "default"
-    set_active_skin(skin_name.strip() if isinstance(skin_name, str) and skin_name.strip() else "default")
+    set_active_skin(configured_skin_name(config))
 
 
 def _active_branding(key: str, fallback: str) -> str:

@@ -22,9 +22,10 @@ OMA Agent does not offer, collect, or send Nous Shared Metrics. Legacy
 `telemetry.shared_metrics` settings cannot turn collection or sending back on.
 
 A fresh OMA install or a profile created without cloning starts with a minimal
-`config.yaml`. It enables only `file`, `terminal`, `browser`, and `web` under
-`agent.enabled_toolsets`. Tool search is on, all selected tools are deferred, and
-the upfront tool listing is off. The tool-search bridge itself stays visible.
+`config.yaml`. It enables `file`, `terminal`, `browser`, `web`, `skills`, and
+`memory` under `agent.enabled_toolsets`. Tool search is on, all selected tools
+are deferred, and the upfront tool listing is off. The tool-search bridge
+itself stays visible.
 
 No skills are auto-loaded by default. Both the default profile and fresh named
 profiles start with `skills.disabled: []`, so bundled skills are available on
@@ -33,6 +34,8 @@ out of seeding. The starter file includes the generated schema version but not
 the boilerplate from `cli-config.yaml.example`. Model/provider settings can be written
 by setup or inherited by a new profile that shares launch credentials. Existing
 configs and cloned tool/skill selections are not replaced by these defaults.
+Both the default profile and named profiles use the `mono` skin unless they
+explicitly set `display.skin` to another skin.
 
 Fresh installs and non-cloned profiles start with an empty `.env` rather than
 copying `.env.example`. Docker still persists a generated `API_SERVER_KEY` for
@@ -61,6 +64,11 @@ commands in cron, single-query, and unattended sessions, and skip the MCP reload
 and destructive slash-command confirmations. Any admitted member can answer
 remaining prompts (`approvers: ["*"]`); the timeout is still 300 seconds.
 Explicit deny rules and built-in hard blocks still apply.
+
+`security.protected_instruction_files` defaults to `false` for both the
+built-in `default` profile and named OMA profiles. This skips the dedicated
+approval prompt for `SOUL.md`, `AGENTS.md`, and other protected instruction
+files. Set it to `true` on any profile to require human approval again.
 
 ## Directory Structure
 

@@ -119,7 +119,9 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     from hermes_cli.config_effective import load_user_config_effective
     from hermes_cli.profiles import create_profile
     from hermes_cli.tools_config import _get_platform_tools
+    from model_tools import get_tool_definitions
     from tools import approval_context
+    from tools.file_tools_write_guards import _protected_instruction_reason
     from tools.tool_search import BRIDGE_TOOL_NAMES, assemble_tool_defs
 
     root = tmp_path / ".hermes"
@@ -143,7 +145,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     content = path.read_text(encoding="utf-8")
     assert "#" not in content
     assert yaml.safe_load(content) == {
-        "agent": {"enabled_toolsets": ["file", "terminal", "browser", "web"]},
+        "agent": {"enabled_toolsets": ["file", "terminal", "browser", "web", "skills", "memory"]},
         "tools": {"tool_search": {"enabled": "on", "eager_toolsets": [], "listing": "off"}},
         "skills": {"disabled": []},
         "approvals": {
@@ -158,12 +160,17 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
         },
         "_config_version": DEFAULT_CONFIG["_config_version"],
     }
-
     monkeypatch.setenv("HERMES_HOME", str(home))
+    target = root / "profiles" / "another-agent" / "SOUL.md"
+    assert _protected_instruction_reason(str(target)) is None
     config = load_user_config_effective(path)
     assert build_auto_load_prompt(user_config=config) == ("", [], [])
     for surface in ("cli", "tui", "telegram"):
-        assert _get_platform_tools(config, surface) == {"file", "terminal", "browser", "web"}
+        assert _get_platform_tools(config, surface) == {"file", "terminal", "browser", "web", "skills", "memory"}
+    tools = get_tool_definitions(
+        enabled_toolsets=sorted(_get_platform_tools(config, "cli")), skip_tool_search_assembly=True,
+    )
+    assert {"skills_list", "skill_view", "skill_manage", "memory"} <= {tool["function"]["name"] for tool in tools}
     assert not get_disabled_skill_names()
     assert approval_context._get_approval_mode() == "off"
     assert approval_context._get_approval_timeout() == 300
@@ -175,6 +182,15 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     assert result.activated and result.deferred_count == len(available)
     assert result.listing_form == "none"
     assert {tool["function"]["name"] for tool in result.tool_defs} == BRIDGE_TOOL_NAMES
+
+
+def test_explicit_instruction_file_protection_still_requires_approval(tmp_path, monkeypatch):
+    from hermes_cli.config import atomic_config_write
+    from tools.file_tools_write_guards import _protected_instruction_reason
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    atomic_config_write(tmp_path / "config.yaml", {"security": {"protected_instruction_files": True}})
+    assert _protected_instruction_reason(str(tmp_path / "SOUL.md")) == "SOUL.md"
 
 
 def test_installer_leaves_existing_config_bytes_untouched(tmp_path, monkeypatch):

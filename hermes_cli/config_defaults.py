@@ -19,6 +19,9 @@ DEFAULT_VERCEL_IMAGE = "vercel/sandbox/universal:latest"
 LEGACY_VERCEL_RUNTIME = "node24"  # the seeded pre-49 default, never a user choice
 
 
+DEFAULT_DISPLAY_SKIN = "mono"
+
+
 DEFAULT_CONFIG = {
     "model": "",
     "providers": {},
@@ -882,7 +885,7 @@ DEFAULT_CONFIG = {
         # /focus off restores. Never affects what the model sees (focus_view.py).
         "focus_view": False,
         "focus_saved_tool_progress": "all",
-        "skin": "mono",
+        "skin": DEFAULT_DISPLAY_SKIN,
         # UI language for static messages (approval prompts, some gateway slash replies); not agent
         # responses/logs/tool outputs. en, zh, ja, de, es, fr, tr, uk; unknown → en.
         "language": "en",
@@ -1727,10 +1730,10 @@ DEFAULT_CONFIG = {
         # DENIES unless transport_fallback is "builtin". Presentation only: plugins cannot detect,
         # suppress, or auto-approve commands outside a correlated human response.
         "approval": {"transport": "builtin", "transport_fallback": "deny"},
-        # Writes to agent-instruction files (AGENTS.md/CLAUDE.md/SOUL.md/.cursorrules, project-local
-        # .hermes config) always need human approval, even under yolo. Extra patterns are fnmatch
-        # globs on the basename (e.g. "*.mdc").
-        "protected_instruction_files": True,
+        # When enabled, writes to agent-instruction files (AGENTS.md/CLAUDE.md/SOUL.md/.cursorrules,
+        # project-local .hermes config) need human approval even under yolo. OMA defaults this off
+        # so profiles can maintain agent instructions. Extra patterns are basename fnmatch globs.
+        "protected_instruction_files": False,
         "protected_instruction_extra_patterns": [],
         "website_blocklist": {"enabled": False, "domains": [], "shared_files": []},
         # IDs of supply-chain advisories the user has read and acted on; acked ones stop the startup

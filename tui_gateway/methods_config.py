@@ -254,6 +254,12 @@ def _cfg_get_mtime(params):
     return {"mtime": mtime, "mcp_rev": _compute_mcp_rev()}
 
 
+def _cfg_get_skin(params: dict) -> dict:
+    from hermes_cli.skin_engine import configured_skin_name
+
+    return {"value": configured_skin_name(_load_cfg())}
+
+
 # key -> getter(params); bind_module rebinds the table's functions onto server.py's globals.
 _CONFIG_GETTERS = {
     "provider": _cfg_get_provider,
@@ -261,7 +267,7 @@ _CONFIG_GETTERS = {
     "project": _cfg_get_project,
     "full": lambda params: {"config": _load_cfg()},
     "prompt": lambda params: {"prompt": _load_cfg().get("custom_prompt", "")},
-    "skin": lambda params: {"value": _display_raw().get("skin", "default")},
+    "skin": _cfg_get_skin,
     # Normalised like the TUI renders it (frontend falls back to the default for the same inputs).
     "indicator": lambda params: {
         "value": _display_word("tui_status_indicator", DEFAULT_INDICATOR_STYLE, INDICATOR_STYLES)},
