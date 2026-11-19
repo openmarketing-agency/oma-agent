@@ -104,7 +104,9 @@ def seed_config_file(config_path: Path, *, model_seed: dict | None = None) -> bo
 
     config = {
         "agent": {"enabled_toolsets": ["file", "terminal", "browser", "web", "skills", "memory"]},
-        "tools": {"tool_search": {"enabled": "on", "eager_toolsets": [], "listing": "off"}},
+        "tools": {"tool_search": {
+            "enabled": "on", "eager_toolsets": ["file", "terminal", "skills", "memory"], "listing": "off",
+        }},
         "skills": {"disabled": []},
         "approvals": {
             "mode": "off",

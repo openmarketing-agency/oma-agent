@@ -23,9 +23,10 @@ OMA Agent does not offer, collect, or send Nous Shared Metrics. Legacy
 
 A fresh OMA install or a profile created without cloning starts with a minimal
 `config.yaml`. It enables `file`, `terminal`, `browser`, `web`, `skills`, and
-`memory` under `agent.enabled_toolsets`. Tool search is on, all selected tools
-are deferred, and the upfront tool listing is off. The tool-search bridge
-itself stays visible.
+`memory` under `agent.enabled_toolsets`. `file`, `terminal`, `skills`, and
+`memory` are eager: their tool schemas are available directly from the first
+turn. `browser` and `web` remain deferred and discoverable through Tool Search.
+The tool-search bridge stays visible, with its upfront catalog listing off.
 
 No skills are auto-loaded by default. Both the default profile and fresh named
 profiles start with `skills.disabled: []`, so bundled skills are available on

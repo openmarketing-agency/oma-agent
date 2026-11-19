@@ -146,7 +146,9 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     assert "#" not in content
     assert yaml.safe_load(content) == {
         "agent": {"enabled_toolsets": ["file", "terminal", "browser", "web", "skills", "memory"]},
-        "tools": {"tool_search": {"enabled": "on", "eager_toolsets": [], "listing": "off"}},
+        "tools": {"tool_search": {
+            "enabled": "on", "eager_toolsets": ["file", "terminal", "skills", "memory"], "listing": "off",
+        }},
         "skills": {"disabled": []},
         "approvals": {
             "mode": "off",
@@ -177,11 +179,13 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     assert approval_context._get_cron_approval_mode() == "approve"
     assert approval_context._get_single_query_approval_mode() == "approve"
     assert approval_context._get_unattended_approval_mode() == "approve"
-    available = [{"type": "function", "function": {"name": "read_file"}}]
+    direct = {"read_file", "terminal", "process_manage", "skills_list", "skill_view", "skill_manage", "memory"}
+    deferred = {"browser_navigate", "web_search"}
+    available = [{"type": "function", "function": {"name": name}} for name in sorted(direct | deferred)]
     result = assemble_tool_defs(available)
-    assert result.activated and result.deferred_count == len(available)
+    assert result.activated and result.deferred_count == len(deferred)
     assert result.listing_form == "none"
-    assert {tool["function"]["name"] for tool in result.tool_defs} == BRIDGE_TOOL_NAMES
+    assert {tool["function"]["name"] for tool in result.tool_defs} == direct | BRIDGE_TOOL_NAMES
 
 
 def test_explicit_instruction_file_protection_still_requires_approval(tmp_path, monkeypatch):
