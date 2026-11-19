@@ -315,6 +315,47 @@ def test_home_refusing_sockets_listens_on_private_fallback_both_clients_reach(sh
     assert not (home / "gateway.sock.path").exists()
 
 
+def test_home_that_cannot_secure_socket_uses_private_fallback(short_home: Path, monkeypatch):
+    import os
+    import stat
+
+    from hermes_cli.gateway_runtime_discovery import query_identify
+
+    home = short_home.resolve()
+    home.chmod(0o700)
+    direct = home / "gateway.sock"
+    real_start, real_chmod = asyncio.start_unix_server, os.chmod
+
+    async def start_with_mount_permissions(callback, path=None, **kwargs):
+        server = await real_start(callback, path=path, **kwargs)
+        if path is not None and Path(path) == direct:
+            real_chmod(path, 0o755)
+        return server
+
+    def refuse_socket_chmod(path, mode, **kwargs):
+        if Path(path) == direct:
+            raise OSError(errno.EINVAL, "Invalid argument")
+        return real_chmod(path, mode, **kwargs)
+
+    monkeypatch.setattr(asyncio, "start_unix_server", start_with_mount_permissions)
+    monkeypatch.setattr(os, "chmod", refuse_socket_chmod)
+
+    async def scenario():
+        server = GatewayControlServer(home, verb_handlers={"identify": lambda: {"pid": 11}})
+        assert await server.start()
+        try:
+            assert not direct.exists()
+            pointer = home / "gateway.sock.path"
+            assert stat.S_IMODE(pointer.lstat().st_mode) == 0o600
+            target = Path(pointer.read_text(encoding="utf-8"))
+            assert stat.S_IMODE(target.lstat().st_mode) == 0o600
+            return await asyncio.to_thread(query_identify, home, timeout=3)
+        finally:
+            await server.stop()
+
+    assert _run(scenario()) == {"pid": 11}
+
+
 def test_bind_refused_for_other_reasons_still_fails(short_home: Path, monkeypatch):
     # A live sibling (EADDRINUSE) must keep failing loudly — no silent fallback
     # that would let two gateways for one home both look healthy.
