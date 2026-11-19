@@ -22,10 +22,11 @@ OMA Agent does not offer, collect, or send Nous Shared Metrics. Legacy
 `telemetry.shared_metrics` settings cannot turn collection or sending back on.
 
 A fresh OMA install or a profile created without cloning starts with a minimal
-`config.yaml`. It enables `file`, `terminal`, `browser`, `web`, `skills`, and
-`memory` under `agent.enabled_toolsets`. `file`, `terminal`, `skills`, and
+`config.yaml`. It enables `file`, `terminal`, `browser`, `web`, `skills`,
+`memory`, and `session_search` under `agent.enabled_toolsets`. `file`, `terminal`, `skills`, and
 `memory` are eager: their tool schemas are available directly from the first
-turn. `browser` and `web` remain deferred and discoverable through Tool Search.
+turn. `browser`, `web`, and `session_search` are deferred and discoverable
+through Tool Search. `session_search` searches past conversations.
 The tool-search bridge stays visible, with its upfront catalog listing off.
 
 No skills are auto-loaded by default. Both the default profile and fresh named

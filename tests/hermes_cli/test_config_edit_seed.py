@@ -143,9 +143,10 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
         home = create_profile("fresh", no_alias=True, seed_model=False)
     path = home / "config.yaml"
     content = path.read_text(encoding="utf-8")
+    enabled = ["file", "terminal", "browser", "web", "skills", "memory", "session_search"]
     assert "#" not in content
     assert yaml.safe_load(content) == {
-        "agent": {"enabled_toolsets": ["file", "terminal", "browser", "web", "skills", "memory"]},
+        "agent": {"enabled_toolsets": enabled},
         "tools": {"tool_search": {
             "enabled": "on", "eager_toolsets": ["file", "terminal", "skills", "memory"], "listing": "off",
         }},
@@ -168,11 +169,13 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     config = load_user_config_effective(path)
     assert build_auto_load_prompt(user_config=config) == ("", [], [])
     for surface in ("cli", "tui", "telegram"):
-        assert _get_platform_tools(config, surface) == {"file", "terminal", "browser", "web", "skills", "memory"}
+        assert _get_platform_tools(config, surface) == set(enabled)
     tools = get_tool_definitions(
         enabled_toolsets=sorted(_get_platform_tools(config, "cli")), skip_tool_search_assembly=True,
     )
-    assert {"skills_list", "skill_view", "skill_manage", "memory"} <= {tool["function"]["name"] for tool in tools}
+    assert {"skills_list", "skill_view", "skill_manage", "memory", "session_search"} <= {
+        tool["function"]["name"] for tool in tools
+    }
     assert not get_disabled_skill_names()
     assert approval_context._get_approval_mode() == "off"
     assert approval_context._get_approval_timeout() == 300
@@ -180,7 +183,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     assert approval_context._get_single_query_approval_mode() == "approve"
     assert approval_context._get_unattended_approval_mode() == "approve"
     direct = {"read_file", "terminal", "process_manage", "skills_list", "skill_view", "skill_manage", "memory"}
-    deferred = {"browser_navigate", "web_search"}
+    deferred = {"browser_navigate", "web_search", "session_search"}
     available = [{"type": "function", "function": {"name": name}} for name in sorted(direct | deferred)]
     result = assemble_tool_defs(available)
     assert result.activated and result.deferred_count == len(deferred)
