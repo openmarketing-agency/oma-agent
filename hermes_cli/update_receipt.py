@@ -705,7 +705,7 @@ def finalize_update_receipt(outcome: str, fleet: list | None = None, stop_reason
         with suppress(Exception):  # stable pointer for the dashboard/desktop
             _write_latest(payload)
         _prune_old_receipts(directory)
-        _publish_shared_metrics(receipt.data)
+
         return path
     except Exception as exc:
         # Visible, not debug: a run that pulled code and left no receipt is exactly the run
@@ -833,26 +833,7 @@ def _park_metric_receipt(data: dict[str, Any], enabled: Optional[bool]) -> None:
 
 
 def _publish_shared_metrics(data: dict[str, Any]) -> None:
-    """hermes.update.run/stage from this FINAL receipt; must never fail or slow the update.
-
-    Rows are emitted only by an interpreter that can read consent with the real config reader.
-    Any other interpreter parks the bounded fields instead, and the next normal start applies the
-    collection gate (records them, or purges them when collection is off)."""
-    with suppress(Exception):
-        pre, post = data.get("pre_update") or {}, data.get("post_update") or {}
-        if data.get("pid") == os.getpid() and not (pre.get("sha") and pre.get("sha") == post.get("sha")):
-            # This interpreter began the run before the checkout swap: importing now would load
-            # pulled code into it. Consent comes from the config module it already has loaded.
-            _park_metric_receipt(data, _collection_enabled_now())
-            return
-        if not _consent_reader_importable():
-            # The bare bootstrap interpreter (dependency preparation failed): no config reader, so
-            # it can neither read consent nor emit. Park, unless consent is knowably off.
-            _park_metric_receipt(data, _bare_collection_enabled())
-            return
-        from hermes_cli.observability.shared_metrics_update import record_update_receipt
-
-        record_update_receipt(data)
+    """Legacy updater hook; OMA retains operational receipts but does not emit metrics."""
 
 
 def finalized_receipt(update_id: str) -> Optional[dict[str, Any]]:

@@ -13,7 +13,7 @@ import { asRpcResult } from '../lib/rpc.js'
 import type { Msg } from '../types.js'
 
 import { cancelPendingRewind, sendPendingRewind } from './backtrackStore.js'
-import { reportSlashCommand } from './createSlashHandler.js'
+
 import type { BusyInputMode, ComposerActions, ComposerRefs, ComposerState, ComposerToken, SlashHandler } from './interfaces.js'
 import { stagePastes } from './pasteStore.js'
 import { applyQueuePlan, planQueueSlash } from './queueSlash.js'
@@ -395,7 +395,7 @@ export function useSubmission(opts: UseSubmissionOptions) {
         if (parsed.name === 'queue' || parsed.name === 'q') {
           // The catalog advertises list/edit/rm/move/clear. Enqueueing those words
           // is what sent them to the model. Handle them before the slash handler.
-          reportSlashCommand(gw, parsed.name, getUiState().sid)
+
           const plan = planQueueSlash(slash.display, slash.command)
 
           if (plan.kind === 'enqueue') {

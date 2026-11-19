@@ -18,6 +18,9 @@ Run `hermes setup --portal` — one OAuth gets you a model provider and all four
 
 ## OMA starter configuration
 
+OMA Agent does not offer, collect, or send Nous Shared Metrics. Legacy
+`telemetry.shared_metrics` settings cannot turn collection or sending back on.
+
 A fresh OMA install or a profile created without cloning starts with a minimal
 `config.yaml`. It enables only `file`, `terminal`, `browser`, and `web` under
 `agent.enabled_toolsets`. Tool search is on, all selected tools are deferred, and

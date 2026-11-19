@@ -141,21 +141,10 @@ def _profile_hash(profile_home: Path) -> str:
 
 
 def _collects(home: Path) -> bool:
-    """The root profile's own collection consent (read-only; never touches its runtime)."""
-    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    """Engagement collection follows OMA's distribution policy, not saved consent."""
+    from .relay_shared_metrics import enabled
 
-    token = set_hermes_home_override(str(home))
-    try:
-        from hermes_cli.config import read_raw_config_readonly
-
-        config: Any = read_raw_config_readonly() or {}
-    except Exception:
-        return False
-    finally:
-        reset_hermes_home_override(token)
-    for key in ("telemetry", "shared_metrics"):
-        config = config.get(key) if isinstance(config, dict) else None
-    return isinstance(config, dict) and config.get("enabled") is True
+    return enabled()
 
 
 _root_stores: dict[Path, Any] = {}

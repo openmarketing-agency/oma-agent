@@ -5,6 +5,8 @@ description: "NeMo Relay shared metrics: what is exported, consent and retention
 
 # NeMo Relay Shared Metrics
 
+> This document describes upstream Hermes. OMA Agent does not offer, collect, or send Nous Shared Metrics, and does not honor legacy Shared Metrics opt-ins.
+
 Hermes includes NeMo Relay as a normal runtime dependency on platforms for
 which Relay publishes a native wheel. The shared-metrics integration is built
 into Hermes and does not require a Hermes observability plugin. Hermes remains

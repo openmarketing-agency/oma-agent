@@ -1,9 +1,7 @@
-"""Shared-metrics consent JSON-RPC handlers (the Desktop twin of ``hermes setup``'s Shared Metrics
-section). Both opt-ins live in the focused profile's config.yaml exactly where the wizard writes
-them — ``telemetry.shared_metrics.enabled`` (local collection) and ``.send`` (daily upload) — so the
-CLI and the app can never disagree about the answer. ``shared_metrics.set`` enforces the wizard's
-invariant (sending needs collection) and reconciles the consent windows in the local store on every
-change, through the same single writer the wizard uses.
+"""Compatibility JSON-RPC handlers for clients that still ask about Shared Metrics.
+
+Consent is always reported as disabled. Legacy event handlers reach the inactive
+collection policy, so old clients can connect without creating metrics.
 Bodies are rebound onto server.py's globals (method_ctx.bind_module) and reference them bare.
 """
 
@@ -44,54 +42,15 @@ def _tui_model_friction(signal, session, turns=1):
 @method("shared_metrics.status")
 @_profile_scoped
 def _(rid, params: dict) -> dict:
-    """``{enabled, send, decided, reask}`` for the focused profile. A pure read of config.yaml (no defaults
-    merged, so ``decided`` sees only what the user wrote)."""
-    try:
-        return _ok(rid, _shared_metrics_consent(_load_cfg()))
-    except Exception as e:
-        return _err(rid, 5095, str(e))
+    """Tell older clients that the feature is unavailable."""
+    return _ok(rid, _shared_metrics_consent(None))
 
 
 @method("shared_metrics.set")
 @_profile_scoped
 def _(rid, params: dict) -> dict:
-    """Write both opt-ins at once and reconcile the consent windows. ``send`` is forced off when
-    ``enabled`` is off (the wizard's rule: sending cannot outlive collection, and turning collection
-    off withdraws send consent). ``first_run`` marks the Desktop first-run answer, which also records
-    the setup-completed metric. Answers the stored ``{enabled, send, decided, reask}``."""
-    enabled = params.get("enabled") is True
-    send = enabled and params.get("send") is True
-    from hermes_cli.config_backend import ConfigWriteError, supports_file_tooling
-    from hermes_cli.observability.shared_metrics_consent import OFFER_VERSION, set_answer
-    try:
-        if supports_file_tooling():
-            cfg = _load_cfg_raw()
-            set_answer(cfg, enabled, send)
-            _save_cfg(cfg)
-        else:
-            # Explicit keys: refused as a whole when locked, never saved-minus-the-locked-part
-            # while the consent bookkeeping below records the proposed answer.
-            _write_config_changes({"telemetry.shared_metrics.enabled": enabled,
-                                   "telemetry.shared_metrics.send": send,
-                                   "telemetry.shared_metrics.offer_version": OFFER_VERSION})
-            cfg = _load_cfg_raw()
-    except ConfigWriteError as e:
-        return _err(rid, 4002, str(e))
-    except Exception as e:
-        return _err(rid, 5096, str(e))
-    from hermes_cli.setup import _record_send_consent_change
-    # Unconditional, like the wizard: a send key already false may still have an open window.
-    _record_send_consent_change(enabled=send)
-    if not enabled:
-        from hermes_cli.observability.shared_metrics_desktop import purge_onboarding_latches
-        from hermes_cli.observability.shared_metrics_process import purge_pending_receipts
-        from hermes_constants import get_hermes_home
-
-        purge_onboarding_latches()
-        purge_pending_receipts(get_hermes_home())
-    if params.get("first_run") is True:
-        _shared_metrics_record_setup_completed(cfg)
-    return _ok(rid, _shared_metrics_consent(cfg))
+    """Compatibility no-op: no profile can opt in."""
+    return _ok(rid, _shared_metrics_consent(None))
 
 
 @method("shared_metrics.slash_command")
