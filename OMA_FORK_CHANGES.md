@@ -1,8 +1,8 @@
 # OMA Agent fork changes and configuration reference
 
-This guide covers **OMA Agent v0.1.5**, compared with the upstream Hermes Agent commit it last incorporated (`fe8b920cae09`). It covers the fork’s behavior and settings, not every inherited Hermes option or every change on newer upstream `main`.[7][11]
+This guide covers **OMA Agent v0.1.6**, compared with the upstream Hermes Agent commit it last incorporated (`fe8b920cae09`). It covers the fork’s behavior and settings, not every inherited Hermes option or every change on newer upstream `main`.[7][11]
 
-**In short:** OMA starts with six selected toolsets and a smaller skill catalog, exposes four of those toolsets directly and defers the other two, opens the compact `mono` TUI for interactive chat, provides an R2-backed playbook installer, and does not collect or send Nous Shared Metrics. An upgrade does **not** replace an existing profile’s saved tool list or recreate an installed team.[1][2][8]
+**In short:** OMA starts with seven selected toolsets and a smaller skill catalog, exposes four of those toolsets directly and defers the other three, opens the compact `mono` TUI for interactive chat, provides an R2-backed playbook installer, and does not collect or send Nous Shared Metrics. An upgrade does **not** replace an existing profile’s saved tool list or recreate an installed team.[1][2][8]
 
 ## 1. What a profile starts with
 
@@ -11,7 +11,7 @@ This guide covers **OMA Agent v0.1.5**, compared with the upstream Hermes Agent 
 | Fresh built-in `default` | Minimal OMA starter `config.yaml`. The stock `SOUL.md` identifies it as OMA Agent, built by Open Marketing Agency and powered by Hermes Agent, and points it to `oma-playbooks`. It is the team setup agent, not the orchestrator of any team. | Bundled skills are available on demand where supported; none preloaded. The fresh `.env` starts empty; Docker may write a real gateway key. |
 | New named profile, no clone | Same minimal starter policy. Stock `SOUL.md` identifies it as OMA Agent without the root’s playbook-management instruction. | Bundled skills are seeded unless opted out. No skill preload or example `.env` entries. Normal creation can mirror real launch credentials and model settings; an empty seed is not a guarantee of credential isolation. |
 | Explicit clone | Uses the source configuration and persona rather than the OMA starter policy. Copy scope and isolation rules still depend on the clone flags. Unset global defaults are still resolved by the installed runtime. | Keeps the clone’s copied skills and `.env` where the clone mode supplies them. A clone does not register a second copy of the source profile’s cron jobs. |
-| New playbook agent | Created under its canonical `<playbook-id>__<role-id>` name. The installed `config.yaml` and `SOUL.md` come from the authored role, not from `default` or the generic six-toolset starter. | Seeds bundled skills and copies the role’s declared `oma_skills`. Blocks the `oma-playbooks` management skill in those roles. Does not mirror launch credentials or register jobs. Hermes’ ordinary shared-auth rules can still apply. |
+| New playbook agent | Created under its canonical `<playbook-id>__<role-id>` name. The installed `config.yaml` and `SOUL.md` come from the authored role, not from `default` or the generic starter. | Seeds bundled skills and copies the role’s declared `oma_skills`. Blocks the `oma-playbooks` management skill in those roles. Does not mirror launch credentials or register jobs. Hermes’ ordinary shared-auth rules can still apply. |
 | Existing profile after upgrade | Saved toolsets, skills settings, display choices, and customized `SOUL.md` are not replaced by the starter. A changed **runtime default** can affect omitted keys; a saved override still wins, except old Shared Metrics opt-ins are inert. | Existing `.env` files are not reinitialized from an example. Missing dotenv files can be seeded empty by profile maintenance. Existing skill packages are not an inventory of what the new release seeds on a clean home. |
 
 The starter is written only for a missing file-backed config. It is shared by source and Docker setup, normal non-clone profile creation, and local config creation through `hermes config edit` or the appropriate doctor repair. Remote config setup does not seed a local shadow config. The annotated [`cli-config.yaml.example`](cli-config.yaml.example) is a reference, not the live file the installer copies.[3][6][8]
@@ -22,7 +22,7 @@ This is the policy portion of a freshly seeded file. The actual file also has an
 
 ```yaml
 agent:
-  enabled_toolsets: [file, terminal, browser, web, skills, memory]
+  enabled_toolsets: [file, terminal, browser, web, skills, memory, session_search]
 tools:
   tool_search:
     enabled: "on"
@@ -45,7 +45,7 @@ approvals:
 
 ## 2. Toolsets: what the agent may use
 
-`agent.enabled_toolsets` is a **fork-added profile-wide allowlist**. Its runtime default is `null`, but the fresh OMA starter explicitly writes the six toolsets shown above. It governs availability, not whether a schema is sent upfront.[1][8]
+`agent.enabled_toolsets` is a **fork-added profile-wide allowlist**. Its runtime default is `null`, but the fresh OMA starter explicitly writes the seven toolsets shown above. It governs availability, not whether a schema is sent upfront.[1][8]
 
 | `agent.enabled_toolsets` | Effective selection |
 | --- | --- |
@@ -64,12 +64,13 @@ Names are literal and case-sensitive. Bundles expand to their member tools. The 
 | `web` | Web search and extraction; a working provider/backend can still be required. |
 | `skills` | The callable `skills_list`, `skill_view`, and `skill_manage` tools. It does not install or preload skills. |
 | `memory` | The callable `memory` tool and eligible memory-provider tools. This is separate from the inherited settings `memory.memory_enabled` and `memory.user_profile_enabled`, which control the built-in stores; enabling storage does not select the toolset. |
+| `session_search` | Search and recall past conversations. Enabled in fresh profiles starting with v0.1.6, but not eager. |
 
 See [profile toolset resolution](hermes_cli/toolset_policy.py), [toolset definitions](toolsets.py), and the [configuration reference](website/docs/user-guide/configuration.md#global-toolset-allowlist).
 
 ## 3. Tool Search: when schemas are visible
 
-Once tools are selected, Tool Search can keep their full schemas out of the initial model request. **Eager** means the model gets a schema directly. **Deferred** means the model can find the tool with `tool_search`, inspect it with `tool_describe`, and invoke it with `tool_call`. Starting with v0.1.5, OMA exposes `file`, `terminal`, `skills`, and `memory` directly in the fresh starter, defers `browser` and `web`, and keeps the bridge visible with its upfront catalog hidden. In v0.1.4 the starter deferred all six. This changes schema disclosure, not the selected tools or skill preloading.[1][3]
+Once tools are selected, Tool Search can keep their full schemas out of the initial model request. **Eager** means the model gets a schema directly. **Deferred** means the model can find the tool with `tool_search`, inspect it with `tool_describe`, and invoke it with `tool_call`. The starter has exposed `file`, `terminal`, `skills`, and `memory` directly since v0.1.5. In v0.1.6, `browser`, `web`, and `session_search` are deferred. The bridge stays visible with its upfront catalog hidden. Making the `skills` tools eager does not preload any skills.[1][3]
 
 All keys in this table live under `tools.tool_search`.
 
@@ -195,7 +196,7 @@ The breakdowns are fresh previews for the chosen profile/platform, not measureme
 
 ## 9. Docker, releases, and maintenance
 
-- **OMA runtime image:** `ghcr.io/openmarketing-agency/oma-agent:v0.1.5`. OMA version tags trigger native builds with release version/revision stamps, architecture smoke tests, and a multi-architecture manifest for `linux/amd64` and `linux/arm64`. The release does not recreate any container. Pull the new tag and recreate the service while retaining its existing Hermes data mount to roll it out. The v0.1.4 workflow is an example of the same release path.[9][10]
+- **OMA runtime image:** `ghcr.io/openmarketing-agency/oma-agent:v0.1.6`. OMA version tags trigger native builds with release version/revision stamps, architecture smoke tests, and a multi-architecture manifest for `linux/amd64` and `linux/arm64`. The release does not recreate any container. Pull the new tag and recreate the service while retaining its existing Hermes data mount to roll it out. The v0.1.4 workflow is an example of the same release path.[9][10]
 - **Secure gateway startup on mounts such as Colima:** If a volume cannot enforce the required owner-only (`0600`) control socket, the gateway uses a private runtime directory rather than advertising an unusable socket. It verifies the socket before accepting clients. This is separate from HTTP gateway authentication and from R2.[6]
 - **Separate release tracks:** The fork releases the runtime through the [OMA Docker workflow](.github/workflows/oma-docker-release.yml). The `openmarketing.agency` source repository publishes the playbook/skill content to R2. Updating one does not automatically update the other or installed profiles.[5][7]
 - **Repository changes:** Catalog indexes, skill pages and navigation reflect the bundled/optional split; regression coverage and prompt fixtures reflect fork behavior. The contributor guidance dropped an old prompt-snapshot approval note (documentation only), and the fork periodically incorporates upstream Hermes changes. This guide does not count upstream imports as independently authored OMA features.[4][7]
@@ -204,13 +205,13 @@ The breakdowns are fresh previews for the chosen profile/platform, not measureme
 
 1. Check `hermes --version` in the runtime you actually use. For Docker, pull and recreate from the OMA tag without replacing the data volume.
 2. Inspect `agent.enabled_toolsets`, `tools.tool_search`, `skills`, `display.skin`, and `security.protected_instruction_files` on each target profile. Use `config path` to compare saved keys with the merged values from `config get`.
-3. If an older profile’s explicit toolset list lacks `skills` or `memory`, add the missing names to that list rather than replacing role-specific tools with the starter. To adopt v0.1.5 disclosure on an existing profile, set `tools.tool_search.eager_toolsets` to `[file, terminal, skills, memory]`; the upgrade does not rewrite a saved `[]` or custom list. Eager settings never enable toolsets on their own.
+3. If an older profile’s explicit toolset list lacks `skills`, `memory`, or `session_search`, add the missing names as needed rather than replacing role-specific tools with the starter. To match starter disclosure, set `tools.tool_search.eager_toolsets` to `[file, terminal, skills, memory]`, leaving `session_search` deferred. The upgrade does not rewrite a saved `[]` or custom list. Eager settings never enable toolsets on their own.
 4. Start a new session to pick up changed tool/skill policy. Use `tools breakdown` and `skills breakdown` to see what the fresh session can access; do not treat the absence of a full schema upfront as the tool being disabled.
 5. Treat content updates and cron setup separately. Check the installed playbook’s `status` before doing anything to a team; fetching content or seeing a declared job in the ledger does not activate anything.
 
 ## Comparison basis
 
-The baseline is `fe8b920cae0980cef854f478236f525aaf2b93ce`, the merge base with upstream Hermes `main` for the v0.1.4 release. The v0.1.5 change is the eager starter policy and its documentation; it does not import a newer upstream baseline. Reproduce the fork comparison with `git diff fe8b920cae0980cef854f478236f525aaf2b93ce v0.1.5`; comparing directly to a newer upstream tip would mix newer upstream changes into the fork inventory.[7][9][11]
+The baseline is `fe8b920cae0980cef854f478236f525aaf2b93ce`, the merge base with upstream Hermes `main` for the v0.1.4 release. Neither the v0.1.5 eager starter change nor the v0.1.6 `session_search` addition imports a newer upstream baseline. Reproduce the fork comparison with `git diff fe8b920cae0980cef854f478236f525aaf2b93ce v0.1.6`; comparing directly to a newer upstream tip would mix newer upstream changes into the fork inventory.[7][9][11]
 
 ## Sources
 
