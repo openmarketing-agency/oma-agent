@@ -83,6 +83,7 @@ async def config_get(connection, ref, params):
         from hermes_cli.config import load_config
         from hermes_cli.config_backend import config_version_or_none, version_token
         from hermes_cli.config_effective import load_user_config_effective
+        from hermes_cli.skin_engine import configured_skin_name
         from hermes_constants import DEFAULT_INDICATOR_STYLE
         from tools.approval_context import _get_approval_mode
         home = Path(connection.authority.profile_id)
@@ -100,7 +101,7 @@ async def config_get(connection, ref, params):
                 'fast': lambda: _fast(connection, ref, policy, agent, cfg),
                 'service_tier': lambda: _service_tier(connection, ref, policy),
                 'daybreak': lambda: {'value': (cfg.get('agent') or {}).get('daybreak') is True},
-                'skin': lambda: {'value': display.get('skin', 'default')},
+                'skin': lambda: {'value': configured_skin_name(cfg)},
                 'theme': lambda: {'value': display.get('tui_theme', 'auto')},
                 'indicator': lambda: {'value': display.get('tui_status_indicator', DEFAULT_INDICATOR_STYLE)},
                 'details_mode': lambda: {'value': display.get('details_mode', 'collapsed')},

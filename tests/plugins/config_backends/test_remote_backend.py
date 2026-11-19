@@ -1670,20 +1670,15 @@ def _locked_then_unlocked_tui_setters(plane, server, session):
     assert all("unset" not in p["body"] for p in plane.patches())
 
 
-def test_tui_shared_metrics_set_refuses_a_locked_consent(plane, monkeypatch):
-    """Round 4 #6 (same class): the consent setter is explicit too; a locked answer is refused,
-    not saved-minus-the-lock while the consent bookkeeping records it."""
-    plane.upper = {"telemetry": {"shared_metrics": {"enabled": False, "send": False}}}
+def test_tui_shared_metrics_cannot_enable_metrics_or_write_remote_config(plane, monkeypatch):
+    plane.upper = {"telemetry": {"shared_metrics": {"enabled": True, "send": True}}}
     plane.upper_locks = [{"path": "telemetry.shared_metrics", "level": "tenant"}]
     server = _tui_server(monkeypatch, plane.home)
-    recorded = []
-    from hermes_cli import setup as setup_mod
-    monkeypatch.setattr(setup_mod, "_record_send_consent_change", lambda **kw: recorded.append(kw))
 
     answer = server._methods["shared_metrics.set"](1, {"enabled": True, "send": True})
 
-    assert answer["error"]["code"] == 4002 and "locked" in answer["error"]["message"]
-    assert plane.patches() == [] and recorded == []
+    assert answer["result"] == {"enabled": False, "send": False, "decided": True, "reask": False}
+    assert plane.patches() == []
 
 
 def test_poll_between_read_and_save_sends_only_the_callers_edit(plane, monkeypatch):

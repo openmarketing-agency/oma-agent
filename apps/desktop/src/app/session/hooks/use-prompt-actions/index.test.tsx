@@ -2211,7 +2211,7 @@ describe('usePromptActions desktop slash pickers', () => {
     expect(requestGateway).not.toHaveBeenCalledWith('command.dispatch', expect.anything())
   })
 
-  it('reports each typed command to shared metrics once, locally handled ones included, never alias re-dispatches', async () => {
+  it('runs local and aliased slash commands without reporting shared metrics', async () => {
     const openMemoryGraph = vi.fn()
 
     const requestGateway = vi.fn(
@@ -2233,12 +2233,7 @@ describe('usePromptActions desktop slash pickers', () => {
     await handle!.submitText('/mg') // user alias: the backend answers "run /journey"
 
     expect(openMemoryGraph).toHaveBeenCalledTimes(2)
-    expect(requestGateway.mock.calls.filter(([method]) => method === SLASH_METRIC).map(([, params]) => params)).toEqual(
-      [
-        { command: 'journey', session_id: RUNTIME_SESSION_ID },
-        { command: 'mg', session_id: RUNTIME_SESSION_ID }
-      ]
-    )
+    expect(requestGateway).not.toHaveBeenCalledWith(SLASH_METRIC, expect.anything())
   })
 
   it('marks a timed-out handoff as failed so the next attempt can retry', async () => {

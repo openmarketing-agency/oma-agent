@@ -1,8 +1,7 @@
-"""First-run routing between the classic CLI guard, the TUI and the shared-metrics offer.
+"""First-run routing between the classic CLI guard and the TUI.
 
 A blank install (no provider) must reach the TUI's own "Setup Required" screen under
-``hermes --tui``; the classic "Run setup now? [Y/n]" guard only fronts the classic CLI, and the
-one-time shared-metrics offer waits until a provider exists (#128663).
+``hermes --tui``; the classic "Run setup now? [Y/n]" guard only fronts the classic CLI.
 """
 
 from __future__ import annotations
@@ -20,7 +19,7 @@ class _Launched(Exception):
 def _run_chat(monkeypatch, argv, *, provider_configured):
     import hermes_cli.main as main_mod
     from hermes_cli._parser import build_top_level_parser
-    import hermes_cli.observability.shared_metrics_consent as consent
+
 
     parser, _subparsers, chat_parser = build_top_level_parser()
     chat_parser.set_defaults(func=main_mod.cmd_chat)
@@ -36,7 +35,7 @@ def _run_chat(monkeypatch, argv, *, provider_configured):
 
     monkeypatch.setattr(main_mod, "_has_any_provider_configured", lambda: provider_configured)
     monkeypatch.setattr(main_mod, "_first_run_setup_guard", lambda _args: calls.append("guard"))
-    monkeypatch.setattr(consent, "offer_consent_before_chat", lambda _args: calls.append("offer"))
+
     monkeypatch.setattr(main_mod, "_launch_tui", launch_tui)
     monkeypatch.setattr(main_mod, "_pin_kanban_board_env", lambda: None)
     monkeypatch.setattr(main_mod, "_start_chat_background_prefetch", lambda: None)
@@ -66,7 +65,7 @@ def _no_tui_env(monkeypatch):
     monkeypatch.delenv("HERMES_TUI", raising=False)
 
 
-def test_blank_install_tui_skips_classic_guard_and_offer(monkeypatch):
+def test_blank_install_tui_skips_classic_guard(monkeypatch):
     assert _run_chat(monkeypatch, ["chat", "--tui"], provider_configured=False) == ["tui"]
 
 

@@ -1363,23 +1363,7 @@ def _reconcile_store_consent(store: SharedMetricsStore, send_enabled: bool) -> N
 
 
 def enabled() -> bool:
-    """Return the shared-metrics policy for the active Hermes profile."""
-    profile_key = relay_runtime.current_profile_key()
-    try:
-        config: Any = _raw_config()
-    except Exception:
-        logger.debug("Unable to read Hermes shared-metrics policy", exc_info=True)
-        config = None
-    for key in ("telemetry", "shared_metrics"):
-        config = config.get(key) if isinstance(config, dict) else None
-    if isinstance(config, dict) and config.get("enabled") is True:
-        return True
-    if profile_key not in _RUNTIMES:  # the opted-out hot path: nothing to tear down, no lock
-        return False
-    with _RUNTIME_LOCK:
-        runtime = _RUNTIMES.pop(profile_key, None)
-        if isinstance(runtime, _Runtime):
-            runtime.deactivate()
+    """OMA Agent does not collect shared metrics, even for previously opted-in profiles."""
     return False
 
 
@@ -1435,7 +1419,6 @@ def _process_marks_admitted() -> bool:
 
 def observe_lifecycle(hook_name: str, **kwargs: Any) -> None:
     """Project one Hermes lifecycle event into the core Relay integration."""
-    _reconcile_send_consent_once()
     if not handles_hook(hook_name):
         return
     if not (
@@ -1642,6 +1625,8 @@ def _terminal_flags(result: dict[str, Any] | None, error: BaseException | None) 
 def _get_runtime(
     *, retry_failed: bool = False, host: relay_runtime.RelayRuntime | None = None
 ) -> _Runtime | None:
+    if not enabled():
+        return None
     profile_key = relay_runtime.current_profile_key()
     with _RUNTIME_LOCK:
         runtime = _RUNTIMES.get(profile_key)

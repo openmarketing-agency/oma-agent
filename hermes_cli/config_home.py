@@ -103,7 +103,7 @@ def seed_config_file(config_path: Path, *, model_seed: dict | None = None) -> bo
         return False
 
     config = {
-        "agent": {"enabled_toolsets": ["file", "terminal", "browser", "web"]},
+        "agent": {"enabled_toolsets": ["file", "terminal", "browser", "web", "skills", "memory"]},
         "tools": {"tool_search": {"enabled": "on", "eager_toolsets": [], "listing": "off"}},
         "skills": {"disabled": []},
         "approvals": {

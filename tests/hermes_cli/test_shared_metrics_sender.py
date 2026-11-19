@@ -946,68 +946,12 @@ class TestConsentRevocation:
         assert posts == []
 
 
-class TestCompression:
-    """Compression lives in the real transport, so exercise _post directly."""
+@pytest.mark.parametrize("payload", [b"{}", b"x" * 20000])
+def test_retired_transport_never_posts(payload, monkeypatch):
+    import urllib.request
 
-    def _captured_request(self, payload: bytes):
-        import urllib.request
+    from hermes_cli.observability.shared_metrics_sender import _post
 
-        from hermes_cli.observability import shared_metrics_sender as mod
-
-        captured = {}
-
-        class FakeConn:
-            status = 202
-            headers = {}
-
-            def read(self, _n=None):
-                return b"{}"
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *a):
-                return False
-
-        def fake_urlopen(request, timeout=None):
-            captured["data"] = request.data
-            captured["headers"] = {k.lower(): v for k, v in request.headers.items()}
-            return FakeConn()
-
-        original = urllib.request.urlopen
-        urllib.request.urlopen = fake_urlopen
-        try:
-            mod._post(ENDPOINT, payload, timeout=5)
-        finally:
-            urllib.request.urlopen = original
-        return captured
-
-    def test_large_payloads_are_gzipped(self):
-        payload = json.dumps({"filler": "x" * 20000}).encode("utf-8")
-        captured = self._captured_request(payload)
-        assert captured["data"][:2] == b"\x1f\x8b", "gzip magic bytes"
-        assert captured["headers"].get("Content-encoding".lower()) == "gzip"
-
-
-    def test_gzip_is_deterministic_across_time(self):
-        """Kills the mtime footgun: gzip embeds a timestamp by default.
-
-        The in-pass retry test cannot catch this — both attempts compress
-        within the same second. Compressing the same bytes at two different
-        wall-clock seconds is what actually exercises mtime=0.
-        """
-        import time as _time
-
-        payload = json.dumps({"filler": "x" * 20000}).encode("utf-8")
-        first = self._captured_request(payload)["data"]
-        _time.sleep(1.1)
-        second = self._captured_request(payload)["data"]
-        assert first == second, (
-            "gzip output changed between seconds — mtime is being embedded"
-        )
-
-    def test_small_payloads_are_sent_plain(self):
-        payload = b'{"small": true}'
-        captured = self._captured_request(payload)
-        assert captured["data"] == payload
-        assert "content-encoding" not in captured["headers"]
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: pytest.fail("unexpected HTTP request"))
+    with pytest.raises(RuntimeError, match="does not send"):
+        _post(ENDPOINT, payload, timeout=5)

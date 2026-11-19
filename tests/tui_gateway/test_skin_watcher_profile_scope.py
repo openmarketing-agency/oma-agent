@@ -76,6 +76,16 @@ def test_watcher_never_pushes_the_launch_home_skin_onto_a_profile_tui(homes):
     assert _skins(peer) == []
 
 
+def test_profiles_without_skin_use_mono_and_explicit_skin_stays(homes):
+    server, default, work = homes
+    _write_skin(default, "")
+    assert server.resolve_skin()["name"] == "mono"
+    assert _under(work, server.resolve_skin)["name"] == "ares"
+    _write_skin(work, "")
+    assert _under(work, server.resolve_skin)["name"] == "mono"
+    assert _under(work, server._skin_sig)[0] == "mono"
+
+
 def test_profile_skin_switch_repaints_only_that_profiles_tui(homes):
     server, default, work = homes
     work_peer, default_peer = _Peer(skin_home=str(work)), _Peer()

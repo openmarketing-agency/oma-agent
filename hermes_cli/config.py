@@ -930,11 +930,11 @@ def get_missing_skill_config_vars() -> list[dict[str, Any]]:
 
 # ---- Config structure validation ----
 
-# DEFAULT_CONFIG is the single source of truth for documented roots; the set is derived so new
-# defaults are accepted automatically. These optional/legacy roots are valid on disk but
-# intentionally absent from DEFAULT_CONFIG (omitted when unused / alternate schema forms).
+# DEFAULT_CONFIG supplies the documented roots; these optional or legacy roots are
+# also accepted on disk, but are intentionally absent from the defaults.
 _EXTRA_KNOWN_ROOT_KEYS = {
     "custom_providers",  # legacy list form; modern equivalent is providers: {}
+    "telemetry",         # legacy inert data; never bridge into the environment
     "fallback_model",    # optional single dict or chain list; omitted when disabled
     "mcp_servers",       # MCP server definitions written by setup/tools flows
     "image_gen",         # agent/image_gen_registry.py
