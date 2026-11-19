@@ -102,14 +102,6 @@ _CLONE_ALL_HISTORY_EXCLUDE_ROOT: frozenset[str] = frozenset({
 # dashboard) skip bundled-skill seeding. Delete the file to opt back in.
 NO_BUNDLED_SKILLS_MARKER = ".no-bundled-skills"
 
-# Header seeded into a profile's empty .env so it owns a credentials file from day one.
-_PLACEHOLDER_ENV = (
-    "# Per-profile secrets for this Hermes profile.\n"
-    "# API keys and tokens set here override the shell environment.\n"
-    "# Behavioral settings belong in config.yaml, not here.\n"
-)
-
-
 def _non_exportable_entries(directory: str, contents: list) -> set:
     """Entries under *directory* that must never be copied out of a profile: bytecode caches,
     ``*.sock``/``*.tmp`` names, and anything that is not a regular file, directory, or symlink.
@@ -1485,19 +1477,14 @@ def seed_profile_skills(profile_dir: Path, quiet: bool = False, problems: Option
 
 
 def backfill_profile_envs(quiet: bool = False) -> list[str]:
-    """Seed the placeholder ``.env`` header into every named profile lacking one; never
-    overwrites an existing file. It never copies the default's ``.env``: secrets are
-    profile-scoped, and a copied bot token makes two adapters fight over one bot.
-    """
+    """Give named profiles without a dotenv file an empty one, without copying secrets."""
+    from hermes_cli.config_home import seed_empty_env_file
+
     backfilled: list[str] = []
     for entry in _iter_named_profile_dirs():
-        env_path = entry / ".env"
-        if env_path.exists():
-            continue
         try:
-            env_path.write_text(_PLACEHOLDER_ENV, encoding="utf-8")
-            os.chmod(str(env_path), 0o600)
-            backfilled.append(entry.name)
+            if seed_empty_env_file(entry / ".env"):
+                backfilled.append(entry.name)
         except OSError as e:
             if not quiet:
                 print(f"⚠ Could not seed .env for profile '{entry.name}': {e}")

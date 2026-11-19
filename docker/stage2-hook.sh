@@ -441,15 +441,12 @@ seed_one() {
         fi
     fi
 }
-# .env receives a generated API_SERVER_KEY below: seed it owner-only so it is
-# never 0644 under the ambient umask even if the later chmod 600 fails.
-(umask 077 && seed_one ".env" ".env.example")
+seed_one "SOUL.md" "docker/SOUL.md"
 if [ ! -f "$HERMES_HOME/config.yaml" ] && ! refuse_symlinked_path "seed" "$HERMES_HOME/config.yaml"; then
     (cd "$INSTALL_DIR" && umask 077 && as_hermes "$INSTALL_DIR/.venv/bin/python" -c \
         'from hermes_cli.config_home import seed_install_config; seed_install_config()') \
         || echo "[stage2] Warning: could not seed starter settings"
 fi
-seed_one "SOUL.md" "docker/SOUL.md"
 
 # --- Ensure a gateway api_server key exists (loopback control plane) ---
 # The gateway's aiohttp api_server refuses to start without a strong
@@ -463,14 +460,12 @@ seed_one "SOUL.md" "docker/SOUL.md"
 # default bind host is 127.0.0.1 and the Fly service only exposes the
 # dashboard's port, so this listener is never publicly reachable.
 #
-# CREATE .env when it is missing rather than requiring it to exist (OOF-285):
-# the first-boot seed above depends on /opt/hermes/.env.example being present
-# in the image, and when it isn't (the .dockerignore excluded it for a long
-# stretch of releases) seed_one is a silent no-op, no .env ever exists, this
-# keygen never ran, the api_server never started, and every scheduled cron
-# fire on the instance was silently lost. The key must not depend on the
-# example-file seed having worked.
-#
+# Start with an empty, owner-only dotenv file instead of copying example
+# settings. This is also the durable target for the loopback key (OOF-285).
+if [ ! -f "$HERMES_HOME/.env" ] && ! refuse_symlinked_path "seed" "$HERMES_HOME/.env"; then
+    (umask 077 && as_hermes sh -c 'set -C; : > "$1"' sh "$HERMES_HOME/.env") 2>/dev/null || true
+fi
+
 # OPERATOR-PROVIDED KEYS WIN: if the container environment already carries
 # API_SERVER_KEY (documented `docker run -e API_SERVER_KEY=...` flow), do
 # not generate one. Hermes loads $HERMES_HOME/.env with override=True, so
@@ -504,19 +499,10 @@ elif ! grep -q '^API_SERVER_KEY=..*' "$HERMES_HOME/.env" 2>/dev/null; then
     if refuse_symlinked_path "append" "$HERMES_HOME/.env"; then
         :
     else
-        if [ ! -f "$HERMES_HOME/.env" ]; then
-            # Create an empty, owner-only .env so the append below (and any
-            # later runtime save_env_value writes) have a durable target.
-            # Created under a restrictive umask so the file is 0600 from the
-            # first instant — no touch→chmod window, and no dependence on a
-            # silenced chmod succeeding. The chown/chmod block below still
-            # re-tightens perms every boot.
-            (umask 077 && as_hermes touch "$HERMES_HOME/.env") 2>/dev/null || true
-        fi
         if [ -f "$HERMES_HOME/.env" ]; then
             _gen_key=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
             if [ -n "$_gen_key" ]; then
-                # Drop an empty assignment line if the seed left one behind,
+                # Drop an empty assignment line from a legacy .env,
                 # then append the generated key. The append is guarded: on a
                 # read-only volume / full disk it must degrade to the warning
                 # below, not abort the whole stage2 hook under `set -e`.

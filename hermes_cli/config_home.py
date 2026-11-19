@@ -82,6 +82,16 @@ def initialize_home(home: Path, subdirs: tuple[str, ...], ensured: set[str]) -> 
     ensured.update((str(home), str(home.resolve())))
 
 
+def seed_empty_env_file(path: Path) -> bool:
+    """Create a private, empty dotenv file without replacing an existing path."""
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        return False
+    os.close(fd)
+    return True
+
+
 def seed_config_file(config_path: Path, *, model_seed: dict | None = None) -> bool:
     """Write the OMA starter policy only if the target has no config."""
     from hermes_cli.config import _secure_file, atomic_config_write

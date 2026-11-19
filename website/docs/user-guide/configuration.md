@@ -31,6 +31,11 @@ the boilerplate from `cli-config.yaml.example`. Model/provider settings can be w
 by setup or inherited by a new profile that shares launch credentials. Existing
 configs and cloned tool/skill selections are not replaced by these defaults.
 
+Fresh installs and non-cloned profiles start with an empty `.env` rather than
+copying `.env.example`. Docker still persists a generated `API_SERVER_KEY` for
+the gateway when no key is supplied. Existing `.env` contents and explicit
+profile cloning behavior are unchanged.
+
 The playbook manager reads `latest.yaml` from
 `https://pub-d3419a6b761b48b38897cf50a5056136.r2.dev` to select the default release.
 If that object returns 404, the manager uses the existing `v0.1.1` R2 snapshot.

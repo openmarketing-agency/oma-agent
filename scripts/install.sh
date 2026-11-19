@@ -1152,10 +1152,11 @@ stage_config() {
     mkdir -p "$HERMES_HOME"/cron "$HERMES_HOME"/sessions "$HERMES_HOME"/logs \
         "$HERMES_HOME"/pairing "$HERMES_HOME"/hooks "$HERMES_HOME"/image_cache \
         "$HERMES_HOME"/audio_cache "$HERMES_HOME"/memories "$HERMES_HOME"/skills
-    if [ ! -f "$HERMES_HOME/.env" ]; then
-        cp "$INSTALL_DIR/.env.example" "$HERMES_HOME/.env" 2>/dev/null || touch "$HERMES_HOME/.env"
+    if [ ! -e "$HERMES_HOME/.env" ] && [ ! -L "$HERMES_HOME/.env" ]; then
+        (umask 077; set -C; : > "$HERMES_HOME/.env")
+    elif [ -f "$HERMES_HOME/.env" ] && [ ! -L "$HERMES_HOME/.env" ]; then
+        chmod 600 "$HERMES_HOME/.env"
     fi
-    chmod 600 "$HERMES_HOME/.env"
     if [ ! -f "$HERMES_HOME/config.yaml" ]; then
         local boot_py
         bootstrap_python

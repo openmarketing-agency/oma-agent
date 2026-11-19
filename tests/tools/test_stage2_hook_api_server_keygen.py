@@ -47,6 +47,8 @@ def _run_keygen(
     stage2_text: str,
     home: Path,
     env_key: str | None = None,
+    *,
+    install_dir: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     if shutil.which("sh") is None:
         pytest.skip("sh not available")
@@ -54,16 +56,23 @@ def _run_keygen(
         env_setup = "unset API_SERVER_KEY\n"
     else:
         env_setup = f'API_SERVER_KEY="{env_key}"\n'
+    seed_block = ""
+    if install_dir is not None:
+        start = stage2_text.index("# --- Seed config files")
+        end = stage2_text.index("# --- Ensure a gateway api_server key exists", start)
+        seed_block = f'INSTALL_DIR="{install_dir}"\n{stage2_text[start:end]}'
     script = (
         # Production runs the hook under `set -eu` (docker/stage2-hook.sh
         # shebang block) — the sandbox must match, or the tests cannot see
         # unguarded-command defects that would abort a real container boot.
         "set -eu\n"
+        "umask 022\n"
         f"{env_setup}"
         f'HERMES_HOME="{home}"\n'
         # In tests we run unprivileged; as_hermes is a passthrough then.
         'as_hermes() { "$@"; }\n'
         f"{_path_guard_functions(stage2_text)}\n"
+        f"{seed_block}\n"
         f"{_keygen_block(stage2_text)}\n"
     )
     return subprocess.run(
@@ -73,6 +82,25 @@ def _run_keygen(
         timeout=30,
         check=False,
     )
+
+
+@pytest.mark.parametrize("operator_key", [None, "operator-provided-key-123"])
+def test_first_boot_env_contains_only_effective_default_values(stage2_text, tmp_path, operator_key):
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "config.yaml").touch()
+    install = tmp_path / "install"
+    install.mkdir()
+    (install / ".env.example").write_text("# Example only\nTERMINAL_TIMEOUT=60\n")
+
+    result = _run_keygen(stage2_text, home, operator_key, install_dir=install)
+    assert result.returncode == 0, result.stderr
+    env = home / ".env"
+    if operator_key is None:
+        assert KEY_LINE_RE.fullmatch(env.read_text().rstrip("\n")), "expected one generated key and no template values"
+    else:
+        assert env.read_bytes() == b""
+    assert env.stat().st_mode & 0o777 == 0o600
 
 
 @pytest.mark.platforms("linux")

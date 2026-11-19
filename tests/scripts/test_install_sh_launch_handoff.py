@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 
@@ -95,6 +96,7 @@ def test_config_stage_delegates_only_when_config_is_missing(tmp_path):
     calls = tmp_path / "calls.json"
     home = tmp_path / "home"
     (install / "hermes_cli").mkdir(parents=True)
+    (install / ".env.example").write_text("# Example only\nTERMINAL_TIMEOUT=60\n", encoding="utf-8")
     (install / "hermes_cli" / "source_completion.py").write_text(
         "import json, os, sys\nfrom pathlib import Path\n"
         "Path(os.environ['CALLS']).write_text(json.dumps(sys.argv[1:]))\n", encoding="utf-8")
@@ -105,13 +107,18 @@ def test_config_stage_delegates_only_when_config_is_missing(tmp_path):
            "HERMES_RUNTIME_DIR": str(tmp_path / "store"), "CALLS": str(calls), "PYTHON_FOR_TEST": sys.executable}
     subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=20, check=True)
     assert json.loads(calls.read_text()) == ["--source", str(install), "--seed-config"]
+    env_path = home / ".env"
+    assert env_path.read_bytes() == b""
+    assert stat.S_IMODE(env_path.stat().st_mode) == 0o600
 
     config = home / "config.yaml"
     config.write_text("# Existing settings\nmodel: custom\n", encoding="utf-8")
+    env_path.write_bytes(b"# User entry\nEXAMPLE_TOKEN=fixture\n")
     calls.unlink()
     subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=20, check=True)
     assert not calls.exists()
     assert config.read_text() == "# Existing settings\nmodel: custom\n"
+    assert env_path.read_bytes() == b"# User entry\nEXAMPLE_TOKEN=fixture\n"
 
 
 @pytest.mark.platforms("posix")

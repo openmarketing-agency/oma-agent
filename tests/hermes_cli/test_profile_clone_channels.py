@@ -186,7 +186,6 @@ def test_clone_all_copies_a_linked_root_file_as_the_source_resolves_it(home, tmp
 def test_clone_all_drops_a_root_file_link_that_dangles_in_the_source(home, tmp_path):
     """A source link to a missing file is still dropped and the clone seeded like a fresh profile; the
     seeding never writes through the link (that would create the missing target)."""
-    from hermes_cli.profiles import _PLACEHOLDER_ENV
     missing = tmp_path / "dotfiles" / "hermes" / ".env"
     missing.parent.mkdir(parents=True)
     (home / ".env").unlink()
@@ -195,7 +194,7 @@ def test_clone_all_drops_a_root_file_link_that_dangles_in_the_source(home, tmp_p
     profile_dir = create_profile("full", clone_all=True, no_alias=True)
 
     assert not (profile_dir / ".env").is_symlink() and not missing.exists()
-    assert (profile_dir / ".env").read_text(encoding="utf-8") == _PLACEHOLDER_ENV
+    assert (profile_dir / ".env").read_bytes() == b""
 
 
 @pytest.mark.require_symlinks
