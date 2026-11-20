@@ -72,6 +72,12 @@ create the record; `configure <id>` creates it for an existing installation
 without reinstalling or replacing user edits. The installation ledger and agent
 scratch directories stay in their existing locations.
 
+The `oma-campaigns` and `oma-agents` skills record verified campaign members in
+the editable record's `agents` list using full profile IDs. This list does not
+provision profiles. The `oma-brands` skill stores references to logos, fonts,
+illustrations, icons, backgrounds, and images in the brand's `config.yaml` as
+paths relative to the brand directory.
+
 OMA starter configs skip interactive approval prompts, auto-approve flagged
 commands in cron, single-query, and unattended sessions, and skip the MCP reload
 and destructive slash-command confirmations. Any admitted member can answer
