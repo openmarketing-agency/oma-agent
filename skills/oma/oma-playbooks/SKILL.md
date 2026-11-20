@@ -48,7 +48,7 @@ strategy: |-
 ## Pitfalls
 
 - Neither drafting nor saving a strategy authorizes executing it. Do not install campaigns, create jobs, or start agent turns as part of saving a record.
-- Do not confuse these records with campaign definitions under `/opt/opa/campaigns` or installation records under `$HERMES_HOME/playbooks/`. Use `oma-campaigns` for campaign installation, not playbook authoring.
+- Do not confuse these records with campaign definitions under `/opt/oma/campaigns` or installation records under `$HERMES_HOME/playbooks/`. Use `oma-campaigns` for campaign installation, not playbook authoring.
 
 ## Verification
 

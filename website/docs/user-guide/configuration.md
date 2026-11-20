@@ -59,7 +59,7 @@ the gateway when no key is supplied. Existing `.env` contents and explicit
 profile cloning behavior are unchanged.
 
 The bundled `oma-campaigns` skill installs from the runtime's local
-`/opt/opa/campaigns` and `/opt/oma/skills` directories. Supply those directories
+`/opt/oma/campaigns` and `/opt/oma/skills` directories. Supply those directories
 in the image or mount them read-only. The helper does not fetch content, query
 a catalog, or check versions. `list` and `status` inspect installed campaigns in
 `$HERMES_HOME/playbooks/`; changing the local source does not update installed

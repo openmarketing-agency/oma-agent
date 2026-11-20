@@ -1,6 +1,6 @@
 # OMA Agent fork changes and configuration reference
 
-This guide covers **OMA Agent v0.1.7**, compared with the upstream Hermes Agent commit it last incorporated (`fe8b920cae09`). It covers the fork’s behavior and settings, not every inherited Hermes option or every change on newer upstream `main`.[7][11]
+This guide covers **OMA Agent v0.1.8**, compared with the upstream Hermes Agent commit it last incorporated (`fe8b920cae09`). It covers the fork’s behavior and settings, not every inherited Hermes option or every change on newer upstream `main`.[7][11]
 
 **In short:** OMA starts with four eager and three deferred toolsets, plus eager `clarify` in the built-in `default` profile. It ships a smaller skill catalog, opens the compact `mono` TUI for interactive chat, installs campaigns from local runtime content, and does not collect or send Nous Shared Metrics. An upgrade does **not** replace an existing profile’s saved tool list or recreate an installed team.[1][2][8]
 
@@ -167,7 +167,7 @@ This does not erase historical Shared Metrics artifacts or disable unrelated loc
 
 ## 7. Campaigns: local definitions and provisioning, not scheduled work
 
-The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) runs its helper in the `default` profile. A campaign defines a team, not a fixed pipeline. Its definition at `/opt/opa/campaigns/<id>/config.yaml` declares `id`, `name`, `description`, `orchestrator`, and its ordered `agents` list. The orchestrator ID is `<id>__orchestrator` and must be in the roster. Each agent entry is already a full profile ID, with a matching `agents/<agent-id>/config.yaml` and adjacent `SOUL.md`. The installer strips source-only metadata before writing live `config.yaml`.[3][5]
+The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) runs its helper in the `default` profile. A campaign defines a team, not a fixed pipeline. Its definition at `/opt/oma/campaigns/<id>/config.yaml` declares `id`, `name`, `description`, `orchestrator`, and its ordered `agents` list. The orchestrator ID is `<id>__orchestrator` and must be in the roster. Each agent entry is already a full profile ID, with a matching `agents/<agent-id>/config.yaml` and adjacent `SOUL.md`. The installer strips source-only metadata before writing live `config.yaml`.[3][5]
 
 | Helper verb | Effect |
 | --- | --- |
@@ -175,7 +175,7 @@ The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) runs its 
 | `list` / `status <id>` | Inspect local installation records and which profiles still exist; no network access. |
 | `configure <id>` | Create a missing editable config for an existing installation without reinstalling or overwriting it. |
 
-**Local sources only:** Provide `/opt/opa/campaigns` and `/opt/oma/skills` in the runtime image or mount them read-only. The helper does not download content, query a catalog, select or compare versions, or fall back to an old cache. See the [argument parser](hermes_cli/oma_playbooks/__main__.py) for supported commands.[3][5]
+**Local sources only:** Provide `/opt/oma/campaigns` and `/opt/oma/skills` in the runtime image or mount them read-only. The helper does not download content, query a catalog, select or compare versions, or fall back to an old cache. See the [argument parser](hermes_cli/oma_playbooks/__main__.py) for supported commands.[3][5]
 
 **Editable campaign config:** `$HERMES_HOME/oma/campaigns/<id>/config.yaml` stores the campaign’s `id`, `name`, `description`, `version`, inline `goals` and `plans`, and a `playbook` ID linking to `$HERMES_HOME/oma/playbooks/<playbook-id>/config.yaml`. New installs seed it automatically. For an older installation, `configure <id>` seeds the same file from the existing ledger without touching profiles or their scratch paths. Unspecified goals, plans, and playbook links start empty.
 
@@ -201,7 +201,7 @@ The breakdowns are fresh previews for the chosen profile/platform, not measureme
 
 ## 9. Docker, releases, and maintenance
 
-- **OMA runtime image:** `ghcr.io/openmarketing-agency/oma-agent:v0.1.7`. OMA version tags trigger native builds with release version/revision stamps, architecture smoke tests, and a multi-architecture manifest for `linux/amd64` and `linux/arm64`. The release does not recreate any container. Pull the new tag and recreate the service while retaining its existing Hermes data mount to roll it out. The v0.1.4 workflow is an example of the same release path.[9][10]
+- **OMA runtime image:** `ghcr.io/openmarketing-agency/oma-agent:v0.1.8`. OMA version tags trigger native builds with release version/revision stamps, architecture smoke tests, and a multi-architecture manifest for `linux/amd64` and `linux/arm64`. The release does not recreate any container. Pull the new tag and recreate the service while retaining its existing Hermes data mount to roll it out. The v0.1.4 workflow is an example of the same release path.[9][10]
 - **Secure gateway startup on mounts such as Colima:** If a volume cannot enforce the required owner-only (`0600`) control socket, the gateway uses a private runtime directory rather than advertising an unusable socket. It verifies the socket before accepting clients. This is separate from HTTP gateway authentication.[6]
 - **Runtime and content:** The fork releases the runtime through the [OMA Docker workflow](.github/workflows/oma-docker-release.yml). The deployment supplies the campaign and skill directories separately. Updating those directories does not change installed profiles.[5][7]
 - **Repository changes:** Catalog indexes, skill pages and navigation reflect the bundled/optional split; regression coverage and prompt fixtures reflect fork behavior. The contributor guidance dropped an old prompt-snapshot approval note (documentation only), and the fork periodically incorporates upstream Hermes changes. This guide does not count upstream imports as independently authored OMA features.[4][7]
@@ -216,7 +216,7 @@ The breakdowns are fresh previews for the chosen profile/platform, not measureme
 
 ## Comparison basis
 
-The baseline is `fe8b920cae0980cef854f478236f525aaf2b93ce`, the merge base with upstream Hermes `main` for the v0.1.4 release. The v0.1.5 through v0.1.7 releases do not import a newer upstream baseline. Reproduce the fork comparison with `git diff fe8b920cae0980cef854f478236f525aaf2b93ce v0.1.7`; comparing directly to a newer upstream tip would mix newer upstream changes into the fork inventory.[7][9][11]
+The baseline is `fe8b920cae0980cef854f478236f525aaf2b93ce`, the merge base with upstream Hermes `main` for the v0.1.4 release. The v0.1.5 through v0.1.8 releases do not import a newer upstream baseline. Reproduce the fork comparison with `git diff fe8b920cae0980cef854f478236f525aaf2b93ce v0.1.8`; comparing directly to a newer upstream tip would mix newer upstream changes into the fork inventory.[7][9][11]
 
 ## Sources
 

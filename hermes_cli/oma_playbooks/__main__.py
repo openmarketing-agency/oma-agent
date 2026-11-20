@@ -9,7 +9,7 @@ from hermes_cli.oma_playbooks.install import configure, default_home, install, i
 from hermes_cli.oma_playbooks.source import resolve
 
 
-_CAMPAIGNS_DIR = Path("/opt/opa/campaigns")
+_CAMPAIGNS_DIR = Path("/opt/oma/campaigns")
 _SKILLS_DIR = Path("/opt/oma/skills")
 
 
