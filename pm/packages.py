@@ -811,6 +811,19 @@ class Pnpm(BinaryPackage):
     exe_platforms = {"linux-arm64-bionic": "android-arm64"}
     on_demand = {"linux-arm64-bionic": "the Termux .deb ships a prebuilt TUI; `hermes dashboard` fetches pnpm to build the web UI"}
 
+    def is_optional(self, target: str) -> bool:
+        from pm.paths import install_root, install_stamp_path
+
+        if super().is_optional(target):
+            return True
+        root = install_root()
+        # Build stages explicitly provision pnpm; the stamped image ships prebuilt JS.
+        if not install_stamp_path(root).is_file():
+            return False
+        from hermes_cli.steward import STEWARD_DOCKER, sealed_steward
+
+        return sealed_steward(root) == STEWARD_DOCKER
+
     def fetch_urls(self, version: str, target: str) -> list[str]:
         exe = self.exe_platforms.get(target, target)
         return [
