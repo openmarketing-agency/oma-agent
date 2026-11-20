@@ -28,11 +28,25 @@ A fresh OMA install or a profile created without cloning starts with a minimal
 turn. `browser`, `web`, and `session_search` are deferred and discoverable
 through Tool Search. `session_search` searches past conversations.
 The tool-search bridge stays visible, with its upfront catalog listing off.
+The built-in `default` profile also starts with `clarify` enabled and eager on
+supported interactive surfaces. Its stock `SOUL.md` tells it to use `clarify`
+for feedback and decisions. New named profiles do not enable it by default.
 
-No skills are auto-loaded by default. Both the default profile and fresh named
-profiles start with `skills.disabled: []`, so bundled skills are available on
-demand on supported platforms. Bundled skills remain installed unless you opt
-out of seeding. The starter file includes the generated schema version but not
+A fresh file-backed OMA install also creates a `maintenance` profile. It enables
+`file`, `terminal`, `skills`, `memory`, `session_search`, `web`, and `browser`.
+Only `file` and `terminal` are eager; the others are available through Tool
+Search where supported. Use `hermes -p maintenance` to select the profile. The
+installer uses `hermes_cli/data/profiles/maintenance/` for its tool config,
+`SOUL.md`, and `omactl` skill. The live profile is stored under
+`$HERMES_HOME/profiles/maintenance/` and is not overwritten on upgrade. The
+`omactl` CLI is a separate runtime prerequisite.
+
+No skills are auto-loaded by default. The five bundled `oma-*` management
+skills are available on demand only in the `default` profile, whose stock
+`SOUL.md` explains which one to use. Named profiles do not seed these skills,
+and cannot load older copies they retain. `skills.disabled: []` in the starter
+does not bypass this rule. Other bundled skills use the normal platform and
+seeding rules. The starter file includes the generated schema version but not
 the boilerplate from `cli-config.yaml.example`. Model/provider settings can be written
 by setup or inherited by a new profile that shares launch credentials. Existing
 configs and cloned tool/skill selections are not replaced by these defaults.
@@ -44,22 +58,19 @@ copying `.env.example`. Docker still persists a generated `API_SERVER_KEY` for
 the gateway when no key is supplied. Existing `.env` contents and explicit
 profile cloning behavior are unchanged.
 
-The playbook manager reads `latest.yaml` from
-`https://pub-d3419a6b761b48b38897cf50a5056136.r2.dev` to select the default release.
-If that object returns 404, the manager uses the existing `v0.1.1` R2 snapshot.
-`--tag` selects a release via `<tag>/release.yaml` (not needed for `v0.1.1`).
-`check` reports cache status without downloading ZIPs. `fetch` downloads
-`<tag>/playbooks.zip` and `<tag>/skills.zip` from R2 and caches both trees under
-`$HERMES_HOME/cache/oma-playbooks-r2/<commit>/` without creating profiles. Neither
-command contacts GitHub.
-New public installs record the source tag, commit, and R2 base URL alongside the
-description, provisioning state, and agent versions in
-`$HERMES_HOME/playbooks/<id>/installation.yaml`.
+The bundled `oma-campaigns` skill installs from the runtime's local
+`/opt/opa/campaigns` and `/opt/oma/skills` directories. Supply those directories
+in the image or mount them read-only. The helper does not fetch content, query
+a catalog, or check versions. `list` and `status` inspect installed campaigns in
+`$HERMES_HOME/playbooks/`; changing the local source does not update installed
+profiles.
 
-OMA Agent `v0.1.2` introduces direct R2 downloads for playbooks and skills.
-The OMA Agent tag versions the runtime; the tag in `latest.yaml` versions the
-playbook and skill bundle. The bundle can be published and fetched independently
-of a runtime release. Fetching a newer bundle does not update installed profiles.
+Editable campaign records live at `$HERMES_HOME/oma/campaigns/<id>/config.yaml`.
+They contain `id`, `name`, `description`, `version`, inline `goals` and `plans`,
+and an optional `playbook` ID from `$HERMES_HOME/oma/playbooks/`. New installs
+create the record; `configure <id>` creates it for an existing installation
+without reinstalling or replacing user edits. The installation ledger and agent
+scratch directories stay in their existing locations.
 
 OMA starter configs skip interactive approval prompts, auto-approve flagged
 commands in cron, single-query, and unattended sessions, and skip the MCP reload

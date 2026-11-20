@@ -1,32 +1,33 @@
 # OMA Agent fork changes and configuration reference
 
-This guide covers **OMA Agent v0.1.6**, compared with the upstream Hermes Agent commit it last incorporated (`fe8b920cae09`). It covers the fork’s behavior and settings, not every inherited Hermes option or every change on newer upstream `main`.[7][11]
+This guide covers **OMA Agent v0.1.7**, compared with the upstream Hermes Agent commit it last incorporated (`fe8b920cae09`). It covers the fork’s behavior and settings, not every inherited Hermes option or every change on newer upstream `main`.[7][11]
 
-**In short:** OMA starts with seven selected toolsets and a smaller skill catalog, exposes four of those toolsets directly and defers the other three, opens the compact `mono` TUI for interactive chat, provides an R2-backed playbook installer, and does not collect or send Nous Shared Metrics. An upgrade does **not** replace an existing profile’s saved tool list or recreate an installed team.[1][2][8]
+**In short:** OMA starts with four eager and three deferred toolsets, plus eager `clarify` in the built-in `default` profile. It ships a smaller skill catalog, opens the compact `mono` TUI for interactive chat, installs campaigns from local runtime content, and does not collect or send Nous Shared Metrics. An upgrade does **not** replace an existing profile’s saved tool list or recreate an installed team.[1][2][8]
 
 ## 1. What a profile starts with
 
 | Profile | Configuration and identity | Skills and credentials |
 | --- | --- | --- |
-| Fresh built-in `default` | Minimal OMA starter `config.yaml`. The stock `SOUL.md` identifies it as OMA Agent, built by Open Marketing Agency and powered by Hermes Agent, and points it to `oma-playbooks`. It is the team setup agent, not the orchestrator of any team. | Bundled skills are available on demand where supported; none preloaded. The fresh `.env` starts empty; Docker may write a real gateway key. |
+| Fresh built-in `default` | Minimal OMA starter `config.yaml`. The stock `SOUL.md` identifies it as OMA Agent and explains when to use `oma-onboarding`, `oma-brands`, `oma-playbooks`, `oma-campaigns`, and `oma-agents`. It is the team setup agent, not the orchestrator of any team. | Bundled skills are available on demand where supported; none preloaded. The fresh `.env` starts empty; Docker may write a real gateway key. |
+| Starter `maintenance` | Created alongside `default` on a fresh file-backed install from [`hermes_cli/data/profiles/maintenance/`](hermes_cli/data/profiles/maintenance/). Enables `file`, `terminal`, `skills`, `memory`, `session_search`, `web`, and `browser`; only `file` and `terminal` are eager. | Seeds a maintenance-specific `SOUL.md` and the supplied `omactl` skill for this profile only; does not install or run the CLI. The five OMA management skills are not available. No launch credentials are copied, and an existing `maintenance` profile is not overwritten. |
 | New named profile, no clone | Same minimal starter policy. Stock `SOUL.md` identifies it as OMA Agent without the root’s playbook-management instruction. | Bundled skills are seeded unless opted out. No skill preload or example `.env` entries. Normal creation can mirror real launch credentials and model settings; an empty seed is not a guarantee of credential isolation. |
 | Explicit clone | Uses the source configuration and persona rather than the OMA starter policy. Copy scope and isolation rules still depend on the clone flags. Unset global defaults are still resolved by the installed runtime. | Keeps the clone’s copied skills and `.env` where the clone mode supplies them. A clone does not register a second copy of the source profile’s cron jobs. |
-| New playbook agent | Created under its canonical `<playbook-id>__<role-id>` name. The installed `config.yaml` and `SOUL.md` come from the authored role, not from `default` or the generic starter. | Seeds bundled skills and copies the role’s declared `oma_skills`. Blocks the `oma-playbooks` management skill in those roles. Does not mirror launch credentials or register jobs. Hermes’ ordinary shared-auth rules can still apply. |
+| New campaign agent | Created under its canonical `<campaign-id>__<role-id>` name. The installed `config.yaml` and `SOUL.md` come from the authored role, not from `default` or the generic starter. | Seeds eligible bundled skills and copies the role’s declared `oma_skills`. The five bundled OMA management skills are default-only. Does not mirror launch credentials or register jobs. Hermes’ ordinary shared-auth rules can still apply. |
 | Existing profile after upgrade | Saved toolsets, skills settings, display choices, and customized `SOUL.md` are not replaced by the starter. A changed **runtime default** can affect omitted keys; a saved override still wins, except old Shared Metrics opt-ins are inert. | Existing `.env` files are not reinitialized from an example. Missing dotenv files can be seeded empty by profile maintenance. Existing skill packages are not an inventory of what the new release seeds on a clean home. |
 
 The starter is written only for a missing file-backed config. It is shared by source and Docker setup, normal non-clone profile creation, and local config creation through `hermes config edit` or the appropriate doctor repair. Remote config setup does not seed a local shadow config. The annotated [`cli-config.yaml.example`](cli-config.yaml.example) is a reference, not the live file the installer copies.[3][6][8]
 
 ### Fresh starter YAML
 
-This is the policy portion of a freshly seeded file. The actual file also has an internal `_config_version` stamp and may have model/provider settings when supplied by setup or profile creation. It does not pin every merged runtime default.[3][8]
+This is the policy portion of a freshly seeded `default` config. Fresh named profiles omit `clarify` from both toolset lists. The actual file also has an internal `_config_version` stamp and may have model/provider settings when supplied by setup or profile creation. It does not pin every merged runtime default.[3][8]
 
 ```yaml
 agent:
-  enabled_toolsets: [file, terminal, browser, web, skills, memory, session_search]
+  enabled_toolsets: [file, terminal, browser, web, skills, memory, session_search, clarify]
 tools:
   tool_search:
     enabled: "on"
-    eager_toolsets: [file, terminal, skills, memory]
+    eager_toolsets: [file, terminal, skills, memory, clarify]
     listing: "off"
 skills:
   disabled: []
@@ -45,7 +46,7 @@ approvals:
 
 ## 2. Toolsets: what the agent may use
 
-`agent.enabled_toolsets` is a **fork-added profile-wide allowlist**. Its runtime default is `null`, but the fresh OMA starter explicitly writes the seven toolsets shown above. It governs availability, not whether a schema is sent upfront.[1][8]
+`agent.enabled_toolsets` is a **fork-added profile-wide allowlist**. Its runtime default is `null`, but the fresh OMA starter explicitly writes the applicable toolsets shown above. It governs availability, not whether a schema is sent upfront.[1][8]
 
 | `agent.enabled_toolsets` | Effective selection |
 | --- | --- |
@@ -65,6 +66,7 @@ Names are literal and case-sensitive. Bundles expand to their member tools. The 
 | `skills` | The callable `skills_list`, `skill_view`, and `skill_manage` tools. It does not install or preload skills. |
 | `memory` | The callable `memory` tool and eligible memory-provider tools. This is separate from the inherited settings `memory.memory_enabled` and `memory.user_profile_enabled`, which control the built-in stores; enabling storage does not select the toolset. |
 | `session_search` | Search and recall past conversations. Enabled in fresh profiles starting with v0.1.6, but not eager. |
+| `clarify` | Ask for feedback, preferences, or decisions on supported interactive surfaces. Enabled and eager in the fresh `default` profile only. |
 
 See [profile toolset resolution](hermes_cli/toolset_policy.py), [toolset definitions](toolsets.py), and the [configuration reference](website/docs/user-guide/configuration.md#global-toolset-allowlist).
 
@@ -76,7 +78,7 @@ All keys in this table live under `tools.tool_search`.
 
 | Key | Runtime default | Fresh starter | Behavior |
 | --- | --- | --- | --- |
-| `eager_toolsets` **(fork-added)** | `null` | `[file, terminal, skills, memory]` | A list keeps members of those selected toolsets eager and defers other selected tools. `[]` defers all selected task tools; the search bridge remains direct when active. Omitted, `null`, or a blank YAML value retains the legacy deferral policy, including `defer_toolsets`. An explicit list takes precedence over both deferral settings. |
+| `eager_toolsets` **(fork-added)** | `null` | `[file, terminal, skills, memory]`, plus `clarify` in `default` | A list keeps members of those selected toolsets eager and defers other selected tools. `[]` defers all selected task tools; the search bridge remains direct when active. Omitted, `null`, or a blank YAML value retains the legacy deferral policy, including `defer_toolsets`. An explicit list takes precedence over both deferral settings. |
 | `defer_toolsets` **(fork-added)** | `[]` | Not written | Adds whole toolsets to legacy deferrals, including new members they gain. `[]` or `null` adds none. Ignored when an explicit `eager_toolsets` list is set. |
 | `defer` (inherited) | Curated list | Not written | Legacy list of individual tool names. An explicit list replaces the curated one. `[]` clears the built-in per-tool list, not inherent deferral of MCP/non-core plugin tools under legacy policy. |
 | `enabled` (inherited) | `"auto"` | `"on"` | `"auto"` and `"on"` activate the bridge when there is anything to defer. `"off"` bypasses the disclosure policy and makes selected local tool schemas direct; it does not disable tools. |
@@ -98,7 +100,7 @@ To use legacy deferrals plus deferred `web` and `browser`, set `eager_toolsets: 
 
 ## 4. Skills: installed, allowed, and loaded are different
 
-OMA ships **three bundled packages**: `hermes-agent`, `computer-use`, and `oma-playbooks`. The `computer-use` package has its own platform constraints and does not itself select the `computer_use` model toolset. Forty-two formerly bundled packages moved to the [optional catalog](website/docs/reference/optional-skills-catalog.md), retaining their support assets, including `p5js` export files. Existing installs can have more than three packages. For example, install an optional skill explicitly with `hermes -p <profile> skills install official/creative/humanizer`.[4]
+OMA bundles `hermes-agent`, `computer-use`, `oma-agents`, `oma-brands`, `oma-campaigns`, `oma-onboarding`, and `oma-playbooks`. The [`oma-onboarding` skill](skills/oma/oma-onboarding/SKILL.md) guides users through brand selection, strategy, campaign selection, and agent creation in the default profile. The [`oma-agents` skill](skills/oma/oma-agents/SKILL.md) keeps agent settings and reusable files in the active profile’s `oma/agents/` directory without changing live profiles or schedules. The [`oma-brands` skill](skills/oma/oma-brands/SKILL.md) keeps brand records and inline knowledge in `oma/brands/`. The [`oma-playbooks` skill](skills/oma/oma-playbooks/SKILL.md) keeps playbook records and inline strategies in `oma/playbooks/`; it does not install campaigns. The `computer-use` package has its own platform constraints and does not itself select the `computer_use` model toolset. Forty-two formerly bundled packages moved to the [optional catalog](website/docs/reference/optional-skills-catalog.md), retaining their support assets, including `p5js` export files. Existing installs can have additional packages. For example, install an optional skill explicitly with `hermes -p <profile> skills install official/creative/humanizer`.[4]
 
 | Setting | Kind and default | Meaning |
 | --- | --- | --- |
@@ -113,14 +115,14 @@ OMA ships **three bundled packages**: `hermes-agent`, `computer-use`, and `oma-p
 
 ```yaml
 skills:
-  enabled: [hermes-agent, humanizer, oma-playbooks]
+  enabled: [hermes-agent, humanizer, oma-campaigns]
   platform_enabled:
     telegram: [humanizer]
   disabled: []
   auto_load: []
 ```
 
-In this example Telegram can select `humanizer` plus essential `hermes-agent` if installed and supported. A profile’s other platforms can select the three listed names subject to the usual gates. This does not make playbook management work outside `default`. The stock root SOUL mentions `oma-playbooks`; generic new named profiles lack that instruction, but their empty denylist does not itself hide the package. Playbook-provisioned roles explicitly exclude it. `--no-skills` opts ordinary new profiles out of nonessential bundled seeding; essential seeding can remain.[1][3][4]
+In this example Telegram can select `humanizer` plus essential `hermes-agent` if installed and supported. On the default profile’s other platforms all three listed names can be selected subject to the usual gates. The five bundled OMA management skills are never seeded into or loadable from named profiles, even if an old installation or a clone retains a copy. Named profiles’ saved config and files are not rewritten. `--no-skills` opts profiles out of nonessential bundled seeding; essential seeding can remain.[1][3][4]
 
 See [skill selection](agent/skill_selection.py), [bundled seeding](tools/skills_sync.py), the [bundled catalog](website/docs/reference/skills-catalog.md), and the [skills guide](website/docs/user-guide/features/skills.md).
 
@@ -163,26 +165,29 @@ Since v0.1.4, OMA Agent does **not prompt for, collect, or upload Nous Shared Me
 
 This does not erase historical Shared Metrics artifacts or disable unrelated local logs, local usage diagnostics, update receipts, or ordinary requests to a configured model or tool provider. A running older image does not acquire this change from the release being published; upgrade the runtime that the profile actually uses. See the [retired consent implementation](hermes_cli/observability/shared_metrics_consent.py), [runtime gate](hermes_cli/observability/relay_shared_metrics.py), and [regressions](tests/hermes_cli/test_oma_shared_metrics_removed.py).
 
-## 7. Playbooks: definitions and provisioning, not scheduled work
+## 7. Campaigns: local definitions and provisioning, not scheduled work
 
-The bundled [`oma-playbooks` skill](skills/autonomous-ai-agents/oma-playbooks/SKILL.md) runs its helper in the `default` profile. A playbook is a versioned definition of a team, not a fixed pipeline. Its root source `config.yaml` declares `id`, `name`, `version`, `description`, `orchestrator`, and its ordered `agents` list. The orchestrator ID is `<playbook-id>__orchestrator` and must be in the roster. Each agent entry is already a full profile ID, with a matching `agents/<agent-id>/config.yaml` and adjacent `SOUL.md`. The agent YAML carries its matching `id`, `version`, `description`, optional `oma_skills` and `jobs`, plus its native Hermes settings. The installer strips source-only metadata before writing live `config.yaml`.[3][5]
+The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) runs its helper in the `default` profile. A campaign defines a team, not a fixed pipeline. Its definition at `/opt/opa/campaigns/<id>/config.yaml` declares `id`, `name`, `description`, `orchestrator`, and its ordered `agents` list. The orchestrator ID is `<id>__orchestrator` and must be in the roster. Each agent entry is already a full profile ID, with a matching `agents/<agent-id>/config.yaml` and adjacent `SOUL.md`. The installer strips source-only metadata before writing live `config.yaml`.[3][5]
 
 | Helper verb | Effect |
 | --- | --- |
-| `check` | Resolve an R2 snapshot and report cache status without downloading ZIPs. |
-| `fetch` | Cache both ZIPs, without creating profiles. Reuse a complete cache entry for that commit. |
-| `catalog` | List available playbooks from the selected snapshot; fetch it if missing. |
-| `plan <id>` | Validate the roster and show agent versions, skill dependencies, and declared job IDs. Does not install. |
-| `install <id>` | Provision a new team using native named profiles, authored configs and SOULs, and declared skill packages. Does not start agent turns. A fully recorded same-version install is a no-op; version changes, partial records, or profile collisions are not overwritten. |
+| `install <id>` | Provision a new team from the named local definition. Does not start agent turns. An existing completed installation is returned unchanged; partial records or profile collisions are not overwritten. |
 | `list` / `status <id>` | Inspect local installation records and which profiles still exist; no network access. |
+| `configure <id>` | Create a missing editable config for an existing installation without reinstalling or overwriting it. |
 
-`--tag` pins the public content snapshot; `--version` for `plan`/`install` asserts the playbook’s own version. The two versions are independent of each other and of the OMA Agent Docker tag. `catalog`, `plan` and `install` accept `--repo <trusted-local-checkout>` as an explicit alternative to public discovery. The built-in helper does not have an upgrade, uninstall, or cron-activation verb. See its [argument parser](hermes_cli/oma_playbooks/__main__.py) for the exact interface.[3][5]
+**Local sources only:** Provide `/opt/opa/campaigns` and `/opt/oma/skills` in the runtime image or mount them read-only. The helper does not download content, query a catalog, select or compare versions, or fall back to an old cache. See the [argument parser](hermes_cli/oma_playbooks/__main__.py) for supported commands.[3][5]
 
-**Public downloads:** R2 serves `latest.yaml`, `<tag>/release.yaml`, `<tag>/playbooks.zip`, and `<tag>/skills.zip`. No Git client, GitHub API or GitHub credential is required for public discovery or fetching. Only a `404` on the unpinned `latest.yaml` falls back to the known `v0.1.1` content snapshot; malformed metadata and other errors do not. Both archives must pass validation, including matching the advertised commit in their archive metadata, before the manager publishes the complete cache at `$HERMES_HOME/cache/oma-playbooks-r2/<commit>/`. Fetching a newer bundle does not upgrade installed agents or change existing environments.[5]
+**Editable campaign config:** `$HERMES_HOME/oma/campaigns/<id>/config.yaml` stores the campaign’s `id`, `name`, `description`, `version`, inline `goals` and `plans`, and a `playbook` ID linking to `$HERMES_HOME/oma/playbooks/<playbook-id>/config.yaml`. New installs seed it automatically. For an older installation, `configure <id>` seeds the same file from the existing ledger without touching profiles or their scratch paths. Unspecified goals, plans, and playbook links start empty.
 
-**What installation leaves on disk:** `$HERMES_HOME/playbooks/<id>/installation.yaml` contains the roster, versions, states, declared job IDs, scratch paths, and public snapshot provenance where applicable. Beneath the installed playbook, each `agents/<agent-id>/` directory gets a child directory named `tmp`; its absolute path appears in the installed SOUL. The source manifest stays in the cache or in the explicitly supplied checkout, not in the installed ledger directory. OMA skill packages resolve by exact `SKILL.md` name from the shared source `skills/` tree or that playbook’s `skills/` tree; ambiguous names and bundled-name collisions are rejected. The installer does not import launch credentials, seed Kanban tasks, or start the team.[3][5]
+**What installation leaves on disk:** `$HERMES_HOME/playbooks/<id>/installation.yaml` contains the roster, states, declared job IDs, scratch paths, and any supplied version metadata. Each agent gets a `tmp` directory whose absolute path appears in its installed SOUL. OMA skill packages resolve by exact `SKILL.md` name from `/opt/oma/skills` or the selected campaign’s own `skills/` tree; ambiguous names and bundled-name collisions are rejected. The installer does not copy launch credentials, seed Kanban tasks, or start the team.[3][5]
 
-**Jobs are declarations only.** An agent’s `jobs` list contains mappings with unique `id` values. The built-in installer records those IDs as `declared_jobs`; it neither validates the rest of the schedule as a native cron configuration nor registers, starts, or runs jobs. Actual cron registration, model/integration setup, and mission activation are separate steps. See [source validation](hermes_cli/oma_playbooks/source.py), [installation](hermes_cli/oma_playbooks/install.py), and [R2 resolution](hermes_cli/oma_playbooks/releases.py).
+**Saved agent context:** Newly provisioned campaign profiles also get `$HERMES_HOME/oma/agents/<agent-id>/saves/` under the default home. Their `SOUL.md` names the absolute path and tells each agent to save useful context as Markdown notes and consult them when needed. The installer preserves existing notes and does not rewrite previously installed profiles.
+
+**Campaign references:** Each new campaign profile's `SOUL.md` points to its own campaign config. It tells the agent to follow that record’s `playbook` link and the playbook’s `brand_id` link, without scanning unrelated records. The references use the current links, so filling them in after installation does not require rewriting the SOUL.
+
+**Campaign Kanban:** A new install creates an empty `campaign-<id>` board without changing the shared current board. It records the manifest's `orchestrator`, the `kanban_board` slug, and the `kanban_board_name` display name in both the editable campaign config and the installation ledger. The team profiles' native Kanban tools use that board; the orchestrator's SOUL names its own roster. `configure` fills missing routing metadata from the ledger but does not create boards or rewire older profiles.
+
+**Jobs are declarations only.** An agent’s `jobs` list contains mappings with unique `id` values. The built-in installer records those IDs as `declared_jobs`; it neither validates the rest of the schedule as a native cron configuration nor registers, starts, or runs jobs. Actual cron registration, model/integration setup, and mission activation are separate steps. See [source validation](hermes_cli/oma_playbooks/source.py) and [installation](hermes_cli/oma_playbooks/install.py).
 
 ## 8. Fork-added inspection commands
 
@@ -196,9 +201,9 @@ The breakdowns are fresh previews for the chosen profile/platform, not measureme
 
 ## 9. Docker, releases, and maintenance
 
-- **OMA runtime image:** `ghcr.io/openmarketing-agency/oma-agent:v0.1.6`. OMA version tags trigger native builds with release version/revision stamps, architecture smoke tests, and a multi-architecture manifest for `linux/amd64` and `linux/arm64`. The release does not recreate any container. Pull the new tag and recreate the service while retaining its existing Hermes data mount to roll it out. The v0.1.4 workflow is an example of the same release path.[9][10]
-- **Secure gateway startup on mounts such as Colima:** If a volume cannot enforce the required owner-only (`0600`) control socket, the gateway uses a private runtime directory rather than advertising an unusable socket. It verifies the socket before accepting clients. This is separate from HTTP gateway authentication and from R2.[6]
-- **Separate release tracks:** The fork releases the runtime through the [OMA Docker workflow](.github/workflows/oma-docker-release.yml). The `openmarketing.agency` source repository publishes the playbook/skill content to R2. Updating one does not automatically update the other or installed profiles.[5][7]
+- **OMA runtime image:** `ghcr.io/openmarketing-agency/oma-agent:v0.1.7`. OMA version tags trigger native builds with release version/revision stamps, architecture smoke tests, and a multi-architecture manifest for `linux/amd64` and `linux/arm64`. The release does not recreate any container. Pull the new tag and recreate the service while retaining its existing Hermes data mount to roll it out. The v0.1.4 workflow is an example of the same release path.[9][10]
+- **Secure gateway startup on mounts such as Colima:** If a volume cannot enforce the required owner-only (`0600`) control socket, the gateway uses a private runtime directory rather than advertising an unusable socket. It verifies the socket before accepting clients. This is separate from HTTP gateway authentication.[6]
+- **Runtime and content:** The fork releases the runtime through the [OMA Docker workflow](.github/workflows/oma-docker-release.yml). The deployment supplies the campaign and skill directories separately. Updating those directories does not change installed profiles.[5][7]
 - **Repository changes:** Catalog indexes, skill pages and navigation reflect the bundled/optional split; regression coverage and prompt fixtures reflect fork behavior. The contributor guidance dropped an old prompt-snapshot approval note (documentation only), and the fork periodically incorporates upstream Hermes changes. This guide does not count upstream imports as independently authored OMA features.[4][7]
 
 ## 10. Upgrade checklist for existing profiles
@@ -211,7 +216,7 @@ The breakdowns are fresh previews for the chosen profile/platform, not measureme
 
 ## Comparison basis
 
-The baseline is `fe8b920cae0980cef854f478236f525aaf2b93ce`, the merge base with upstream Hermes `main` for the v0.1.4 release. Neither the v0.1.5 eager starter change nor the v0.1.6 `session_search` addition imports a newer upstream baseline. Reproduce the fork comparison with `git diff fe8b920cae0980cef854f478236f525aaf2b93ce v0.1.6`; comparing directly to a newer upstream tip would mix newer upstream changes into the fork inventory.[7][9][11]
+The baseline is `fe8b920cae0980cef854f478236f525aaf2b93ce`, the merge base with upstream Hermes `main` for the v0.1.4 release. The v0.1.5 through v0.1.7 releases do not import a newer upstream baseline. Reproduce the fork comparison with `git diff fe8b920cae0980cef854f478236f525aaf2b93ce v0.1.7`; comparing directly to a newer upstream tip would mix newer upstream changes into the fork inventory.[7][9][11]
 
 ## Sources
 

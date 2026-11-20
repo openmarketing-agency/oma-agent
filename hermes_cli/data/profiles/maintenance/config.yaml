@@ -1,0 +1,8 @@
+# Applied over the standard named-profile starter config on first install.
+agent:
+  enabled_toolsets: [file, terminal, skills, memory, session_search, web, browser]
+tools:
+  tool_search:
+    enabled: "on"
+    eager_toolsets: [file, terminal]
+    listing: "off"

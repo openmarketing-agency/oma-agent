@@ -16,6 +16,7 @@ from hermes_constants import (
     get_skills_dir,
     get_subprocess_home,
 )
+from agent.skill_selection import profile_excluded_skills
 
 logger = logging.getLogger(__name__)
 
@@ -279,14 +280,15 @@ ESSENTIAL_SKILLS: frozenset = frozenset({"hermes-agent"})
 
 
 def get_disabled_skill_names(platform: str | None = None) -> set[str]:
-    """Disabled skill names from config.yaml: global list ∪ platform list
+    """Profile exclusions and disabled skill names from the global and platform lists
     (*platform* defaults to ``HERMES_PLATFORM`` / ``HERMES_SESSION_PLATFORM``)."""
+    disabled = set(profile_excluded_skills())
     skills_cfg = _skills_cfg()
     if skills_cfg is None:
-        return set()
+        return disabled
     from gateway.session_context import get_session_env
     resolved_platform = platform or os.getenv("HERMES_PLATFORM") or get_session_env("HERMES_SESSION_PLATFORM")
-    disabled = _normalize_string_set(skills_cfg.get("disabled"))
+    disabled |= _normalize_string_set(skills_cfg.get("disabled"))
     platform_disabled = (skills_cfg.get("platform_disabled") or {}).get(resolved_platform) if resolved_platform else None
     if platform_disabled is not None:
         disabled |= _normalize_string_set(platform_disabled)

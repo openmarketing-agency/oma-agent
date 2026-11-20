@@ -74,7 +74,10 @@ def _all_names():
 def test_oma_bundled_skills_exclude_the_optional_catalog():
     bundled = {p.parent.name for p in (REPO / "skills").rglob("SKILL.md")}
     optional = {p.parent.name for p in (REPO / "optional-skills").rglob("SKILL.md")}
-    assert bundled == {"computer-use", "hermes-agent", "oma-playbooks"}
+    assert bundled == {
+        "computer-use", "hermes-agent", "oma-agents", "oma-brands",
+        "oma-campaigns", "oma-onboarding", "oma-playbooks",
+    }
     assert {"pdf", "weekly-review-planning"} <= optional
     assert not bundled & optional
 

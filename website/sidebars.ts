@@ -171,7 +171,19 @@ const sidebars: SidebarsConfig = {
                   items: [
                     'user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-computer-use',
                     'user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-hermes-agent',
-                    'user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-oma-playbooks',
+                  ],
+                },
+                {
+                  type: 'category',
+                  label: 'oma',
+                  key: 'skills-bundled-oma',
+                  collapsed: true,
+                  items: [
+                    'user-guide/skills/bundled/oma/oma-oma-agents',
+                    'user-guide/skills/bundled/oma/oma-oma-brands',
+                    'user-guide/skills/bundled/oma/oma-oma-campaigns',
+                    'user-guide/skills/bundled/oma/oma-oma-onboarding',
+                    'user-guide/skills/bundled/oma/oma-oma-playbooks',
                   ],
                 },
               ],

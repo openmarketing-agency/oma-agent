@@ -1,10 +1,14 @@
 """Directory initialization and storage diagnostics for the active Hermes home."""
 
 import os
+import shutil
 from pathlib import Path
+
+from hermes_constants import get_default_hermes_root
 from hermes_dir_acl import make_user_dir
 
-OMA_PLAYBOOK_SKILL = "oma-playbooks"
+OMA_PLAYBOOK_SKILL = "oma-campaigns"
+MAINTENANCE_TEMPLATE = Path(__file__).parent / "data" / "profiles" / "maintenance"
 
 
 class HomeInitializationError(RuntimeError):
@@ -102,10 +106,16 @@ def seed_config_file(config_path: Path, *, model_seed: dict | None = None) -> bo
     if config_exists(config_path) or config_path.is_symlink():
         return False
 
+    enabled_toolsets = ["file", "terminal", "browser", "web", "skills", "memory", "session_search"]
+    eager_toolsets = ["file", "terminal", "skills", "memory"]
+    home = config_path.parent
+    if home.resolve() == get_default_hermes_root(home=home).resolve():
+        enabled_toolsets.append("clarify")
+        eager_toolsets.append("clarify")
     config = {
-        "agent": {"enabled_toolsets": ["file", "terminal", "browser", "web", "skills", "memory", "session_search"]},
+        "agent": {"enabled_toolsets": enabled_toolsets},
         "tools": {"tool_search": {
-            "enabled": "on", "eager_toolsets": ["file", "terminal", "skills", "memory"], "listing": "off",
+            "enabled": "on", "eager_toolsets": eager_toolsets, "listing": "off",
         }},
         "skills": {"disabled": []},
         "approvals": {
@@ -128,15 +138,53 @@ def seed_config_file(config_path: Path, *, model_seed: dict | None = None) -> bo
     return True
 
 
+def _initialize_maintenance_profile(staging: Path) -> None:
+    from hermes_yaml import safe_load
+
+    from agent.runtime_scope import bind_profile_scope
+    from hermes_cli.config import _deep_merge, atomic_config_write, read_user_config_raw
+    from tools.skills_sync import sync_skills
+
+    path = staging / "config.yaml"
+    overrides = safe_load((MAINTENANCE_TEMPLATE / "config.yaml").read_text(encoding="utf-8"))
+    atomic_config_write(path, _deep_merge(read_user_config_raw(path), overrides))
+    with bind_profile_scope(staging, hydrate_secrets=False):
+        sync_skills(quiet=True)
+    shutil.copytree(MAINTENANCE_TEMPLATE / "skills", staging / "skills", dirs_exist_ok=True)
+
+
+def _seed_maintenance_profile(home: Path) -> None:
+    from hermes_cli.profile_provision import ProfileCreateRequest, provision_profile
+    from hermes_cli.profiles import get_profile_dir
+    from hermes_constants import named_profile_is_deleted
+
+    target = get_profile_dir("maintenance")
+    if target.parent.parent.resolve() != home.resolve():
+        raise ValueError("Maintenance profile does not resolve under the install home")
+    if target.exists() or target.is_symlink() or named_profile_is_deleted(target):
+        return
+    request = ProfileCreateRequest(
+        name="maintenance", description="Maintain and troubleshoot OMA Agent.",
+        soul=(MAINTENANCE_TEMPLATE / "SOUL.md").read_text(encoding="utf-8"),
+        alias=False, mirror_credentials=False,
+    )
+    try:
+        provision_profile(request, initialize=_initialize_maintenance_profile)
+    except FileExistsError:
+        if not (target.exists() or target.is_symlink()):
+            raise
+
+
 def seed_install_config() -> None:
-    """Seed a fresh file-backed install, without creating a shadow file in remote mode."""
+    """Seed a fresh file-backed install and its starter maintenance profile."""
     from hermes_cli.config import get_config_path
     from hermes_cli.config_backend import supports_file_tooling
     from hermes_cli.env_loader import selected_config_backend_name
 
     path = get_config_path()
     if selected_config_backend_name(path.parent) != "remote" and supports_file_tooling():
-        seed_config_file(path)
+        if seed_config_file(path) and path.parent.resolve() == get_default_hermes_root(home=path.parent).resolve():
+            _seed_maintenance_profile(path.parent)
 
 
 def config_load_issue(exc: Exception):

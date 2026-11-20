@@ -17,7 +17,7 @@ def main() -> int:
             raise ValueError("Invalid Hermes runtime command")
         return subprocess.run([*argv, *sys.argv[1:]], check=False, timeout=600).returncode
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
-        print(f"Cannot launch the OMA playbook manager: {exc}", file=sys.stderr)
+        print(f"Cannot launch the OMA campaign manager: {exc}", file=sys.stderr)
         return 1
 
 
