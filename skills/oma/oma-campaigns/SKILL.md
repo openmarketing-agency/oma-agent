@@ -36,7 +36,7 @@ Use `terminal` to run `scripts/playbook.py` from the installed skill directory (
 
 ## Campaign Config
 
-The default profile stores each installed campaign's editable config at `oma/campaigns/<campaign_dir>/config.yaml` under its Hermes home. Use the campaign ID as the directory name. For example:
+The default profile stores each installed campaign's editable config at `oma/campaigns/<campaign_id>/config.yaml` under its Hermes home. Use the campaign ID as the directory name. For example:
 
 ```yaml
 id: seo
@@ -44,6 +44,9 @@ name: SEO
 description: Improve the site's organic visibility.
 version: 0.1.0
 orchestrator: seo__orchestrator
+agents:
+  - seo__orchestrator
+  - seo__researcher
 kanban_board: campaign-seo
 kanban_board_name: SEO
 goals:
@@ -55,14 +58,15 @@ playbook: organic-growth
 
 Goals and plans are inline YAML lists of text. `playbook` is the ID of a saved playbook at `oma/playbooks/<id>/config.yaml` in the same Hermes home. Verify that record exists and its ID matches before linking it. Use `goals: []`, `plans: []`, and `playbook: null` until the user supplies or approves values. Keep this file separate from source definitions and the installation ledger.
 
-`orchestrator` is the canonical profile ID declared in the source manifest's `orchestrator` field. The manifest's `agents` list defines the roster. Use those IDs unchanged. `kanban_board` is the board slug (`campaign-<id>`); `kanban_board_name` is its display name at installation. Use the slug in commands. Editing this metadata does not rename the board, reassign the orchestrator, or rebind profiles.
+`orchestrator` is the canonical profile ID declared in the source manifest's `orchestrator` field. Keep `agents` as an ordered YAML list of verified campaign profile IDs, including the orchestrator. Use canonical `<campaign_id>__<agent_id>` IDs unchanged and without duplicates. `kanban_board` is the board slug (`campaign-<id>`); `kanban_board_name` is its display name at installation. Use the slug in commands. Editing this metadata does not provision agents, rename the board, reassign the orchestrator, or rebind profiles.
 
 ## Procedure
 
 1. When asked what can be installed, inspect the campaign directories already present under `/opt/oma/campaigns` using `search_files`. Do not fetch or check for updates.
 2. On request, run `install <id>` with the local campaign ID. The helper validates `orchestrator`, `agents`, and declared `oma_skills` from the manifest. It creates one Kanban board, enables the team's Kanban tools on that board, and tells the declared orchestrator to coordinate work there with its own roster. Do not switch the shared current board. Installation does not start agent turns, copy launch credentials, register cron jobs, or seed tasks.
-3. Use `status <id>` to check the board slug, orchestrator, and profiles. To inspect the board from the CLI, use `terminal` with `hermes kanban --board <kanban_board> list`; a newly installed board can be empty. The ledger is `$HERMES_HOME/playbooks/<id>/installation.yaml`. Scratch paths live under that directory and are exposed in each installed agent's SOUL.
-4. To save campaign goals, plans, or a playbook link, run `configure <id>` if the config is missing. Use `read_file` and `patch` on the campaign config to update only the requested fields. Saving a plan does not schedule or execute it.
+3. Use `status <id>` to check the board slug, orchestrator, and profiles. After installation or when asked to record the roster, use `read_file` and `patch` to save the verified `present_profiles` under `agents` in the editable `config.yaml`, in roster order. Run `configure <id>` first if the record is missing. Do not list unprovisioned drafts. Report discrepancies rather than silently removing existing entries.
+4. To inspect the board from the CLI, use `terminal` with `hermes kanban --board <kanban_board> list`; a newly installed board can be empty. The ledger is `$HERMES_HOME/playbooks/<id>/installation.yaml`. Scratch paths live under that directory and are exposed in each installed agent's SOUL.
+5. To save campaign goals, plans, or a playbook link, run `configure <id>` if the config is missing. Use `read_file` and `patch` on the campaign config to update only the requested fields. Saving a plan does not schedule or execute it.
 
 ## Pitfalls
 
@@ -71,4 +75,4 @@ Goals and plans are inline YAML lists of text. `playbook` is the ID of a saved p
 
 ## Verification
 
-For provisioning, report the campaign ID, board slug, orchestrator, and present agent profiles. Reopen the campaign config and confirm its routing metadata matches the installation ledger. For config edits, verify the changed values and any playbook link. An installed team is not necessarily running or connected to the user's services.
+For provisioning, report the campaign ID, board slug, orchestrator, and present agent profiles. Reopen the campaign config, confirm its routing metadata matches the installation ledger, and verify the `agents` list against the present profiles. For config edits, verify the changed values and any playbook link. An installed team is not necessarily running or connected to the user's services.

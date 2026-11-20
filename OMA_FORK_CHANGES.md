@@ -1,6 +1,6 @@
 # OMA Agent fork changes and configuration reference
 
-This guide covers **OMA Agent v0.1.8**, compared with the upstream Hermes Agent commit it last incorporated (`fe8b920cae09`). It covers the fork’s behavior and settings, not every inherited Hermes option or every change on newer upstream `main`.[7][11]
+This guide covers **OMA Agent v0.1.9**, compared with the upstream Hermes Agent commit it last incorporated (`fe8b920cae09`). It covers the fork’s behavior and settings, not every inherited Hermes option or every change on newer upstream `main`.[7][11]
 
 **In short:** OMA starts with four eager and three deferred toolsets, plus eager `clarify` in the built-in `default` profile. It ships a smaller skill catalog, opens the compact `mono` TUI for interactive chat, installs campaigns from local runtime content, and does not collect or send Nous Shared Metrics. An upgrade does **not** replace an existing profile’s saved tool list or recreate an installed team.[1][2][8]
 
@@ -179,6 +179,8 @@ The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) runs its 
 
 **Editable campaign config:** `$HERMES_HOME/oma/campaigns/<id>/config.yaml` stores the campaign’s `id`, `name`, `description`, `version`, inline `goals` and `plans`, and a `playbook` ID linking to `$HERMES_HOME/oma/playbooks/<playbook-id>/config.yaml`. New installs seed it automatically. For an older installation, `configure <id>` seeds the same file from the existing ledger without touching profiles or their scratch paths. Unspecified goals, plans, and playbook links start empty.
 
+The campaign and agent skills maintain an ordered `agents` list of verified profile IDs in the editable campaign config. The brand skill records brand-relative references to logos, fonts, illustrations, icons, backgrounds, and images in the brand’s `config.yaml`. These are skill workflows, not installer changes or migrations.
+
 **What installation leaves on disk:** `$HERMES_HOME/playbooks/<id>/installation.yaml` contains the roster, states, declared job IDs, scratch paths, and any supplied version metadata. Each agent gets a `tmp` directory whose absolute path appears in its installed SOUL. OMA skill packages resolve by exact `SKILL.md` name from `/opt/oma/skills` or the selected campaign’s own `skills/` tree; ambiguous names and bundled-name collisions are rejected. The installer does not copy launch credentials, seed Kanban tasks, or start the team.[3][5]
 
 **Saved agent context:** Newly provisioned campaign profiles also get `$HERMES_HOME/oma/agents/<agent-id>/saves/` under the default home. Their `SOUL.md` names the absolute path and tells each agent to save useful context as Markdown notes and consult them when needed. The installer preserves existing notes and does not rewrite previously installed profiles.
@@ -201,7 +203,7 @@ The breakdowns are fresh previews for the chosen profile/platform, not measureme
 
 ## 9. Docker, releases, and maintenance
 
-- **OMA runtime image:** `ghcr.io/openmarketing-agency/oma-agent:v0.1.8`. OMA version tags trigger native builds with release version/revision stamps, architecture smoke tests, and a multi-architecture manifest for `linux/amd64` and `linux/arm64`. The release does not recreate any container. Pull the new tag and recreate the service while retaining its existing Hermes data mount to roll it out. The v0.1.4 workflow is an example of the same release path.[9][10]
+- **OMA runtime image:** `ghcr.io/openmarketing-agency/oma-agent:v0.1.9`. OMA version tags trigger native builds with release version/revision stamps, architecture smoke tests, and a multi-architecture manifest for `linux/amd64` and `linux/arm64`. The release does not recreate any container. Pull the new tag and recreate the service while retaining its existing Hermes data mount to roll it out. The v0.1.4 workflow is an example of the same release path.[9][10]
 - **Secure gateway startup on mounts such as Colima:** If a volume cannot enforce the required owner-only (`0600`) control socket, the gateway uses a private runtime directory rather than advertising an unusable socket. It verifies the socket before accepting clients. This is separate from HTTP gateway authentication.[6]
 - **Runtime and content:** The fork releases the runtime through the [OMA Docker workflow](.github/workflows/oma-docker-release.yml). The deployment supplies the campaign and skill directories separately. Updating those directories does not change installed profiles.[5][7]
 - **Repository changes:** Catalog indexes, skill pages and navigation reflect the bundled/optional split; regression coverage and prompt fixtures reflect fork behavior. The contributor guidance dropped an old prompt-snapshot approval note (documentation only), and the fork periodically incorporates upstream Hermes changes. This guide does not count upstream imports as independently authored OMA features.[4][7]
@@ -216,7 +218,7 @@ The breakdowns are fresh previews for the chosen profile/platform, not measureme
 
 ## Comparison basis
 
-The baseline is `fe8b920cae0980cef854f478236f525aaf2b93ce`, the merge base with upstream Hermes `main` for the v0.1.4 release. The v0.1.5 through v0.1.8 releases do not import a newer upstream baseline. Reproduce the fork comparison with `git diff fe8b920cae0980cef854f478236f525aaf2b93ce v0.1.8`; comparing directly to a newer upstream tip would mix newer upstream changes into the fork inventory.[7][9][11]
+The baseline is `fe8b920cae0980cef854f478236f525aaf2b93ce`, the merge base with upstream Hermes `main` for the v0.1.4 release. The v0.1.5 through v0.1.9 releases do not import a newer upstream baseline. Reproduce the fork comparison with `git diff fe8b920cae0980cef854f478236f525aaf2b93ce v0.1.9`; comparing directly to a newer upstream tip would mix newer upstream changes into the fork inventory.[7][9][11]
 
 ## Sources
 
