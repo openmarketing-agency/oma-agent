@@ -12,7 +12,7 @@ from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS
 from agent.skill_utils import parse_config_string_list
 from hermes_cli import kanban_db
 from hermes_cli.config import atomic_config_replace, atomic_config_write
-from hermes_cli.config_backend import require_file_tooling
+from hermes_cli.config_backend import FileBackend, require_file_tooling
 from hermes_cli.config_defaults import DEFAULT_CONFIG
 from hermes_cli.config_home import OMA_PLAYBOOK_SKILL
 from hermes_cli.oma_playbooks.source import Agent, Playbook, checked_id, read_mapping
@@ -70,14 +70,14 @@ def _campaign_config_path(home: Path, campaign_id: str) -> Path:
     campaigns = _real_path(oma / "campaigns")
     directory = _real_path(campaigns / checked_id(campaign_id))
     path = _real_path(directory / "config.yaml")
-    if path.exists() and read_mapping(path).get("id") != campaign_id:
+    if FileBackend().exists(directory) and read_mapping(path).get("id") != campaign_id:
         raise ValueError(f"Campaign config ID does not match its installation: {path}")
     return path
 
 
 def _ensure_campaign_config(path: Path, record: dict) -> Path:
     routing = {key: record[key] for key in ("orchestrator", "kanban_board", "kanban_board_name") if record.get(key)}
-    if path.exists():
+    if FileBackend().exists(path.parent):
         config = read_mapping(path)
         missing = {key: value for key, value in routing.items() if key not in config}
         if missing:
@@ -278,7 +278,7 @@ def install(home: Path, playbook: Playbook) -> dict:
         saves_paths = {agent.id: _agent_saves_path(home, agent.id) for agent in playbook.agents}
         board = f"campaign-{playbook.id}"
         record = _new_record(playbook, board)
-        if config_path.exists():
+        if FileBackend().exists(config_path.parent):
             existing = read_mapping(config_path)
             for key in ("orchestrator", "kanban_board"):
                 if key in existing and existing[key] != record[key]:

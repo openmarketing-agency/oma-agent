@@ -139,14 +139,13 @@ def seed_config_file(config_path: Path, *, model_seed: dict | None = None) -> bo
 
 
 def _initialize_maintenance_profile(staging: Path) -> None:
-    from hermes_yaml import safe_load
-
     from agent.runtime_scope import bind_profile_scope
     from hermes_cli.config import _deep_merge, atomic_config_write, read_user_config_raw
+    from hermes_cli.config_backend import FileBackend
     from tools.skills_sync import sync_skills
 
     path = staging / "config.yaml"
-    overrides = safe_load((MAINTENANCE_TEMPLATE / "config.yaml").read_text(encoding="utf-8"))
+    overrides = FileBackend.read_path(MAINTENANCE_TEMPLATE / "config.yaml")
     atomic_config_write(path, _deep_merge(read_user_config_raw(path), overrides))
     with bind_profile_scope(staging, hydrate_secrets=False):
         sync_skills(quiet=True)
@@ -165,7 +164,7 @@ def _seed_maintenance_profile(home: Path) -> None:
         return
     request = ProfileCreateRequest(
         name="maintenance", description="Maintain and troubleshoot OMA Agent.",
-        soul=(MAINTENANCE_TEMPLATE / "SOUL.md").read_text(encoding="utf-8"),
+        soul=(MAINTENANCE_TEMPLATE / "SOUL.md").read_text(encoding="utf-8-sig"),
         alias=False, mirror_credentials=False,
     )
     try:
