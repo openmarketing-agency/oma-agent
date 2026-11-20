@@ -19,7 +19,7 @@ from agent.delegation_context import owned_kanban_task
 from agent.redact import redact_sensitive_text
 from hermes_cli.goals import judge_goal
 from tools.registry import no_cache_check_fn, registry, tool_error
-from hermes_cli.config import cfg_get, load_config
+from hermes_cli.config import cfg_get, load_config, load_config_readonly
 from tools.kanban_tools_schemas import (
     KANBAN_ATTACH_SCHEMA,
     KANBAN_ATTACH_URL_SCHEMA, KANBAN_ATTACHMENTS_SCHEMA, KANBAN_BLOCK_SCHEMA, KANBAN_COMMENT_SCHEMA,
@@ -166,7 +166,7 @@ def _kanban_handler(tool_name: str) -> Callable:
                 _check(not unknown,
                        f"{tool_name}: unknown parameter(s): {', '.join(unknown)}. "
                        f"Valid parameters: {', '.join(sorted(properties))}. Nothing changed.")
-                return fn(args, **kw)
+                return fn(_with_profile_board(args), **kw)
             except _Reject as e:
                 return e.args[0]
             except Exception as e:
@@ -175,6 +175,25 @@ def _kanban_handler(tool_name: str) -> Callable:
                 return tool_error(f"{tool_name}: {e}")
         return wrapper
     return deco
+
+
+def _with_profile_board(args: dict) -> dict:
+    """Bind tool calls without changing the operator's global current board."""
+    configured = cfg_get(load_config_readonly(), "kanban", "profile_board")
+    if configured is None:
+        return args
+    from hermes_cli import kanban_db as kb
+    _check(isinstance(configured, str) and bool(configured) and kb._normalize_board_slug(configured) == configured,
+           "kanban.profile_board must be a canonical board slug")
+    _check(args.get("board") in (None, configured), f"This profile uses only Kanban board {configured!r}")
+    _check(kb.board_exists(configured) and not kb.read_board_metadata(configured).get("archived"),
+           f"This profile's Kanban board {configured!r} is missing or archived")
+    if owned_kanban_task():
+        _check(os.environ.get("HERMES_KANBAN_BOARD") == configured,
+               f"The dispatcher assigned this worker outside its Kanban board {configured!r}")
+        # Keep the dispatcher's DB and workspace pins for the task-owned turn.
+        return {key: value for key, value in args.items() if key != "board"}
+    return {**args, "board": configured}
 
 
 def _reject_delegated_child_mutation(tool_name: str) -> None:
