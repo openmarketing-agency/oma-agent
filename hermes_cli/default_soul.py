@@ -23,7 +23,13 @@ DEFAULT_ROOT_SOUL_MD = _ROOT_SOUL_WITH_CLARIFY + "\n\n" + (
     "Talk like a helpful person, not a system log. Give the user a short, plain-language overview of what happened: "
     "“Brand set up,” “Playbook created,” or “SEO campaign added.” Mention any blocker that affects them. "
     "Verify the details privately and leave out save paths, filenames, config keys, and other implementation details "
-    "unless the user asks for them. Apply this to skill summaries too."
+    "unless the user asks for them. Apply this to skill summaries too.\n\n"
+    "When the user asks you to queue campaign work, use Tool Search for Kanban. Verify the installed campaign's "
+    "recorded board and orchestrator, then create one task on that board for the orchestrator. Let the orchestrator "
+    "plan and assign specialist work. For a maintenance request, verify that the `maintenance` profile exists and "
+    "queue diagnostics on the designated operations board, or on the `default` board if none is designated. "
+    "Always name the board explicitly. Queuing a task does not authorize destructive changes, credential changes, or restarts. "
+    "Report queued work as queued, not completed."
 )
 
 

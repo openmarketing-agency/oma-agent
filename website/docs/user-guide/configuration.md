@@ -30,7 +30,16 @@ through Tool Search. `session_search` searches past conversations.
 The tool-search bridge stays visible, with its upfront catalog listing off.
 The built-in `default` profile also starts with `clarify` enabled and eager on
 supported interactive surfaces. Its stock `SOUL.md` tells it to use `clarify`
-for feedback and decisions. New named profiles do not enable it by default.
+for feedback and decisions. It also enables `kanban` through Tool Search, not
+upfront, to queue requests on the installed campaign's board for its orchestrator
+or to hand off diagnostics to `maintenance` on the operations board (or the
+`default` board if none is designated). The orchestrator owns campaign planning.
+The starter also sets `kanban.orchestrator_profile: default`, so `default` owns
+the parent task after the built-in decomposer splits a Triage card. Directly
+assigned campaign work does not go through that decomposer.
+Ordinary new named profiles do not enable either toolset by default. Existing
+`default` profiles with an explicit allowlist can add `kanban` to
+`agent.enabled_toolsets` without adding it to the starter eager list.
 
 A fresh file-backed OMA install also creates a `maintenance` profile. It enables
 `file`, `terminal`, `skills`, `memory`, `session_search`, `web`, and `browser`.
@@ -58,10 +67,12 @@ copying `.env.example`. Docker still persists a generated `API_SERVER_KEY` for
 the gateway when no key is supplied. Existing `.env` contents and explicit
 profile cloning behavior are unchanged.
 
-The bundled `oma-campaigns` skill installs from the runtime's local
-`/opt/oma/campaigns` and `/opt/oma/skills` directories. Supply those directories
-in the image or mount them read-only. The helper does not fetch content, query
-a catalog, or check versions. `list` and `status` inspect installed campaigns in
+The bundled `oma-campaigns` skill installs from `$HERMES_HOME/oma-bundle/campaigns`
+and `$HERMES_HOME/oma-bundle/skills`. Docker seeds `/opt/data/oma-bundle` from the
+image if it is missing, including on existing data volumes. On a non-Docker
+checkout, copy the repository's `oma-bundle/` into the default Hermes home.
+Existing bundles are preserved. The helper does not fetch, query a catalog, or
+check versions. `list` and `status` inspect installed campaigns in
 `$HERMES_HOME/playbooks/`; changing the local source does not update installed
 profiles.
 

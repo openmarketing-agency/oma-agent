@@ -880,15 +880,16 @@ def is_skill_description_truncated_for_prompt(frontmatter: dict[str, Any]) -> bo
     return len(_normalize_skill_description(frontmatter)) > SKILL_PROMPT_DESC_LIMIT
 
 
-def iter_skill_index_files(skills_dir: Path, filename: str):
+def iter_skill_index_files(skills_dir: Path, filename: str, *, followlinks: bool = True):
     """Walk skills_dir yielding sorted paths matching *filename*; prunes
     EXCLUDED_SKILL_DIRS and support dirs of skill roots."""
     matches: list[str] = []
-    for root, dirs, files in os.walk(str(skills_dir), followlinks=True):
+    for root, dirs, files in os.walk(str(skills_dir), followlinks=followlinks):
         has_skill_md = "SKILL.md" in files
         dirs[:] = [d for d in dirs if d not in EXCLUDED_SKILL_DIRS and not (has_skill_md and d in SKILL_SUPPORT_DIRS)]
-        if filename in files:
-            matches.append(os.path.join(root, filename))
+        candidate = os.path.join(root, filename)
+        if filename in files and (followlinks or not os.path.islink(candidate)):
+            matches.append(candidate)
     yield from map(Path, sorted(matches))
 
 

@@ -448,6 +448,15 @@ if [ ! -f "$HERMES_HOME/config.yaml" ] && ! refuse_symlinked_path "seed" "$HERME
         || echo "[stage2] Warning: could not seed starter settings"
 fi
 
+# Seed the source bundle independently of config.yaml so upgrades with an existing
+# data volume get it too. Run as hermes; never replace an existing bundle.
+if [ ! -e "$HERMES_HOME/oma-bundle" ] && ! refuse_symlinked_path "seed" "$HERMES_HOME/oma-bundle"; then
+    (cd "$INSTALL_DIR" && umask 077 && as_hermes "$INSTALL_DIR/.venv/bin/python" -c \
+        'import sys; from pathlib import Path; from hermes_cli.oma_playbooks.bundle import seed_bundle; seed_bundle(Path(sys.argv[1]), Path(sys.argv[2]))' \
+        "$INSTALL_DIR/oma-bundle" "$HERMES_HOME") \
+        || echo "[stage2] Warning: could not seed the OMA bundle"
+fi
+
 # --- Ensure a gateway api_server key exists (loopback control plane) ---
 # The gateway's aiohttp api_server refuses to start without a strong
 # API_SERVER_KEY (>=16 chars; startup guard in gateway/platforms/api_server.py).

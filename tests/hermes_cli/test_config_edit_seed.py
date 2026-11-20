@@ -177,7 +177,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     enabled = ["file", "terminal", "browser", "web", "skills", "memory", "session_search"]
     eager = ["file", "terminal", "skills", "memory"]
     if entry == "install":
-        enabled.append("clarify")
+        enabled.extend(["clarify", "kanban"])
         eager.append("clarify")
     assert "#" not in content
     assert yaml.safe_load(content) == {
@@ -186,6 +186,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
             "enabled": "on", "eager_toolsets": eager, "listing": "off",
         }},
         "skills": {"disabled": []},
+        **({"kanban": {"orchestrator_profile": "default"}} if entry == "install" else {}),
         "approvals": {
             "mode": "off",
             "timeout": 300,
@@ -202,6 +203,10 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     target = root / "profiles" / "another-agent" / "SOUL.md"
     assert _protected_instruction_reason(str(target)) is None
     config = load_user_config_effective(path)
+    if entry == "install":
+        from hermes_cli.kanban_decompose import _load_routing
+
+        assert _load_routing(root_assignee="maintenance").orchestrator == "default"
     assert build_auto_load_prompt(user_config=config) == ("", [], [])
     for surface in ("cli", "tui", "telegram"):
         assert _get_platform_tools(config, surface) == set(enabled)
@@ -211,9 +216,13 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     available_names = {tool["function"]["name"] for tool in tools}
     assert {"skills_list", "skill_view", "skill_manage", "memory", "session_search"} <= available_names
     assert ("clarify" in available_names) == (entry == "install")
+    kanban_tools = {"kanban_create", "kanban_list", "kanban_show"}
+    assert available_names & kanban_tools == (kanban_tools if entry == "install" else set())
     disclosed = assemble_tool_defs(tools)
     assert disclosed.activated
-    assert ("clarify" in {tool["function"]["name"] for tool in disclosed.tool_defs}) == (entry == "install")
+    direct_names = {tool["function"]["name"] for tool in disclosed.tool_defs}
+    assert ("clarify" in direct_names) == (entry == "install")
+    assert not any(name.startswith("kanban_") for name in direct_names)
     assert get_disabled_skill_names() == (OMA_RETIRED_SKILLS if entry == "install" else OMA_DEFAULT_ONLY_SKILLS)
     assert approval_context._get_approval_mode() == "off"
     assert approval_context._get_approval_timeout() == 300

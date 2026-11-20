@@ -109,8 +109,9 @@ def seed_config_file(config_path: Path, *, model_seed: dict | None = None) -> bo
     enabled_toolsets = ["file", "terminal", "browser", "web", "skills", "memory", "session_search"]
     eager_toolsets = ["file", "terminal", "skills", "memory"]
     home = config_path.parent
-    if home.resolve() == get_default_hermes_root(home=home).resolve():
-        enabled_toolsets.append("clarify")
+    is_default = home.resolve() == get_default_hermes_root(home=home).resolve()
+    if is_default:
+        enabled_toolsets.extend(["clarify", "kanban"])
         eager_toolsets.append("clarify")
     config = {
         "agent": {"enabled_toolsets": enabled_toolsets},
@@ -131,6 +132,8 @@ def seed_config_file(config_path: Path, *, model_seed: dict | None = None) -> bo
         "_config_version": DEFAULT_CONFIG["_config_version"],
         **(model_seed or {}),
     }
+    if is_default:
+        config["kanban"] = {"orchestrator_profile": "default"}
     note_first_stamp(config_path.parent, {}, config)
     config_path.parent.mkdir(parents=True, exist_ok=True)
     atomic_config_write(config_path, config)

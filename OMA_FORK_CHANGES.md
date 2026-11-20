@@ -2,7 +2,7 @@
 
 This guide covers **OMA Agent v0.1.9**, compared with the upstream Hermes Agent commit it last incorporated (`fe8b920cae09`). It covers the fork’s behavior and settings, not every inherited Hermes option or every change on newer upstream `main`.[7][11]
 
-**In short:** OMA starts with four eager and three deferred toolsets, plus eager `clarify` in the built-in `default` profile. It ships a smaller skill catalog, opens the compact `mono` TUI for interactive chat, installs campaigns from local runtime content, and does not collect or send Nous Shared Metrics. An upgrade does **not** replace an existing profile’s saved tool list or recreate an installed team.[1][2][8]
+**In short:** OMA starts with four eager and three deferred toolsets, plus eager `clarify` and deferred `kanban` in the built-in `default` profile. It ships a smaller skill catalog, opens the compact `mono` TUI for interactive chat, installs campaigns from local runtime content, and does not collect or send Nous Shared Metrics. An upgrade does **not** replace an existing profile’s saved tool list or recreate an installed team.[1][2][8]
 
 ## 1. What a profile starts with
 
@@ -19,16 +19,18 @@ The starter is written only for a missing file-backed config. It is shared by so
 
 ### Fresh starter YAML
 
-This is the policy portion of a freshly seeded `default` config. Fresh named profiles omit `clarify` from both toolset lists. The actual file also has an internal `_config_version` stamp and may have model/provider settings when supplied by setup or profile creation. It does not pin every merged runtime default.[3][8]
+This is the policy portion of a freshly seeded `default` config. Ordinary new named profiles omit `clarify` and `kanban` from their starter selection. The actual file also has an internal `_config_version` stamp and may have model/provider settings when supplied by setup or profile creation. It does not pin every merged runtime default.[3][8]
 
 ```yaml
 agent:
-  enabled_toolsets: [file, terminal, browser, web, skills, memory, session_search, clarify]
+  enabled_toolsets: [file, terminal, browser, web, skills, memory, session_search, clarify, kanban]
 tools:
   tool_search:
     enabled: "on"
     eager_toolsets: [file, terminal, skills, memory, clarify]
     listing: "off"
+kanban:
+  orchestrator_profile: default
 skills:
   disabled: []
 approvals:
@@ -67,6 +69,7 @@ Names are literal and case-sensitive. Bundles expand to their member tools. The 
 | `memory` | The callable `memory` tool and eligible memory-provider tools. This is separate from the inherited settings `memory.memory_enabled` and `memory.user_profile_enabled`, which control the built-in stores; enabling storage does not select the toolset. |
 | `session_search` | Search and recall past conversations. Enabled in fresh profiles starting with v0.1.6, but not eager. |
 | `clarify` | Ask for feedback, preferences, or decisions on supported interactive surfaces. Enabled and eager in the fresh `default` profile only. |
+| `kanban` | Queue and check work on a named board. Deferred in the `default` starter so the intake agent can route work without becoming the campaign planner. |
 
 See [profile toolset resolution](hermes_cli/toolset_policy.py), [toolset definitions](toolsets.py), and the [configuration reference](website/docs/user-guide/configuration.md#global-toolset-allowlist).
 
@@ -169,7 +172,7 @@ This does not erase historical Shared Metrics artifacts or disable unrelated loc
 
 ## 7. Campaigns: local definitions and provisioning, not scheduled work
 
-The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) runs its helper in the `default` profile. A campaign defines a team, not a fixed pipeline. Its definition at `/opt/oma/campaigns/<id>/config.yaml` declares `id`, `name`, `description`, `orchestrator`, and its ordered `agents` list. The orchestrator ID is `<id>__orchestrator` and must be in the roster. Each agent entry is already a full profile ID, with a matching `agents/<agent-id>/config.yaml` and adjacent `SOUL.md`. The installer strips source-only metadata before writing live `config.yaml`.[3][5]
+The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) runs its helper in the `default` profile. A campaign defines a team, not a fixed pipeline. Its definition at `$HERMES_HOME/oma-bundle/campaigns/<id>/config.yaml` declares `id`, `name`, `description`, `orchestrator`, and its ordered `agents` list. The orchestrator ID is `<id>__orchestrator` and must be in the roster. Each agent entry is already a full profile ID, with a matching `agents/<agent-id>/config.yaml` and adjacent `SOUL.md`. The installer strips source-only metadata before writing live `config.yaml`.[3][5]
 
 | Helper verb | Effect |
 | --- | --- |
@@ -177,19 +180,23 @@ The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) runs its 
 | `list` / `status <id>` | Inspect local installation records and which profiles still exist; no network access. |
 | `configure <id>` | Create a missing editable config for an existing installation without reinstalling or overwriting it. |
 
-**Local sources only:** Provide `/opt/oma/campaigns` and `/opt/oma/skills` in the runtime image or mount them read-only. The helper does not download content, query a catalog, select or compare versions, or fall back to an old cache. See the [argument parser](hermes_cli/oma_playbooks/__main__.py) for supported commands.[3][5]
+**Local sources only:** The [repository bundle](oma-bundle/README.md) ships with OMA Agent. Docker seeds it at `/opt/data/oma-bundle` (`$HERMES_HOME/oma-bundle`) only if absent, including when upgrading an existing volume. The installer reads `campaigns/` and `skills/` within that bundle; it does not download content, query a catalog, select or compare versions, or use the old source location. See the [argument parser](hermes_cli/oma_playbooks/__main__.py) for supported commands.[3][5]
 
 **Editable campaign config:** `$HERMES_HOME/oma/campaigns/<id>/config.yaml` stores the campaign’s `id`, `name`, `description`, `version`, and inline `goals` and `plans`. New installs seed it automatically. For an older installation, `configure <id>` seeds a missing file from the existing ledger without touching profiles or their scratch paths. Unspecified goals and plans start empty. Campaigns use the single stored playbook and do not need a `playbook` field.
 
 The campaign and agent skills maintain an ordered `agents` list of verified profile IDs in the editable campaign config. The brand skill records brand-relative references to logos, fonts, illustrations, icons, backgrounds, and images in the brand’s `config.yaml`. These are skill workflows, not installer changes or migrations.
 
-**What installation leaves on disk:** `$HERMES_HOME/playbooks/<id>/installation.yaml` contains the roster, states, declared job IDs, scratch paths, and any supplied version metadata. Each agent gets a `tmp` directory whose absolute path appears in its installed SOUL. OMA skill packages resolve by exact `SKILL.md` name from `/opt/oma/skills` or the selected campaign’s own `skills/` tree; ambiguous names and bundled-name collisions are rejected. The installer does not copy launch credentials, seed Kanban tasks, or start the team.[3][5]
+**What installation leaves on disk:** `$HERMES_HOME/playbooks/<id>/installation.yaml` contains the roster, states, declared job IDs, scratch paths, and any supplied version metadata. Each agent gets a `tmp` directory whose absolute path appears in its installed SOUL. Skill packages resolve by exact `SKILL.md` name from `$HERMES_HOME/oma-bundle/skills` or the selected campaign’s own `skills/` tree; ambiguous names and bundled-name collisions are rejected. The installer does not copy launch credentials, seed Kanban tasks, or start the team.[3][5]
 
 **Saved agent context:** Newly provisioned campaign profiles also get `$HERMES_HOME/oma/agents/<agent-id>/saves/` under the default home. Their `SOUL.md` names the absolute path and tells each agent to save useful context as Markdown notes and consult them when needed. The installer preserves existing notes and does not rewrite previously installed profiles.
 
 **Campaign context:** Each new campaign profile's `SOUL.md` points directly to its own campaign config and the shared playbook and brand configs at `oma/playbook/config.yaml` and `oma/brand/config.yaml`. No ID links are needed between those records. Editable agent records still use `campaign_id` to identify the campaign they belong to.
 
 **Campaign Kanban:** A new install creates an empty `campaign-<id>` board without changing the shared current board. It records the manifest's `orchestrator`, the `kanban_board` slug, and the `kanban_board_name` display name in both the editable campaign config and the installation ledger. The team profiles' native Kanban tools use that board; the orchestrator's SOUL names its own roster. `configure` fills missing routing metadata from the ledger but does not create boards or rewire older profiles.
+
+The `default` starter uses this routing to queue one task for the installed orchestrator on its recorded board. The orchestrator plans the work. Diagnostics go to the installed `maintenance` profile on an explicitly named operations board if configured, otherwise the `default` board. Neither onboarding nor enabling the toolset creates a task or starts a dispatcher. For an existing `default` with an explicit allowlist, add `kanban` to `agent.enabled_toolsets` and keep it out of the starter eager list; the upgrade preserves saved settings.
+
+When the built-in decomposer runs under `default`, `kanban.orchestrator_profile: default` assigns the parent task back to `default` after decomposition. This does not change who runs child tasks, or redirect ordinary tasks assigned directly to campaign orchestrators.
 
 **Campaign installation does not register jobs.** An agent’s `jobs` list contains mappings with unique `id` values. The built-in installer records those IDs as `declared_jobs`; it neither validates the rest of the schedule as native cron configuration nor registers or runs jobs. See [source validation](hermes_cli/oma_playbooks/source.py) and [installation](hermes_cli/oma_playbooks/install.py).
 

@@ -17,11 +17,9 @@ def bundle(tmp_path, monkeypatch):
     monkeypatch.delenv("HERMES_KANBAN_DB", raising=False)
     monkeypatch.delenv("HERMES_KANBAN_BOARD", raising=False)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    opt = tmp_path / "opt"
-    campaigns = opt / "oma" / "campaigns"
-    skills = opt / "oma" / "skills"
-    monkeypatch.setattr(cli, "_CAMPAIGNS_DIR", tmp_path.joinpath(*cli._CAMPAIGNS_DIR.parts[1:]))
-    monkeypatch.setattr(cli, "_SKILLS_DIR", tmp_path.joinpath(*cli._SKILLS_DIR.parts[1:]))
+    source = home / "oma-bundle"
+    campaigns = source / "campaigns"
+    skills = source / "skills"
     team = campaigns / "demo"
     team.mkdir(parents=True)
     (team / "config.yaml").write_text(
@@ -42,7 +40,7 @@ def bundle(tmp_path, monkeypatch):
         (skill / "SKILL.md").write_text(f"---\nname: {name}\ndescription: Test skill.\n---\n\nContents.\n",
                                        encoding="utf-8")
         (skill / "support.txt").write_text("Support file.", encoding="utf-8")
-    return home, opt, cli.main
+    return home, source, cli.main
 
 
 def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
@@ -52,7 +50,7 @@ def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
     from hermes_cli.oma_playbooks.source import read_mapping
     from tools.file_tools import read_file_tool, write_file_tool
 
-    home, opt, main = bundle
+    home, source, main = bundle
     assert main(["list"]) == 0
     assert json.loads(capsys.readouterr().out) == []
     existing = home / "oma" / "agents" / "demo__worker" / "saves" / "handoff.md"
@@ -74,7 +72,7 @@ def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
         "orchestrator": "demo__orchestrator", "kanban_board": "campaign-demo",
         "kanban_board_name": "Demo",
     }
-    manifest = (opt / "oma" / "campaigns" / "demo" / "config.yaml").resolve()
+    manifest = (source / "campaigns" / "demo" / "config.yaml").resolve()
     assert saved["source_manifest"] == str(manifest)
     assert not (directory / "config.yaml").exists()
     for agent_id, row in saved["agents"].items():
@@ -126,14 +124,15 @@ def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
 
 
 def test_missing_local_sources_and_profile_collision_do_not_publish(bundle, capsys):
-    home, opt, main = bundle
-    campaigns = opt / "oma" / "campaigns"
-    old_source = opt / "oma" / "playbooks"
+    home, source, main = bundle
+    campaigns = source / "campaigns"
+    old_source = home / "oma" / "campaigns"
+    old_source.parent.mkdir()
     campaigns.rename(old_source)
     assert main(["install", "demo"]) == 1
     assert str(campaigns / "demo" / "config.yaml") in capsys.readouterr().err
     old_source.rename(campaigns)
-    missing = opt / "oma" / "skills" / "category" / "shared" / "SKILL.md"
+    missing = source / "skills" / "category" / "shared" / "SKILL.md"
     missing.rename(missing.with_suffix(".disabled"))
     assert main(["install", "demo"]) == 1
     assert "skill 'shared' must resolve" in capsys.readouterr().err
@@ -209,8 +208,8 @@ def test_saves_path_conflict_does_not_publish_profiles(bundle, capsys):
 def test_configure_backfills_from_installed_campaign_without_reinstalling(bundle, capsys):
     from hermes_cli.oma_playbooks.source import read_mapping
 
-    home, opt, main = bundle
-    (opt / "oma" / "campaigns").rename(opt / "oma" / "unavailable")
+    home, source, main = bundle
+    (source / "campaigns").rename(source / "unavailable")
     ledger = home / "playbooks" / "demo" / "installation.yaml"
     ledger.parent.mkdir(parents=True)
     ledger.write_text(

@@ -1264,7 +1264,8 @@ def build_skills_system_prompt(
         skills_dir = get_skills_dir()
     try:
         # Every non-local root as (tier, dir) in the shared precedence order: trusted project dirs (cwd/trust
-        # are session-stable, so byte-stable), skills.create_dir, skills.external_dirs.
+        # are session-stable, so byte-stable), skills.create_dir, skills.external_dirs. The shared OMA
+        # bundle is intentionally a tool-only fallback, not part of a profile's default prompt index.
         extra_roots = [(t, d) for t, d in get_skill_search_roots(skills_dir) if t != TIER_LOCAL]
         if not skills_dir.exists() and not extra_roots:
             return ""
