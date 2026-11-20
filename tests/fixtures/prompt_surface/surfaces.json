@@ -5,7 +5,7 @@
       "stable": 1829,
       "volatile": 618
     },
-    "tool_tokens": 9464,
+    "tool_tokens": 9547,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -17,6 +17,7 @@
       "patch",
       "read_file",
       "search_files",
+      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
@@ -36,7 +37,7 @@
       "stable": 1225,
       "volatile": 618
     },
-    "tool_tokens": 9464,
+    "tool_tokens": 9547,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -48,6 +49,7 @@
       "patch",
       "read_file",
       "search_files",
+      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
@@ -67,7 +69,7 @@
       "stable": 1646,
       "volatile": 616
     },
-    "tool_tokens": 9464,
+    "tool_tokens": 9547,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -79,6 +81,7 @@
       "patch",
       "read_file",
       "search_files",
+      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
@@ -98,7 +101,7 @@
       "stable": 2420,
       "volatile": 614
     },
-    "tool_tokens": 9620,
+    "tool_tokens": 9703,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -110,6 +113,7 @@
       "patch",
       "read_file",
       "search_files",
+      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
@@ -129,7 +133,7 @@
       "stable": 1225,
       "volatile": 618
     },
-    "tool_tokens": 9464,
+    "tool_tokens": 9547,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -141,6 +145,7 @@
       "patch",
       "read_file",
       "search_files",
+      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
@@ -160,7 +165,7 @@
       "stable": 1211,
       "volatile": 618
     },
-    "tool_tokens": 9464,
+    "tool_tokens": 9547,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -172,6 +177,7 @@
       "patch",
       "read_file",
       "search_files",
+      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
@@ -191,7 +197,7 @@
       "stable": 1495,
       "volatile": 619
     },
-    "tool_tokens": 10120,
+    "tool_tokens": 10203,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -204,6 +210,7 @@
       "react_to_message",
       "read_file",
       "search_files",
+      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
@@ -223,7 +230,7 @@
       "stable": 1244,
       "volatile": 619
     },
-    "tool_tokens": 9464,
+    "tool_tokens": 9547,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -235,6 +242,7 @@
       "patch",
       "read_file",
       "search_files",
+      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
@@ -254,7 +262,7 @@
       "stable": 1330,
       "volatile": 619
     },
-    "tool_tokens": 9464,
+    "tool_tokens": 9547,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -266,6 +274,7 @@
       "patch",
       "read_file",
       "search_files",
+      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",

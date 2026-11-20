@@ -16,9 +16,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from hermes_constants import get_hermes_home
 from tools.registry import registry, tool_error
 from hermes_cli.config import cfg_get
+from hermes_cli.oma_playbooks.bundle import shared_skill_dir
 from agent.skill_selection import get_enabled_skill_names, is_enabled_entry, profile_excluded_skills, skill_is_selected
 from agent.skill_utils import (
-    EXCLUDED_SKILL_DIRS as _EXCLUDED_SKILL_DIRS, is_skill_support_path as _is_skill_support_path)
+    EXCLUDED_SKILL_DIRS as _EXCLUDED_SKILL_DIRS, TIER_EXTERNAL, TIER_LOCAL,
+    is_skill_support_path as _is_skill_support_path)
 from tools.skills_tool_setup import (
     SkillReadinessStatus, _build_setup_note, _capture_required_environment_variables,
     _get_required_environment_variables, _is_env_var_persisted, _is_remote_env_backend)
@@ -40,6 +42,7 @@ _SKILLS_CACHE: dict = {}
 _SKILLS_CACHE_TTL_SECONDS = 30.0
 # Deepest directory the signature descends to below a root (a skill sits at <cat>/<sub>/<skill>/).
 _SIGNATURE_MAX_DEPTH = 6
+_TIER_OMA_BUNDLE = TIER_EXTERNAL + 1
 
 
 def clear_skills_cache() -> None:
@@ -222,27 +225,30 @@ def _is_skill_disabled(*names: str, platform: str | None = None) -> bool:
         return False
 
 
-def skill_search_dirs() -> tuple[list[tuple[int, Path]], Path]:
+def skill_search_dirs(*, include_bundle: bool = False) -> tuple[list[tuple[int, Path]], Path]:
     """(``(tier, dir)`` roots in precedence order, active_skills_dir) — the shared
     ``agent.skill_utils.get_skill_search_roots`` order with the live profile dir (dropped if absent)."""
-    from agent.skill_utils import TIER_LOCAL, get_skill_search_roots
+    from agent.skill_utils import get_skill_search_roots
     active_skills_dir = _skills_dir()
     roots = [(t, d) for t, d in get_skill_search_roots(active_skills_dir)
              if t != TIER_LOCAL or d.exists()]
+    if include_bundle and (bundle := shared_skill_dir()) and all(d != bundle for _, d in roots):
+        roots.append((_TIER_OMA_BUNDLE, bundle))
     return roots, active_skills_dir
 
 
-def _skill_catalog(*, skip_disabled: bool = False, include_hidden: bool = False) -> list[dict[str, Any]]:
+def _skill_catalog(*, skip_disabled: bool = False, include_hidden: bool = False,
+                   include_bundle: bool = False) -> list[dict[str, Any]]:
     """Every scanned skill resolved by ``agent.skill_utils.resolve_skill_catalog`` (status /
     load_name / tier / path), visible ones only unless *include_hidden*; cached per session.
     Resolution runs over ALL files first — skill_view ignores platform/disabled gates when
     collecting candidates, so it asks for hidden rows too."""
     from agent.skill_utils import (
         TIER_PROJECT, is_disabled_entry, iter_project_skill_files, iter_skill_index_files, resolve_skill_catalog)
-    cache_key = ("with_disabled" if skip_disabled else "filtered", include_hidden)
+    cache_key = ("with_disabled" if skip_disabled else "filtered", include_hidden, include_bundle)
     disabled = set() if skip_disabled else _get_disabled_skill_names()
     enabled = None if skip_disabled else get_enabled_skill_names()
-    roots, _ = skill_search_dirs()
+    roots, _ = skill_search_dirs(include_bundle=include_bundle)
     signature = _skills_scan_signature([d for _t, d in roots], disabled, enabled)
     now = time.monotonic()
     cached = _SKILLS_CACHE.get(cache_key)
@@ -252,8 +258,10 @@ def _skill_catalog(*, skip_disabled: bool = False, include_hidden: bool = False)
         return [dict(s) for s in cached[2]]
     scanned = []
     for tier, scan_dir in roots:  # project dirs go through the quarantine chokepoint
-        _iter = iter_project_skill_files if tier == TIER_PROJECT else lambda d: iter_skill_index_files(d, "SKILL.md")
-        for skill_md in _iter(scan_dir):
+        is_bundle = tier == _TIER_OMA_BUNDLE
+        skill_files = (iter_project_skill_files(scan_dir) if tier == TIER_PROJECT else
+                       iter_skill_index_files(scan_dir, "SKILL.md", followlinks=not is_bundle))
+        for skill_md in skill_files:
             if any(part in _EXCLUDED_SKILL_DIRS for part in skill_md.parts):
                 continue
             try:
@@ -262,10 +270,12 @@ def _skill_catalog(*, skip_disabled: bool = False, include_hidden: bool = False)
                 if not description:  # first non-heading body line (a null value stays null)
                     description = next((ln for ln in map(str.strip, body.strip().split("\n"))
                                         if ln and not ln.startswith("#")), description)
+                parts = skill_md.relative_to(scan_dir).parts
+                category = (parts[0] if len(parts) >= 3 else None) if is_bundle else _get_category_from_path(skill_md)
                 scanned.append({
                     "name": frontmatter.get("name", skill_md.parent.name)[:MAX_NAME_LENGTH],
                     "description": _truncate_description(description),
-                    "category": _get_category_from_path(skill_md), "tier": tier, "root": scan_dir,
+                    "category": category, "tier": tier, "root": scan_dir,
                     "path": skill_md, "visible": bool(skill_matches_platform(frontmatter)
                                                       and skill_matches_environment(frontmatter)
                                                       and skill_matches_apps(frontmatter))})
@@ -306,6 +316,23 @@ def _host_skills(fn):
             return _fail(refusal)
         return fn(*args, **kwargs)
     return gated
+
+
+@_host_skills
+def search_skills(query: str) -> str:
+    """Find matching skill metadata without loading content or altering installed skills."""
+    if not isinstance(query, str) or not (words := query.casefold().split()):
+        return _fail("Provide a nonempty skill search query.")
+    results = []
+    sources = {TIER_LOCAL: "profile", _TIER_OMA_BUNDLE: "oma-bundle"}
+    for skill in _skill_catalog(include_bundle=True):
+        name, category, description = skill["load_name"], skill["category"], skill["description"]
+        searchable = f"{name} {description or ''} {category or ''}".casefold()
+        if name and all(word in searchable for word in words):
+            results.append({"name": name, "category": category, "description": description,
+                            "source": sources.get(skill["tier"], "configured")})
+    return _json({"success": True, "skills": sort_skills(results), "count": len(results),
+                  "hint": "Use skill_view(name) to load a matching skill."})
 
 
 @_host_skills
@@ -560,6 +587,15 @@ def _owning_search_dir(skill_md: Path, all_dirs) -> Optional[Path]:
     return max(owners, key=lambda d: len(d.parts), default=None)
 
 
+def _bundle_skill_candidates(name: str, alias: str | None, root: Path):
+    from agent.skill_utils import iter_skill_index_files
+
+    for md in iter_skill_index_files(root, "SKILL.md", followlinks=False):
+        names = (md.parent.name, md.parent.relative_to(root).as_posix(), _safe_frontmatter(md).get("name"))
+        if name in names or (alias and alias in names):
+            yield md.parent, md
+
+
 def locate_skill(name: str, local_category_name: Optional[str], roots):
     """Unique on-disk skill for *name* over ``(tier, dir)`` *roots*: cross-tier precedence
     (project > local > create_dir > external, shadowed copies logged), same-tier collision refusal,
@@ -570,7 +606,10 @@ def locate_skill(name: str, local_category_name: Optional[str], roots):
     if not all_dirs:
         return _fail(
             "Skills directory does not exist yet. It will be created on first install."), None, None
-    candidates = _collect_skill_candidates(name, local_category_name, all_dirs)
+    candidates = _collect_skill_candidates(name, local_category_name, [d for t, d in roots if t != _TIER_OMA_BUNDLE])
+    for tier, root in roots:
+        if tier == _TIER_OMA_BUNDLE:
+            candidates.extend(_bundle_skill_candidates(name, local_category_name, root))
     tier_of = {d: t for t, d in roots}
     if len(candidates) > 1:
         owned = [(c, _owning_search_dir(c[1], all_dirs)) for c in candidates]
@@ -647,11 +686,12 @@ def _skill_selection_error(resolved_name, skill_dir, skill_md, all_dirs) -> str 
     enabled = get_enabled_skill_names()
     if not skill_is_selected(enabled, resolved_name) and not any(
             e["path"] == skill_md and is_enabled_entry(e, enabled)
-            for e in _skill_catalog(skip_disabled=True, include_hidden=True)):
+            for e in _skill_catalog(skip_disabled=True, include_hidden=True, include_bundle=True)):
         return _fail(f"Skill '{resolved_name}' is excluded by skills.enabled or skills.platform_enabled.")
     # A path matches only when it is this copy's advertised load name, not an unrelated alias.
     if _is_skill_disabled(resolved_name, rel) and (_is_skill_disabled(resolved_name) or any(
-            e["path"] == skill_md and e["load_name"] == rel for e in _skill_catalog(skip_disabled=True, include_hidden=True))):
+            e["path"] == skill_md and e["load_name"] == rel
+            for e in _skill_catalog(skip_disabled=True, include_hidden=True, include_bundle=True))):
         return _fail(f"Skill '{resolved_name}' is disabled. Enable it with `hermes skills` or inspect the files directly on disk.")
     return None
 
@@ -677,7 +717,7 @@ def skill_view(
         # since `bare` is not namespace-checked.
         if local_category_name and (lookup_error := skill_lookup_path_error(local_category_name)):
             return _fail(lookup_error, hint=_LOOKUP_HINT)
-        roots, active_skills_dir = skill_search_dirs()
+        roots, active_skills_dir = skill_search_dirs(include_bundle=True)
         all_dirs = [d for _t, d in roots]
         error, skill_dir, skill_md = locate_skill(name, local_category_name, roots)
         if error is not None:
@@ -757,6 +797,22 @@ def skill_view(
     except Exception as e:
         return tool_error(str(e), success=False)
 
+
+SEARCH_SKILLS_SCHEMA = {
+    "name": "search_skills",
+    "description": "Find skills by name, description, or category in this profile and the shared OMA bundle. "
+                   "Use skill_view to load a match.",
+    "parameters": {
+        "type": "object",
+        "properties": {"query": {"type": "string", "description": "Case-insensitive search terms"}},
+        "required": ["query"],
+    },
+}
+
+registry.register(
+    name="search_skills", toolset="skills", schema=SEARCH_SKILLS_SCHEMA,
+    handler=lambda args, **kw: search_skills(args.get("query", "")),
+    check_fn=check_skills_requirements, emoji="📚")
 
 SKILLS_LIST_SCHEMA = {
     "name": "skills_list",

@@ -21,7 +21,7 @@ Use this skill in the default OMA Agent profile to install a campaign already pr
 
 ## Prerequisites
 
-The runtime must provide campaign definitions at `/opt/oma/campaigns/<id>/config.yaml` and shared skill packages at `/opt/oma/skills`. A campaign may also include its own `skills/` directory. Use the default profile with the OMA Agent `hermes` launcher on `PATH` and Python 3 available. There is no network source, catalog, or version selection.
+Use `$HERMES_HOME/oma-bundle` in the default profile. In Docker this is `/opt/data/oma-bundle`: campaign definitions are in `campaigns/<id>/config.yaml`, and shared skill packages are in `skills/`. A campaign may also include its own `skills/` directory. Use the OMA Agent `hermes` launcher on `PATH` and Python 3. There is no network source, catalog, or version selection.
 
 ## How to Run
 
@@ -61,7 +61,7 @@ Goals and plans are inline YAML lists of text. Use `goals: []` and `plans: []` u
 
 ## Procedure
 
-1. When asked what can be installed, inspect the campaign directories already present under `/opt/oma/campaigns` using `search_files`. Do not fetch or check for updates.
+1. When asked what can be installed, inspect `$HERMES_HOME/oma-bundle/campaigns` using `search_files`. Do not fetch or check for updates.
 2. On request, run `install <id>` with the local campaign ID. The helper validates `orchestrator`, `agents`, and declared `oma_skills` from the manifest. It creates one Kanban board, enables the team's Kanban tools on that board, and tells the declared orchestrator to coordinate work there with its own roster. Do not switch the shared current board. Installation does not start agent turns, copy launch credentials, register cron jobs, or seed tasks.
 3. Use `status <id>` to check the board slug, orchestrator, and profiles. After installation or when asked to record the roster, use `read_file` and `patch` to save the verified `present_profiles` under `agents` in the editable `config.yaml`, in roster order. Run `configure <id>` first if the record is missing. Do not list unprovisioned drafts. Report discrepancies rather than silently removing existing entries.
 4. To inspect the board from the CLI, use `terminal` with `hermes kanban --board <kanban_board> list`; a newly installed board can be empty. The ledger is `$HERMES_HOME/playbooks/<id>/installation.yaml`. Scratch paths live under that directory and are exposed in each installed agent's SOUL.
