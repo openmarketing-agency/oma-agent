@@ -21,7 +21,7 @@ Use this skill in the default OMA Agent profile to install a campaign already pr
 
 ## Prerequisites
 
-The runtime must provide campaign definitions at `/opt/opa/campaigns/<id>/config.yaml` and shared skill packages at `/opt/oma/skills`. A campaign may also include its own `skills/` directory. Use the default profile with the OMA Agent `hermes` launcher on `PATH` and Python 3 available. There is no network source, catalog, or version selection.
+The runtime must provide campaign definitions at `/opt/oma/campaigns/<id>/config.yaml` and shared skill packages at `/opt/oma/skills`. A campaign may also include its own `skills/` directory. Use the default profile with the OMA Agent `hermes` launcher on `PATH` and Python 3 available. There is no network source, catalog, or version selection.
 
 ## How to Run
 
@@ -59,7 +59,7 @@ Goals and plans are inline YAML lists of text. `playbook` is the ID of a saved p
 
 ## Procedure
 
-1. When asked what can be installed, inspect the campaign directories already present under `/opt/opa/campaigns` using `search_files`. Do not fetch or check for updates.
+1. When asked what can be installed, inspect the campaign directories already present under `/opt/oma/campaigns` using `search_files`. Do not fetch or check for updates.
 2. On request, run `install <id>` with the local campaign ID. The helper validates `orchestrator`, `agents`, and declared `oma_skills` from the manifest. It creates one Kanban board, enables the team's Kanban tools on that board, and tells the declared orchestrator to coordinate work there with its own roster. Do not switch the shared current board. Installation does not start agent turns, copy launch credentials, register cron jobs, or seed tasks.
 3. Use `status <id>` to check the board slug, orchestrator, and profiles. To inspect the board from the CLI, use `terminal` with `hermes kanban --board <kanban_board> list`; a newly installed board can be empty. The ledger is `$HERMES_HOME/playbooks/<id>/installation.yaml`. Scratch paths live under that directory and are exposed in each installed agent's SOUL.
 4. To save campaign goals, plans, or a playbook link, run `configure <id>` if the config is missing. Use `read_file` and `patch` on the campaign config to update only the requested fields. Saving a plan does not schedule or execute it.

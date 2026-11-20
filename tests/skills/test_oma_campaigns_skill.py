@@ -18,10 +18,10 @@ def bundle(tmp_path, monkeypatch):
     monkeypatch.delenv("HERMES_KANBAN_BOARD", raising=False)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     opt = tmp_path / "opt"
-    campaigns = opt / "opa" / "campaigns"
+    campaigns = opt / "oma" / "campaigns"
     skills = opt / "oma" / "skills"
-    monkeypatch.setattr(cli, "_CAMPAIGNS_DIR", campaigns)
-    monkeypatch.setattr(cli, "_SKILLS_DIR", skills)
+    monkeypatch.setattr(cli, "_CAMPAIGNS_DIR", tmp_path.joinpath(*cli._CAMPAIGNS_DIR.parts[1:]))
+    monkeypatch.setattr(cli, "_SKILLS_DIR", tmp_path.joinpath(*cli._SKILLS_DIR.parts[1:]))
     team = campaigns / "demo"
     team.mkdir(parents=True)
     (team / "config.yaml").write_text(
@@ -74,7 +74,7 @@ def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
         "orchestrator": "demo__orchestrator", "kanban_board": "campaign-demo",
         "kanban_board_name": "Demo",
     }
-    manifest = (opt / "opa" / "campaigns" / "demo" / "config.yaml").resolve()
+    manifest = (opt / "oma" / "campaigns" / "demo" / "config.yaml").resolve()
     assert saved["source_manifest"] == str(manifest)
     assert not (directory / "config.yaml").exists()
     for agent_id, row in saved["agents"].items():
@@ -127,7 +127,7 @@ def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
 
 def test_missing_local_sources_and_profile_collision_do_not_publish(bundle, capsys):
     home, opt, main = bundle
-    campaigns = opt / "opa" / "campaigns"
+    campaigns = opt / "oma" / "campaigns"
     old_source = opt / "oma" / "playbooks"
     campaigns.rename(old_source)
     assert main(["install", "demo"]) == 1
@@ -210,7 +210,7 @@ def test_configure_backfills_from_installed_campaign_without_reinstalling(bundle
     from hermes_cli.oma_playbooks.source import read_mapping
 
     home, opt, main = bundle
-    (opt / "opa" / "campaigns").rename(opt / "opa" / "unavailable")
+    (opt / "oma" / "campaigns").rename(opt / "oma" / "unavailable")
     ledger = home / "playbooks" / "demo" / "installation.yaml"
     ledger.parent.mkdir(parents=True)
     ledger.write_text(
