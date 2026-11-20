@@ -180,10 +180,10 @@ const sidebars: SidebarsConfig = {
                   collapsed: true,
                   items: [
                     'user-guide/skills/bundled/oma/oma-oma-agents',
-                    'user-guide/skills/bundled/oma/oma-oma-brands',
+                    'user-guide/skills/bundled/oma/oma-oma-brand',
                     'user-guide/skills/bundled/oma/oma-oma-campaigns',
                     'user-guide/skills/bundled/oma/oma-oma-onboarding',
-                    'user-guide/skills/bundled/oma/oma-oma-playbooks',
+                    'user-guide/skills/bundled/oma/oma-oma-playbook',
                   ],
                 },
               ],

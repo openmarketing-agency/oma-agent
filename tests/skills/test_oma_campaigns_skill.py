@@ -70,7 +70,7 @@ def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
     config_path = home / "oma" / "campaigns" / "demo" / "config.yaml"
     assert read_mapping(config_path) == {
         "id": "demo", "name": "Demo", "description": "Test team.", "version": None,
-        "goals": [], "plans": [], "playbook": None,
+        "goals": [], "plans": [],
         "orchestrator": "demo__orchestrator", "kanban_board": "campaign-demo",
         "kanban_board_name": "Demo",
     }
@@ -88,9 +88,9 @@ def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
         assert "Markdown (`.md`)" in soul and "read the relevant notes" in soul
         assert f"`{config_path.resolve()}`" in soul
         oma = home.resolve() / "oma"
-        assert f"`{oma / 'playbooks' / '<playbook-id>' / 'config.yaml'}`" in soul
-        assert f"`{oma / 'brands' / '<brand-id>' / 'config.yaml'}`" in soul
-        assert "`brand_id`" in soul and "`playbook`" in soul
+        assert f"`{oma / 'playbook' / 'config.yaml'}`" in soul
+        assert f"`{oma / 'brand' / 'config.yaml'}`" in soul
+        assert "`brand_id`" not in soul and "`playbook`" not in soul
         assert "Do not scan other records" in soul
         assert row["state"] == "installed" and row["declared_jobs"] == ["sample"]
         assert not (profile / "cron" / "jobs.json").exists()
@@ -226,7 +226,7 @@ def test_configure_backfills_from_installed_campaign_without_reinstalling(bundle
     assert Path(json.loads(capsys.readouterr().out)["config_path"]).resolve() == config_path.resolve()
     assert read_mapping(config_path) == {
         "id": "demo", "name": "Installed Demo", "description": "Existing campaign.",
-        "version": "1.2.3", "goals": [], "plans": [], "playbook": None,
+        "version": "1.2.3", "goals": [], "plans": [],
         "orchestrator": "demo__orchestrator",
     }
     custom = "# Keep my comment\nid: demo\ngoals: [Measure sign-ups]\nplans: [Review weekly]\nplaybook: product-launch\n"

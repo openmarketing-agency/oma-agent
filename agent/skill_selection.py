@@ -9,16 +9,18 @@ from hermes_constants import get_default_hermes_root, get_hermes_home
 
 logger = logging.getLogger(__name__)
 
-OMA_DEFAULT_ONLY_SKILLS = frozenset({
-    "oma-agents", "oma-brands", "oma-campaigns", "oma-onboarding", "oma-playbooks",
-})
+# Old bundled copies can remain on disk after sync; never offer the retired workflow.
+OMA_RETIRED_SKILLS = frozenset({"oma-brands", "oma-playbooks"})
+OMA_DEFAULT_ONLY_SKILLS = OMA_RETIRED_SKILLS | {
+    "oma-agents", "oma-brand", "oma-campaigns", "oma-onboarding", "oma-playbook",
+}
 
 
 def profile_excluded_skills(home: Path | None = None) -> frozenset[str]:
-    """Reserve the OMA management skills for the default profile."""
+    """Reserve the OMA management skills for default and hide retired IDs."""
     home = get_hermes_home() if home is None else home
     if home.resolve() == get_default_hermes_root(home=home).resolve():
-        return frozenset()
+        return OMA_RETIRED_SKILLS
     return OMA_DEFAULT_ONLY_SKILLS
 
 

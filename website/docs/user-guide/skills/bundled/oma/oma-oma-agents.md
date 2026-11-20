@@ -68,7 +68,7 @@ cron:
 jobs: []
 ```
 
-`campaign_id` is the ID of the owning campaign. Verify that it matches the `id` in `oma/campaigns/<campaign_id>/config.yaml` in the same Hermes home. Use `campaign_id: null` for a standalone agent. Do not store a `playbook_id` in the agent record; the campaign owns the playbook link.
+`campaign_id` is the ID of the owning campaign. Verify that it matches the `id` in `oma/campaigns/<campaign_id>/config.yaml` in the same Hermes home. Use `campaign_id: null` for a standalone agent. Do not store playbook or brand links in the agent record; agents use the single playbook and brand at their fixed locations when needed.
 
 The owning campaign's `config.yaml` keeps its roster under `agents`, a YAML list of full canonical IDs. For example, `agents: [seo__orchestrator, seo__researcher]`. Keep this roster separate from the agent's own config.
 

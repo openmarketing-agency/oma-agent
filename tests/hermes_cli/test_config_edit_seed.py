@@ -115,7 +115,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     import json
     import hermes_yaml as yaml
     from agent.runtime_scope import bind_profile_scope
-    from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS
+    from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS, OMA_RETIRED_SKILLS
     from agent.skill_utils import get_disabled_skill_names
     from agent.skill_commands import build_auto_load_prompt
     from hermes_cli.config_defaults import DEFAULT_CONFIG
@@ -214,7 +214,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     disclosed = assemble_tool_defs(tools)
     assert disclosed.activated
     assert ("clarify" in {tool["function"]["name"] for tool in disclosed.tool_defs}) == (entry == "install")
-    assert get_disabled_skill_names() == (set() if entry == "install" else OMA_DEFAULT_ONLY_SKILLS)
+    assert get_disabled_skill_names() == (OMA_RETIRED_SKILLS if entry == "install" else OMA_DEFAULT_ONLY_SKILLS)
     assert approval_context._get_approval_mode() == "off"
     assert approval_context._get_approval_timeout() == 300
     assert approval_context._get_cron_approval_mode() == "approve"

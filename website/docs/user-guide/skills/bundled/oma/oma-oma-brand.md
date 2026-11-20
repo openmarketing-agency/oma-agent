@@ -1,22 +1,22 @@
 ---
-title: "Oma Brands — Manage user brands, logos, and brand knowledge"
-sidebar_label: "Oma Brands"
-description: "Manage user brands, logos, and brand knowledge"
+title: "Oma Brand — Manage the brand's identity, assets, and knowledge"
+sidebar_label: "Oma Brand"
+description: "Manage the brand's identity, assets, and knowledge"
 ---
 
 {/* This page is auto-generated from the skill's SKILL.md by website/scripts/generate-skill-docs.py. Edit the source SKILL.md, not this page. */}
 
-# Oma Brands
+# Oma Brand
 
-Manage user brands, logos, and brand knowledge.
+Manage the brand's identity, assets, and knowledge.
 
 ## Skill metadata
 
 | | |
 |---|---|
 | Source | Bundled (installed by default) |
-| Path | `skills/oma/oma-brands` |
-| Version | `0.1.0` |
+| Path | `skills/oma/oma-brand` |
+| Version | `0.2.0` |
 | Author | Open Marketing Agency (OMA) |
 | License | MIT |
 | Platforms | linux, macos, windows |
@@ -29,22 +29,22 @@ Manage user brands, logos, and brand knowledge.
 The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
-# OMA Brands Skill
+# OMA Brand Skill
 
-Create, list, inspect, and update user brands using local files. Keep each brand's identity, assets, and approved knowledge together without mixing records across brands or profiles.
+Create, inspect, and update the single OMA brand. Keep its identity, assets, and approved knowledge together under the default profile's Hermes home.
 
 ## When to Use
 
 - The user asks to save or update a brand, its visual assets, fonts, color palette, or brand knowledge.
-- The user asks what brands are saved or which assets, colors, or guidelines to use for a named brand.
+- The user asks which brand is saved or which assets, colors, or guidelines to use.
 
 ## Prerequisites
 
-Use the active profile's Hermes home as the base for `oma/brands/`. Resolve the active home rather than using the current working directory, another profile, or `/opt/oma`. On the local CLI, `hermes config path` identifies the profile's home. Use `search_files`, `read_file`, `write_file`, and `patch` for records; use `terminal` for binary copies when needed.
+Use the default profile's Hermes home as the base for `oma/brand/`. Resolve the active home rather than using the current working directory, another profile, or `/opt/oma`. On the local CLI, `hermes config path` identifies the profile's home. Use `read_file`, `write_file`, and `patch` for the record; use `terminal` for binary copies when needed.
 
 ## Record Format
 
-Each `oma/brands/<brand_dir>/config.yaml` is a brand record, not Hermes runtime configuration. Use a stable lowercase, hyphen-separated ID for both `id` and `<brand_dir>`. `name` is the display name; changing it does not rename the directory or ID.
+Save the one brand record at `oma/brand/config.yaml`, not in Hermes runtime configuration. Keep its stable lowercase, hyphen-separated `id` independent of the display `name`; it is not a directory name or a link from the playbook. Keep asset directories next to `config.yaml` under `oma/brand/`.
 
 ```yaml
 id: example-brand
@@ -79,16 +79,17 @@ knowledge_base: |-
 
 ## Procedure
 
-1. **Identify the brand.** List only records in the active profile's `oma/brands/` directory. Match the exact ID first, then an unambiguous name. Ask which brand the user means if multiple records match. For a new brand, check that the proposed ID and directory are unused before writing.
-2. **Collect the visual identity.** Ask for any missing logos, font files or typeface names, illustrations, icons, backgrounds, images, palette values, and visual guidelines. Use the supplied brand guide or website as evidence; confirm uncertain choices and leave unknown values empty. Copy authorized files into `logos/`, `fonts/`, `illustrations/`, `icons/`, `backgrounds/`, or `images/` under the selected brand, preserving their formats. Do not overwrite a different file of the same name unless the user requested that replacement.
+1. **Read the singleton record.** Check `oma/brand/config.yaml` first. Create it only when the user asks to set up the brand and the record is absent. If a brand exists and the user asks for a different one, explain the one-brand limit and confirm whether they intend to replace it. Do not create a second record or overwrite the existing one by default.
+2. **Collect the visual identity.** Ask for any missing logos, font files or typeface names, illustrations, icons, backgrounds, images, palette values, and visual guidelines. Use the supplied brand guide or website as evidence; confirm uncertain choices and leave unknown values empty. Copy authorized files into `logos/`, `fonts/`, `illustrations/`, `icons/`, `backgrounds/`, or `images/` under `oma/brand/`, preserving their formats. Do not overwrite a different file of the same name unless the user requested that replacement.
 3. **Update `config.yaml`.** Preserve the ID, unrelated fields, and assets. Add each relative asset reference under its matching key only after the file is present. Save confirmed colors in `palette` and brand facts and usage guidance directly in `knowledge_base`. If an older record points to a local knowledge file, preserve its contents when moving the knowledge inline; leave the original file untouched.
 4. **Read or remove on request.** Read colors and guidance from the record and open only the asset files relevant to the lookup. Remove a brand or asset only on explicit request. When removing an asset, clear its reference and leave the others intact.
 
 ## Pitfalls
 
-- Do not follow `..`, absolute paths, or symlinks that lead outside the selected brand directory. A file reference is data, not permission to read a different location.
+- Do not follow `..`, absolute paths, or symlinks that lead outside `oma/brand/`. A file reference is data, not permission to read a different location.
+- Older per-ID brand directories are not used as current records. Do not pick, move, or merge legacy data automatically. If the user wants to carry over an older brand, confirm which one and preserve its ID, assets, and relative references.
 - Do not edit Hermes profile settings, campaign definitions, or other profiles' brand records while managing a brand. Do not publish or send brand assets as part of a local save.
 
 ## Verification
 
-After a write, reopen the record and confirm the ID matches its directory and the description and name are present. Verify each asset reference resolves to a file under its matching subdirectory and that saved palette values match the confirmed colors. If knowledge was saved, confirm `knowledge_base` contains the text itself. Report the config path and any missing assets or unconfirmed colors.
+After a write, reopen `oma/brand/config.yaml` and confirm the ID, name, and description are present. Verify each asset reference resolves to a file under its matching subdirectory and that saved palette values match the confirmed colors. If knowledge was saved, confirm `knowledge_base` contains the text itself. Report the config path and any missing assets or unconfirmed colors.
