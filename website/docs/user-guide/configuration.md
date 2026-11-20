@@ -66,17 +66,29 @@ a catalog, or check versions. `list` and `status` inspect installed campaigns in
 profiles.
 
 Editable campaign records live at `$HERMES_HOME/oma/campaigns/<id>/config.yaml`.
-They contain `id`, `name`, `description`, `version`, inline `goals` and `plans`,
-and an optional `playbook` ID from `$HERMES_HOME/oma/playbooks/`. New installs
-create the record; `configure <id>` creates it for an existing installation
-without reinstalling or replacing user edits. The installation ledger and agent
-scratch directories stay in their existing locations.
+They contain `id`, `name`, `description`, `version`, and inline `goals` and `plans`.
+New installs create the record; `configure <id>` creates it for an existing
+installation without reinstalling or replacing user edits. The installation
+ledger and agent scratch directories stay in their existing locations.
 
 The `oma-campaigns` and `oma-agents` skills record verified campaign members in
 the editable record's `agents` list using full profile IDs. This list does not
-provision profiles. The `oma-brands` skill stores references to logos, fonts,
-illustrations, icons, backgrounds, and images in the brand's `config.yaml` as
-paths relative to the brand directory.
+provision profiles.
+
+The default profile manages one brand with `oma-brand` and one playbook with
+`oma-playbook`. The brand lives at `$HERMES_HOME/oma/brand/config.yaml` and stores
+paths relative to `oma/brand/` for logos, fonts, illustrations, icons,
+backgrounds, and images. The playbook lives at `$HERMES_HOME/oma/playbook/config.yaml`
+with an inline `strategy`. Campaigns and their agents use the brand and playbook
+at these fixed locations, without `playbook` or `brand_id` links between the
+records. Older per-ID records are not migrated automatically.
+
+For initial setup, `oma-onboarding` only asks for a website or GitHub repository
+URL. It builds the brand and playbook from that source, chooses and installs
+matching local campaigns, and enables eligible jobs from those teams' agent
+configs in their owning profiles. Cron activation is an onboarding step, not
+part of campaign installation. Jobs run on their declared schedule when a
+healthy Hermes gateway serves the profile.
 
 OMA starter configs skip interactive approval prompts, auto-approve flagged
 commands in cron, single-query, and unattended sessions, and skip the MCP reload

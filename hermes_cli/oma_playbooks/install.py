@@ -84,7 +84,7 @@ def _ensure_campaign_config(path: Path, record: dict) -> Path:
             atomic_config_write(path, {**config, **missing})
         return path
     config = {key: record.get(key) for key in ("id", "name", "description", "version")}
-    config.update(goals=[], plans=[], playbook=None, **routing)
+    config.update(goals=[], plans=[], **routing)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     atomic_yaml_write(path, config, create_mode=0o600)  # config-writer: ok — campaign data, not Hermes settings
     return path
@@ -218,16 +218,16 @@ def _new_record(playbook: Playbook, board: str) -> dict:
 
 def _campaign_context_soul(config_path: Path) -> str:
     oma = config_path.parents[2]
-    playbook = oma / "playbooks" / "<playbook-id>" / "config.yaml"
-    brand = oma / "brands" / "<brand-id>" / "config.yaml"
+    playbook = oma / "playbook" / "config.yaml"
+    brand = oma / "brand" / "config.yaml"
     return (
         "## Your campaign context\n\n"
         f"- Campaign: read `{config_path}` for your campaign's goals and plans.\n"
-        f"- Playbook: use that campaign record's `playbook` ID to read only `{playbook}`.\n"
-        f"- Brand: use that playbook record's `brand_id` to read only `{brand}`.\n\n"
-        "Use the current links from these records. Follow only lowercase, hyphen-separated IDs "
-        "that match their records; don't follow symlinks outside those record directories. "
-        "If a link or record is missing, stop at the last verified record. "
+        f"- Playbook: read `{playbook}` for the shared strategy.\n"
+        f"- Brand: read `{brand}` for the shared brand context.\n\n"
+        "No record links are required; use only these fixed paths. "
+        "Don't follow symlinks outside those record directories. "
+        "If a record needed for the work is missing, report the gap rather than guessing. "
         "Do not scan other records or change these records as part of loading context.\n"
     )
 

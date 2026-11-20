@@ -37,10 +37,10 @@ After difficult/iterative tasks, offer to save as a skill. If a skill you loaded
     - hermes-agent: Use, configure, theme, extend, and orchestrate Hermes Agent.
   oma:
     - oma-agents: Manage agent settings and context for future runs.
-    - oma-brands: Manage user brands, logos, and brand knowledge.
+    - oma-brand: Manage the brand's identity, assets, and knowledge.
     - oma-campaigns: Install and inspect local OMA campaigns.
-    - oma-onboarding: Guide brand setup, strategy, campaigns, and agent creation.
-    - oma-playbooks: Manage user playbooks and their strategies.
+    - oma-onboarding: Set up a brand, campaigns, and agents from one URL.
+    - oma-playbook: Manage the brand's playbook and strategy.
 </available_skills>
 
 Only proceed without loading a skill if genuinely none are relevant to the task.

@@ -8,7 +8,8 @@ from tools.skills_sync import sync_skills
 from tools.skills_tool import find_all_skills, skill_view
 
 
-OMA_SKILLS = {"oma-agents", "oma-brands", "oma-campaigns", "oma-onboarding", "oma-playbooks"}
+OMA_SKILLS = {"oma-agents", "oma-brand", "oma-campaigns", "oma-onboarding", "oma-playbook"}
+OLD_SKILLS = {"oma-brands", "oma-playbooks"}
 
 
 def test_oma_onboarding_loads_with_its_workflow_skills(tmp_path, monkeypatch):
@@ -56,3 +57,25 @@ def test_named_profile_sync_excludes_oma_and_hides_retained_copies(tmp_path, mon
         reset_hermes_home_override(token)
 
     assert OMA_SKILLS <= {row["name"] for row in find_all_skills()}
+
+
+def test_default_sync_retires_plural_skills_without_removing_old_data(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    for name in OLD_SKILLS:
+        skill = tmp_path / "skills" / "oma" / name / "SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text(f"---\nname: {name}\ndescription: Old skill.\n---\nOld instructions.\n")
+    old_records = [tmp_path / "oma" / group / "example" / "config.yaml" for group in ("brands", "playbooks")]
+    for record in old_records:
+        record.parent.mkdir(parents=True)
+        record.write_text("id: example\n")
+
+    assert {"oma-brand", "oma-playbook"} <= set(sync_skills(quiet=True)["copied"])
+    assert OLD_SKILLS.isdisjoint(row["name"] for row in find_all_skills())
+    for name in OLD_SKILLS:
+        assert not json.loads(skill_view(name))["success"]
+        assert not json.loads(skill_view(f"oma/{name}"))["success"]
+        assert (tmp_path / "skills" / "oma" / name / "SKILL.md").is_file()
+    assert all(record.read_text() == "id: example\n" for record in old_records)
+    assert not (tmp_path / "oma" / "brand").exists()
+    assert not (tmp_path / "oma" / "playbook").exists()
