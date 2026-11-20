@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from hermes_constants import get_hermes_home
 from tools.registry import registry, tool_error
 from hermes_cli.config import cfg_get
-from agent.skill_selection import get_enabled_skill_names, is_enabled_entry, skill_is_selected
+from agent.skill_selection import get_enabled_skill_names, is_enabled_entry, profile_excluded_skills, skill_is_selected
 from agent.skill_utils import (
     EXCLUDED_SKILL_DIRS as _EXCLUDED_SKILL_DIRS, is_skill_support_path as _is_skill_support_path)
 from tools.skills_tool_setup import (
@@ -200,6 +200,8 @@ def _is_skill_disabled(*names: str, platform: str | None = None) -> bool:
     """Any of *names* disabled in config (one config load)? Platform precedence: explicit arg,
     ``HERMES_PLATFORM``, session ``HERMES_SESSION_PLATFORM``. A globally-disabled skill stays disabled on every platform
     (keep in sync with agent.skill_utils.get_disabled_skill_names)."""
+    if not profile_excluded_skills().isdisjoint(names):
+        return True
     try:
         from agent.skill_utils import ESSENTIAL_SKILLS
         if not ESSENTIAL_SKILLS.isdisjoint(names):
@@ -639,6 +641,8 @@ def _log_security_warnings(name: str, skill_md: Path, content: str, all_dirs, ac
 
 def _skill_selection_error(resolved_name, skill_dir, skill_md, all_dirs) -> str | None:
     """Resolve policy on the selected file, not whichever alias reached it."""
+    if resolved_name in profile_excluded_skills():
+        return _fail(f"Skill '{resolved_name}' is only available in the default profile.")
     rel = _owned_relative(skill_dir, skill_md, all_dirs)
     enabled = get_enabled_skill_names()
     if not skill_is_selected(enabled, resolved_name) and not any(

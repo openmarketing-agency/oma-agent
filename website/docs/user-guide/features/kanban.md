@@ -198,6 +198,14 @@ Board resolution order (highest precedence first):
    boards switch`.
 4. `default`.
 
+For native agent tool calls, a profile can set `kanban.profile_board` to one
+existing board slug. Calls without `board` use that board, and calls naming a
+different, missing, or archived board are rejected. Dispatcher-owned workers
+retain their run pins; their Kanban calls are rejected if dispatched on a
+different board. This setting does not change CLI or dashboard selection and is not
+a filesystem or terminal access control. OMA campaign installs set it on the
+campaign's profiles automatically.
+
 Slugs are validated: lowercase alphanumerics + hyphens + underscores, 1-64
 chars, must start with alphanumeric. Uppercase input is auto-downcased.
 Anything else (slashes, spaces, dots, `..`) is rejected at the CLI layer

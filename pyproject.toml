@@ -745,6 +745,9 @@ include = [
 hermes_cli = [
   "observability/schemas/*.json",
   "data/*.json",
+  "data/profiles/maintenance/config.yaml",
+  "data/profiles/maintenance/SOUL.md",
+  "data/profiles/maintenance/skills/omactl/SKILL.md",
   "local_runtime/*.json",
   "process_supervisor.sh",
 ]

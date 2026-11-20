@@ -112,7 +112,10 @@ def test_seeded_config_keeps_the_update_backup_default(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("entry", ["install", "profile"])
 def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
+    import json
     import hermes_yaml as yaml
+    from agent.runtime_scope import bind_profile_scope
+    from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS
     from agent.skill_utils import get_disabled_skill_names
     from agent.skill_commands import build_auto_load_prompt
     from hermes_cli.config_defaults import DEFAULT_CONFIG
@@ -139,16 +142,48 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
             env={**os.environ, "HOME": str(tmp_path)}, check=True, timeout=20,
         )
         home = root
+        maintenance = root / "profiles" / "maintenance"
+        assert maintenance.is_dir()
+        soul = (maintenance / "SOUL.md").read_text(encoding="utf-8")
+        assert "OMA Maintenance" in soul and "`omactl`" in soul
+        maintenance_config = load_user_config_effective(maintenance / "config.yaml")
+        assert _get_platform_tools(maintenance_config, "cli") == {
+            "file", "terminal", "skills", "memory", "session_search", "web", "browser",
+        }
+        assert maintenance_config["tools"]["tool_search"]["eager_toolsets"] == ["file", "terminal"]
+        assert maintenance_config["tools"]["tool_search"]["listing"] == "off"
+        assert maintenance_config["approvals"]["cron_mode"] == "approve"
+        assert not (maintenance / "skills" / "oma").exists()
+        assert (maintenance / "skills" / "autonomous-ai-agents" / "hermes-agent" / "SKILL.md").is_file()
+        with bind_profile_scope(maintenance, hydrate_secrets=False):
+            from tools.skills_tool import skill_view
+            assert json.loads(skill_view("omactl"))["success"]
+            maintenance_tools = get_tool_definitions(
+                enabled_toolsets=sorted(_get_platform_tools(maintenance_config, "cli")),
+                skip_tool_search_assembly=True,
+            )
+            disclosed = assemble_tool_defs(maintenance_tools)
+            assert disclosed.activated
+            assert {tool["function"]["name"] for tool in disclosed.tool_defs} == {
+                "read_file", "write_file", "search_files", "patch", "terminal", "process_manage",
+            } | BRIDGE_TOOL_NAMES
     else:
         home = create_profile("fresh", no_alias=True, seed_model=False)
+        assert not (root / "profiles" / "maintenance").exists()
+        assert "OMA Maintenance" not in (home / "SOUL.md").read_text(encoding="utf-8")
+    assert not (home / "skills" / "omactl").exists()
     path = home / "config.yaml"
     content = path.read_text(encoding="utf-8")
     enabled = ["file", "terminal", "browser", "web", "skills", "memory", "session_search"]
+    eager = ["file", "terminal", "skills", "memory"]
+    if entry == "install":
+        enabled.append("clarify")
+        eager.append("clarify")
     assert "#" not in content
     assert yaml.safe_load(content) == {
         "agent": {"enabled_toolsets": enabled},
         "tools": {"tool_search": {
-            "enabled": "on", "eager_toolsets": ["file", "terminal", "skills", "memory"], "listing": "off",
+            "enabled": "on", "eager_toolsets": eager, "listing": "off",
         }},
         "skills": {"disabled": []},
         "approvals": {
@@ -173,10 +208,13 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     tools = get_tool_definitions(
         enabled_toolsets=sorted(_get_platform_tools(config, "cli")), skip_tool_search_assembly=True,
     )
-    assert {"skills_list", "skill_view", "skill_manage", "memory", "session_search"} <= {
-        tool["function"]["name"] for tool in tools
-    }
-    assert not get_disabled_skill_names()
+    available_names = {tool["function"]["name"] for tool in tools}
+    assert {"skills_list", "skill_view", "skill_manage", "memory", "session_search"} <= available_names
+    assert ("clarify" in available_names) == (entry == "install")
+    disclosed = assemble_tool_defs(tools)
+    assert disclosed.activated
+    assert ("clarify" in {tool["function"]["name"] for tool in disclosed.tool_defs}) == (entry == "install")
+    assert get_disabled_skill_names() == (set() if entry == "install" else OMA_DEFAULT_ONLY_SKILLS)
     assert approval_context._get_approval_mode() == "off"
     assert approval_context._get_approval_timeout() == 300
     assert approval_context._get_cron_approval_mode() == "approve"
@@ -209,4 +247,5 @@ def test_installer_leaves_existing_config_bytes_untouched(tmp_path, monkeypatch)
     path.write_bytes(existing)
     seed_install_config()
     assert path.read_bytes() == existing
+    assert not (tmp_path / "profiles" / "maintenance").exists()
 

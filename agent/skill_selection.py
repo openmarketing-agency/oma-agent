@@ -2,9 +2,24 @@
 
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
+from hermes_constants import get_default_hermes_root, get_hermes_home
+
 logger = logging.getLogger(__name__)
+
+OMA_DEFAULT_ONLY_SKILLS = frozenset({
+    "oma-agents", "oma-brands", "oma-campaigns", "oma-onboarding", "oma-playbooks",
+})
+
+
+def profile_excluded_skills(home: Path | None = None) -> frozenset[str]:
+    """Reserve the OMA management skills for the default profile."""
+    home = get_hermes_home() if home is None else home
+    if home.resolve() == get_default_hermes_root(home=home).resolve():
+        return frozenset()
+    return OMA_DEFAULT_ONLY_SKILLS
 
 
 def _allowlist(value: Any, key: str) -> frozenset[str] | None:

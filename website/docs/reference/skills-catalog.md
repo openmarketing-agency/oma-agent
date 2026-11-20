@@ -18,4 +18,13 @@ If a skill is missing from this list but present in the repo, the catalog is reg
 |-------|-------------|------|
 | [`computer-use`](../user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-computer-use.md) | Drive the desktop background-first; escalate on signal. | `autonomous-ai-agents/computer-use` |
 | [`hermes-agent`](../user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-hermes-agent.md) | Use, configure, theme, extend, and orchestrate Hermes Agent. | `autonomous-ai-agents/hermes-agent` |
-| [`oma-playbooks`](../user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-oma-playbooks.md) | Manage playbooks, agent setup, and installed versions. | `autonomous-ai-agents/oma-playbooks` |
+
+## oma
+
+| Skill | Description | Path |
+|-------|-------------|------|
+| [`oma-agents`](../user-guide/skills/bundled/oma/oma-oma-agents.md) | Manage agent settings and context for future runs. | `oma/oma-agents` |
+| [`oma-brands`](../user-guide/skills/bundled/oma/oma-oma-brands.md) | Manage user brands, logos, and brand knowledge. | `oma/oma-brands` |
+| [`oma-campaigns`](../user-guide/skills/bundled/oma/oma-oma-campaigns.md) | Install and inspect local OMA campaigns. | `oma/oma-campaigns` |
+| [`oma-onboarding`](../user-guide/skills/bundled/oma/oma-oma-onboarding.md) | Guide brand setup, strategy, campaigns, and agent creation. | `oma/oma-onboarding` |
+| [`oma-playbooks`](../user-guide/skills/bundled/oma/oma-oma-playbooks.md) | Manage user playbooks and their strategies. | `oma/oma-playbooks` |

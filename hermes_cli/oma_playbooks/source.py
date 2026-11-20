@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import hermes_yaml as yaml
+from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS
 from hermes_constants import PROFILE_ID_RE
 from tools.skill_usage import read_skill_name
 
@@ -14,7 +15,7 @@ PLAYBOOK_ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 @dataclass(frozen=True)
 class Agent:
     id: str
-    version: str
+    version: str | None
     description: str
     config: dict
     soul: str
@@ -26,10 +27,11 @@ class Agent:
 class Playbook:
     id: str
     name: str
-    version: str
+    version: str | None
     description: str
     orchestrator: str
     agents: tuple[Agent, ...]
+    source_manifest: Path
 
 
 def checked_id(value: str) -> str:
@@ -70,19 +72,14 @@ def _names(value: object, context: str) -> list[str]:
     return value
 
 
-def _source_manifest(directory: Path) -> dict:
-    data = read_mapping(_member(directory, "config.yaml"))
-    if data.get("id") != checked_id(directory.name):
-        raise ValueError(f"{directory.name}: manifest id does not match its directory")
-    return {key: _text(data, key, directory.name) for key in ("id", "name", "version", "description", "orchestrator")} | {
-        "agents": _names(data.get("agents"), f"{directory.name}.agents"),
+def _source_manifest(path: Path, campaign_id: str) -> dict:
+    data = read_mapping(path)
+    if data.get("id") != campaign_id:
+        raise ValueError(f"{campaign_id}: manifest id does not match its directory")
+    return {key: _text(data, key, campaign_id) for key in ("id", "name", "description", "orchestrator")} | {
+        "version": data.get("version"),
+        "agents": _names(data.get("agents"), f"{campaign_id}.agents"),
     }
-
-
-def catalog(repo: Path) -> list[dict]:
-    root = _member(repo, "playbooks")
-    return [_source_manifest(_member(root, path.name)) for path in sorted(root.iterdir())
-            if path.is_dir() and not path.name.startswith(".") and (path / "config.yaml").is_file()]  # config-reader: ok — source definitions, not runtime config
 
 
 def _skill_index(*roots: Path) -> dict[str, list[Path]]:
@@ -103,7 +100,7 @@ def _resolve_skills(data: dict, context: str, index: dict[str, list[Path]]) -> d
     selected = {}
     for name in _names(data.pop("oma_skills", []), f"{context}.oma_skills"):
         paths = index.get(name, [])
-        if len(paths) != 1 or not PROFILE_ID_RE.fullmatch(name) or name == "oma-playbooks":
+        if len(paths) != 1 or not PROFILE_ID_RE.fullmatch(name) or name in OMA_DEFAULT_ONLY_SKILLS:
             raise ValueError(f"{context}: skill {name!r} must resolve to one eligible OMA package (found {len(paths)})")
         if any(path.is_symlink() or not (path.is_file() or path.is_dir()) for path in paths[0].rglob("*")):
             raise ValueError(f"{context}: skill {name!r} contains unsupported files or symlinks")
@@ -122,9 +119,9 @@ def _read_agent(root: Path, agent_id: str, index: dict[str, list[Path]]) -> Agen
     data = read_mapping(_member(path, "config.yaml"))
     if data.pop("id", None) != agent_id:
         raise ValueError(f"{agent_id}: config id does not match the roster")
-    version = _text(data, "version", agent_id)
+    version = data.pop("version", None)
     description = _text(data, "description", agent_id)
-    del data["version"], data["description"]
+    del data["description"]
     soul = _member(path, "SOUL.md").read_text(encoding="utf-8-sig")
     if not soul.strip():
         raise ValueError(f"{agent_id}: SOUL.md is empty")
@@ -133,11 +130,11 @@ def _read_agent(root: Path, agent_id: str, index: dict[str, list[Path]]) -> Agen
     return Agent(agent_id, version, description, data, soul, skills, jobs)
 
 
-def resolve(repo: Path, playbook_id: str, version: str | None = None) -> Playbook:
-    directory = _member(_member(repo.resolve(), "playbooks"), checked_id(playbook_id))
-    data = _source_manifest(directory)
-    if version is not None and data["version"] != version:
-        raise ValueError(f"{playbook_id}: expected version {version}, found {data['version']}")
+def resolve(campaigns_dir: Path, skills_dir: Path, playbook_id: str) -> Playbook:
+    campaigns_dir = _member(campaigns_dir.parent.resolve(), campaigns_dir.name)
+    directory = _member(campaigns_dir, checked_id(playbook_id))
+    manifest = _member(directory, "config.yaml")
+    data = _source_manifest(manifest, playbook_id)
     ids = data.pop("agents")
     orchestrator = f"{playbook_id}__orchestrator"
     if data["orchestrator"] != orchestrator or orchestrator not in ids:
@@ -146,7 +143,8 @@ def resolve(repo: Path, playbook_id: str, version: str | None = None) -> Playboo
     if any(not agent.startswith(prefix) or not PLAYBOOK_ID.fullmatch(agent[len(prefix):])
            or not PROFILE_ID_RE.fullmatch(agent) for agent in ids):
         raise ValueError(f"{playbook_id}: roster must use canonical playbook-prefixed IDs")
-    index = _skill_index(_member(repo.resolve(), "skills"), _member(directory, "skills"))
+    shared_skills = _member(skills_dir.parent.resolve(), skills_dir.name)
+    index = _skill_index(shared_skills, _member(directory, "skills"))
     agents_root = _member(directory, "agents")
     agents = tuple(_read_agent(agents_root, agent, index) for agent in ids)
-    return Playbook(**data, agents=agents)
+    return Playbook(**data, agents=agents, source_manifest=manifest)

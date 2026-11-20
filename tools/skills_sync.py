@@ -24,6 +24,7 @@ for _stream in (sys.stdout, sys.stderr):
         with suppress(ValueError, TypeError):
             _stream.reconfigure(encoding="utf-8", errors="replace")
 from hermes_constants import get_bundled_skills_dir, get_hermes_home, get_optional_skills_dir
+from agent.skill_selection import profile_excluded_skills
 from agent.skill_utils import ESSENTIAL_SKILLS, is_excluded_skill_path
 from tools.skill_usage import read_skill_name
 from tools.skills_sync_optional import (
@@ -413,6 +414,8 @@ def sync_skills(quiet: bool = False) -> dict:
                 "suppressed": [], "total_bundled": 0, "optional_provenance_backfilled": []}
     _skills_dir().mkdir(parents=True, exist_ok=True)
     bundled_skills = _discover_bundled_skills(bundled_dir)
+    excluded = profile_excluded_skills(_hermes_home())
+    bundled_skills = [(name, src) for name, src in bundled_skills if name not in excluded]
     if essential_only:
         bundled_skills = [(name, src) for name, src in bundled_skills if name in ESSENTIAL_SKILLS]
     suppressed = _read_suppressed_names()

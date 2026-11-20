@@ -18,4 +18,13 @@ Hermes 在执行 `hermes update` 时也会同步内置技能，但同步清单�
 |---|---|---|
 | [`computer-use`](/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-computer-use) | 控制桌面应用。 | `autonomous-ai-agents/computer-use` |
 | [`hermes-agent`](/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-hermes-agent) | 配置、扩展或贡献 Hermes Agent。 | `autonomous-ai-agents/hermes-agent` |
-| [`oma-playbooks`](/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-oma-playbooks) | 管理 OMA 剧本和代理。 | `autonomous-ai-agents/oma-playbooks` |
+
+## oma
+
+| 技能 | 描述 | 路径 |
+|---|---|---|
+| [`oma-agents`](/user-guide/skills/bundled/oma/oma-oma-agents) | 管理代理设置和供后续使用的文件。 | `oma/oma-agents` |
+| [`oma-brands`](/user-guide/skills/bundled/oma/oma-oma-brands) | 管理用户品牌、标志和品牌知识。 | `oma/oma-brands` |
+| [`oma-campaigns`](/user-guide/skills/bundled/oma/oma-oma-campaigns) | 管理 OMA 剧本和代理。 | `oma/oma-campaigns` |
+| [`oma-onboarding`](/user-guide/skills/bundled/oma/oma-oma-onboarding) | 引导用户设置品牌、策略和活动，并创建代理。 | `oma/oma-onboarding` |
+| [`oma-playbooks`](/user-guide/skills/bundled/oma/oma-oma-playbooks) | 管理用户剧本及其策略。 | `oma/oma-playbooks` |
