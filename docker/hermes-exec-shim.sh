@@ -49,33 +49,44 @@ if [ ! -x "$REAL" ]; then
     exit 127
 fi
 
-# Already non-root? Just exec the real binary. This is the hot path for
-# supervised processes (uid 10000) and for `docker exec --user hermes`.
-if [ "$(id -u)" != "0" ]; then
-    exec "$REAL" "$@"
-fi
-
-# Root, with opt-out set? Honor it.
-case "${HERMES_DOCKER_EXEC_AS_ROOT:-}" in
-    1|true|TRUE|True|yes|YES|Yes)
-        exec "$REAL" "$@"
-        ;;
-esac
-
-# Root, no opt-out. Drop to the hermes user.
-#
 # s6-setuidgid lives under /command/ which is NOT on `docker exec`'s PATH
 # (s6-overlay only puts /command/ on PATH for supervision-tree children).
 # Reference it by absolute path so the drop is robust against PATH
 # manipulation.
 S6_SUID=/command/s6-setuidgid
-if [ ! -x "$S6_SUID" ]; then
+drop_uid=0
+if [ "$(id -u)" = "0" ]; then
+    case "${HERMES_DOCKER_EXEC_AS_ROOT:-}" in
+        1|true|TRUE|True|yes|YES|Yes) ;;
+        *) drop_uid=1 ;;
+    esac
+fi
+if [ "$drop_uid" = "1" ] && [ ! -x "$S6_SUID" ]; then
     # Non-s6 image (someone stripped s6-overlay, or a hand-built variant).
     # Fail loud rather than silently re-execing as root and leaking the
     # bug this shim exists to prevent.
     echo "hermes-shim: $S6_SUID not found; refusing to silently run as root." >&2
     echo "hermes-shim: re-run with --user hermes or set HERMES_DOCKER_EXEC_AS_ROOT=1." >&2
     exit 126
+fi
+
+# Keep the source launcher's JSON contract on sealed images too. The returned
+# command must retain the venv and privilege drop, not use PM's bare Python.
+if [ "${1:-}" = "--print-runtime-command" ]; then
+    shift
+    exec /opt/hermes/.venv/bin/python -I -B -c '
+import sys
+from pathlib import Path
+root = Path("/opt/hermes")
+sys.path.insert(0, str(root))
+from hermes_cli._launchers import print_runtime_command
+prefix = ("/usr/bin/env", "HOME=/opt/data", sys.argv[2], "hermes") if sys.argv[1] == "1" else ()
+print_runtime_command(root, sys.argv[3:], python=Path(sys.executable), prefix=prefix)
+' "$drop_uid" "$S6_SUID" "$@"
+fi
+
+if [ "$drop_uid" = "0" ]; then
+    exec "$REAL" "$@"
 fi
 
 # Reset HOME to the hermes user's home before dropping privileges. Without

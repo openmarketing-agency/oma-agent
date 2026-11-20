@@ -72,7 +72,8 @@ def runtime_command(repo_root: Path, args=(), *, module: str = "hermes_cli.main"
     return [str(python), "-I", "-c", bootstrap, *args]
 
 
-def print_runtime_command(repo_root: Path, argv: list[str]) -> None:
+def print_runtime_command(repo_root: Path, argv: list[str], *, python: Path | None = None,
+                          prefix: tuple[str, ...] = ()) -> None:
     """Machine boundary for consumers holding the exact published launcher."""
     import argparse
 
@@ -81,7 +82,7 @@ def print_runtime_command(repo_root: Path, argv: list[str]) -> None:
     parser.add_argument("args", nargs=argparse.REMAINDER)
     options = parser.parse_args(argv)
     args = options.args[1:] if options.args[:1] == ["--"] else options.args
-    print(json.dumps(runtime_command(repo_root, args, module=options.module)))
+    print(json.dumps([*prefix, *runtime_command(repo_root, args, module=options.module, python=python)]))
 
 
 def installation_command(repo_root: Path, args=(), *, module: str = "hermes_cli.main",
