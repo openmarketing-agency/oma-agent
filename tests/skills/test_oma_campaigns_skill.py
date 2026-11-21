@@ -17,25 +17,27 @@ def bundle(tmp_path, monkeypatch):
     monkeypatch.delenv("HERMES_KANBAN_DB", raising=False)
     monkeypatch.delenv("HERMES_KANBAN_BOARD", raising=False)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    source = home / "oma-bundle"
+    source = home / "oma"
     campaigns = source / "campaigns"
-    skills = source / "skills"
+    skills = home / "oma-bundle" / "skills"
     team = campaigns / "demo"
     team.mkdir(parents=True)
     (team / "config.yaml").write_text(
         "id: demo\nname: Demo\ndescription: Test team.\norchestrator: demo__orchestrator\n"
-        "agents: [demo__orchestrator, demo__worker]\n", encoding="utf-8",
+        "agents: [demo__orchestrator, demo__worker]\ngoals: [Measure demand]\nplans: [Review evidence]\n",
+        encoding="utf-8",
     )
-    for role, dependencies in (("orchestrator", "[shared, local]"), ("worker", "[]")):
-        candidate = team / "agents" / f"demo__{role}"
+    for role, dependencies in (("orchestrator", "[shared]"), ("worker", "[]")):
+        candidate = source / "agents" / f"demo__{role}"
         candidate.mkdir(parents=True)
+        jobs = "[{id: sample, schedule: '1d', prompt: Review evidence.}]" if role == "orchestrator" else "[]"
         (candidate / "config.yaml").write_text(
-            f"id: demo__{role}\ndescription: Test role.\noma_skills: {dependencies}\n"
-            "agent: {enabled_toolsets: [file]}\njobs: [{id: sample}]\n", encoding="utf-8",
+            f"id: demo__{role}\nname: {role.title()}\ndescription: Test role.\ncampaign_id: demo\noma_skills: {dependencies}\n"
+            f"agent: {{enabled_toolsets: [file]}}\njobs: {jobs}\n", encoding="utf-8",
         )
         (candidate / "SOUL.md").write_text(f"I am the {role}.\n", encoding="utf-8")
-    for parent, name in ((skills, "shared"), (team / "skills", "local"), (skills, "unused")):
-        skill = parent / "category" / name
+    for name in ("shared", "unused"):
+        skill = skills / "category" / name
         skill.mkdir(parents=True)
         (skill / "SKILL.md").write_text(f"---\nname: {name}\ndescription: Test skill.\n---\n\nContents.\n",
                                        encoding="utf-8")
@@ -43,7 +45,7 @@ def bundle(tmp_path, monkeypatch):
     return home, source, cli.main
 
 
-def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
+def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     from agent.runtime_scope import bind_profile_scope
     from hermes_cli.config import read_user_config_raw
     from hermes_cli.oma_playbooks.install import default_home
@@ -52,6 +54,7 @@ def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
 
     home, source, main = bundle
     assert main(["list"]) == 0
+    assert not (home / "oma-bundle" / "campaigns").exists()
     assert json.loads(capsys.readouterr().out) == []
     existing = home / "oma" / "agents" / "demo__worker" / "saves" / "handoff.md"
     existing.parent.mkdir(parents=True)
@@ -67,8 +70,9 @@ def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
     saved = read_mapping(ledger)
     config_path = home / "oma" / "campaigns" / "demo" / "config.yaml"
     assert read_mapping(config_path) == {
-        "id": "demo", "name": "Demo", "description": "Test team.", "version": None,
-        "goals": [], "plans": [],
+        "id": "demo", "name": "Demo", "description": "Test team.",
+        "goals": ["Measure demand"], "plans": ["Review evidence"],
+        "agents": ["demo__orchestrator", "demo__worker"],
         "orchestrator": "demo__orchestrator", "kanban_board": "campaign-demo",
         "kanban_board_name": "Demo",
     }
@@ -90,11 +94,14 @@ def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
         assert f"`{oma / 'brand' / 'config.yaml'}`" in soul
         assert "`brand_id`" not in soul and "`playbook`" not in soul
         assert "Do not scan other records" in soul
-        assert row["state"] == "installed" and row["declared_jobs"] == ["sample"]
+        agent_record = read_mapping(source / "agents" / agent_id / "config.yaml")
+        assert row["state"] == "installed"
+        assert row["declared_jobs"] == [job["id"] for job in agent_record["jobs"]]
+        assert agent_record["campaign_id"] == "demo"
         assert not (profile / "cron" / "jobs.json").exists()
         assert not (profile / "skills" / "unused").exists()
         raw = read_user_config_raw(profile / "config.yaml")
-        assert not {"id", "description", "version", "jobs", "oma_skills"} & raw.keys()
+        assert not {"id", "name", "description", "campaign_id", "version", "jobs", "oma_skills"} & raw.keys()
         assert "oma-campaigns" in raw["skills"]["disabled"]
         with bind_profile_scope(profile, hydrate_secrets=False):
             marker = str(scratch / "marker.txt")
@@ -107,8 +114,7 @@ def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
             with pytest.raises(ValueError, match="default OMA Agent"):
                 default_home()
     orchestrator_skills = home / "profiles" / "demo__orchestrator" / "skills"
-    for name in ("shared", "local"):
-        assert (orchestrator_skills / name / "support.txt").read_text(encoding="utf-8") == "Support file."
+    assert (orchestrator_skills / "shared" / "support.txt").read_text(encoding="utf-8") == "Support file."
     assert not (home / "profiles" / "demo__worker" / "skills" / "shared").exists()
 
     with manifest.open("a", encoding="utf-8") as stream:
@@ -123,16 +129,15 @@ def test_install_local_campaign_without_versions_and_inspect_it(bundle, capsys):
     assert json.loads(capsys.readouterr().out) == record
 
 
-def test_missing_local_sources_and_profile_collision_do_not_publish(bundle, capsys):
+def test_bundle_templates_are_ignored_and_profile_conflicts_do_not_publish(bundle, capsys):
     home, source, main = bundle
     campaigns = source / "campaigns"
-    old_source = home / "oma" / "campaigns"
-    old_source.parent.mkdir()
+    old_source = home / "oma-bundle" / "campaigns"
     campaigns.rename(old_source)
     assert main(["install", "demo"]) == 1
     assert str(campaigns / "demo" / "config.yaml") in capsys.readouterr().err
     old_source.rename(campaigns)
-    missing = source / "skills" / "category" / "shared" / "SKILL.md"
+    missing = home / "oma-bundle" / "skills" / "category" / "shared" / "SKILL.md"
     missing.rename(missing.with_suffix(".disabled"))
     assert main(["install", "demo"]) == 1
     assert "skill 'shared' must resolve" in capsys.readouterr().err
@@ -144,6 +149,51 @@ def test_missing_local_sources_and_profile_collision_do_not_publish(bundle, caps
     assert "already exists" in capsys.readouterr().err
     assert not (home / "profiles" / "demo__orchestrator").exists()
     assert not (home / "playbooks" / "demo").exists()
+
+
+@pytest.mark.parametrize(("file", "before", "after", "error"), [
+    ("campaigns/demo/config.yaml", "demo__orchestrator, demo__worker", "demo__worker", "canonical orchestrator"),
+    ("campaigns/demo/config.yaml", "demo__orchestrator, demo__worker", "demo__orchestrator, demo__orchestrator", "duplicate names"),
+    ("agents/demo__worker/config.yaml", "campaign_id: demo", "campaign_id: other", "campaign_id"),
+])
+def test_invalid_roster_does_not_publish(bundle, capsys, file, before, after, error):
+    home, source, main = bundle
+    path = source / file
+    path.write_text(path.read_text(encoding="utf-8").replace(before, after), encoding="utf-8")
+    assert main(["install", "demo"]) == 1
+    assert error in capsys.readouterr().err
+    assert not (home / "profiles").exists()
+    assert not (home / "playbooks" / "demo").exists()
+
+
+def test_generated_cron_belongs_to_the_verified_owner(bundle, capsys):
+    from argparse import ArgumentParser
+
+    from agent.runtime_scope import bind_profile_scope
+    from cron.jobs import list_jobs
+    from hermes_cli.cron import cron_create
+    from hermes_cli.oma_playbooks.source import read_mapping
+    from hermes_cli.subcommands.cron import build_cron_parser
+
+    home, source, main = bundle
+    assert main(["install", "demo"]) == 0
+    team = json.loads(capsys.readouterr().out)
+    owner = team["orchestrator"]
+    job, = read_mapping(source / "agents" / owner / "config.yaml")["jobs"]
+    assert team["agents"][owner]["declared_jobs"] == [job["id"]]
+    parser = ArgumentParser()
+    build_cron_parser(parser.add_subparsers(), cmd_cron=cron_create)
+    args = parser.parse_args(["cron", "create", "--name", f"oma:{job['id']}", "--deliver", "local",
+                              "--", job["schedule"], job["prompt"]])
+    with bind_profile_scope(home / "profiles" / owner, hydrate_secrets=False):
+        assert list_jobs(include_disabled=True) == []
+        assert cron_create(args) == 0
+        saved, = list_jobs(include_disabled=True)
+        assert saved["name"] == f"oma:{job['id']}" and saved["enabled"]
+        assert saved["prompt"] == job["prompt"]
+    with bind_profile_scope(home / "profiles" / "demo__worker", hydrate_secrets=False):
+        assert list_jobs(include_disabled=True) == []
+    assert list_jobs(include_disabled=True) == []
 
 
 def test_campaign_agents_share_their_own_kanban_board(bundle, capsys):
@@ -195,7 +245,6 @@ def test_campaign_agents_share_their_own_kanban_board(bundle, capsys):
 def test_saves_path_conflict_does_not_publish_profiles(bundle, capsys):
     home, _, main = bundle
     conflict = home / "oma" / "agents" / "demo__worker" / "saves"
-    conflict.parent.mkdir(parents=True)
     conflict.write_text("Keep this file.", encoding="utf-8")
 
     assert main(["install", "demo"]) == 1

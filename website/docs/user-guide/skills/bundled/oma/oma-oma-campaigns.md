@@ -16,7 +16,7 @@ Install and inspect local OMA campaigns.
 |---|---|
 | Source | Bundled (installed by default) |
 | Path | `skills/oma/oma-campaigns` |
-| Version | `0.2.2` |
+| Version | `0.3.0` |
 | Author | Open Marketing Agency (OMA) |
 | License | MIT |
 | Platforms | linux, macos, windows |
@@ -31,15 +31,15 @@ The following is the complete skill definition that Hermes loads when this skill
 
 # OMA Campaigns Skill
 
-Use this skill in the default OMA Agent profile to install a campaign already present on the runtime. A campaign defines a team; its orchestrator, not the default profile, plans and runs the work.
+Use this skill in the default OMA Agent profile to design and provision campaigns from the saved brand and playbook. Each campaign has one orchestrator, which plans and assigns work on its own Kanban board. There are no campaign or agent templates.
 
 ## When to Use
 
-- The user asks to install a named local campaign, inspect an installed one, or save its goals or plans.
+- The user asks to create or provision a campaign, inspect an installed one, or save its goals or plans.
 
 ## Prerequisites
 
-Use `$HERMES_HOME/oma-bundle` in the default profile. In Docker this is `/opt/data/oma-bundle`: campaign definitions are in `campaigns/<id>/config.yaml`, and shared skill packages are in `skills/`. A campaign may also include its own `skills/` directory. Use the OMA Agent `hermes` launcher on `PATH` and Python 3. There is no network source, catalog, or version selection.
+Resolve the default Hermes home with `hermes -p default config path`. Read `oma/brand/config.yaml` and `oma/playbook/config.yaml` from that home before designing a team. For record formats load `oma-agents` with `skill_view`. `oma-bundle/skills/` supplies reusable skills only; find them with `search_skills` and read relevant ones with `skill_view`. Do not look for campaign templates or use the onboarding URL as a source of executable definitions.
 
 ## How to Run
 
@@ -47,14 +47,14 @@ Use `terminal` to run `scripts/playbook.py` from the installed skill directory (
 
 | Arguments | What they do |
 |---|---|
-| `install <id>` | Create the campaign board, provision its agent profiles, and install their declared skills. |
-| `list` | List installed campaigns, not available source definitions. |
+| `install <id>` | Provision the saved campaign and agent records, create the board, and install declared shared skills. |
+| `list` | List installed campaigns. |
 | `status <id>` | Show an installation record and the profiles that still exist. |
 | `configure <id>` | Create a missing campaign config or fill missing routing fields from the installation ledger. Does not reprovision agents or create a board. |
 
 ## Campaign Config
 
-The default profile stores each installed campaign's editable config at `oma/campaigns/<campaign_id>/config.yaml` under its Hermes home. Use the campaign ID as the directory name. For example:
+Save the editable config at `oma/campaigns/<campaign_id>/config.yaml`. Use the campaign ID as the directory name. For example, not as a template to install verbatim:
 
 ```yaml
 id: seo
@@ -73,23 +73,29 @@ plans:
   - Review search performance and prioritize high-impact fixes.
 ```
 
-Goals and plans are inline YAML lists of text. Use `goals: []` and `plans: []` until values have been chosen. All campaigns share the single strategy at `oma/playbook/config.yaml`; do not add a `playbook` field. Ignore legacy `playbook` fields without rewriting old records just to remove them. Keep this file separate from source definitions and the installation ledger.
+Goals and plans are inline YAML lists of text. All campaigns share the strategy at `oma/playbook/config.yaml`; do not add a `playbook` field or rewrite older records just to remove it. This config is the source for initial provisioning; the installation ledger is separate.
 
-`orchestrator` is the canonical profile ID declared in the source manifest's `orchestrator` field. Keep `agents` as an ordered YAML list of verified campaign profile IDs, including the orchestrator. Use canonical `<campaign_id>__<agent_id>` IDs unchanged and without duplicates. `kanban_board` is the board slug (`campaign-<id>`); `kanban_board_name` is its display name at installation. Use the slug in commands. Editing this metadata does not provision agents, rename the board, reassign the orchestrator, or rebind profiles.
+Use exactly one orchestrator, `<campaign_id>__orchestrator`, in the ordered `agents` list. Use canonical `<campaign_id>__<agent_id>` IDs unchanged and without duplicates. Before provisioning, the list is the proposed roster; after provisioning verify it against `present_profiles`. The helper fills missing `kanban_board` and `kanban_board_name`. Use the board slug in commands. Editing a record does not reconfigure an installed board or profile.
 
 ## Procedure
 
-1. When asked what can be installed, inspect `$HERMES_HOME/oma-bundle/campaigns` using `search_files`. Do not fetch or check for updates.
-2. On request, run `install <id>` with the local campaign ID. The helper validates `orchestrator`, `agents`, and declared `oma_skills` from the manifest. It creates one Kanban board, enables the team's Kanban tools on that board, and tells the declared orchestrator to coordinate work there with its own roster. Do not switch the shared current board. Installation does not start agent turns, copy launch credentials, register cron jobs, or seed tasks.
-3. Use `status <id>` to check the board slug, orchestrator, and profiles. After installation or when asked to record the roster, use `read_file` and `patch` to save the verified `present_profiles` under `agents` in the editable `config.yaml`, in roster order. Run `configure <id>` first if the record is missing. Do not list unprovisioned drafts. Report discrepancies rather than silently removing existing entries.
-4. To inspect the board from the CLI, use `terminal` with `hermes kanban --board <kanban_board> list`; a newly installed board can be empty. The ledger is `$HERMES_HOME/playbooks/<id>/installation.yaml`. Scratch paths live under that directory and are exposed in each installed agent's SOUL.
-5. To save campaign goals or plans, run `configure <id>` if the config is missing. Use `read_file` and `patch` on the campaign config to update only the requested fields. Saving a plan does not schedule or execute it.
+1. **Design from the records.** Compare the saved strategy, audience, channels, assets, and available capabilities. Choose the smallest set of campaigns with distinct goals and useful first steps. For each, choose one orchestrator and only the specialists that have distinct responsibilities and handoffs. Use `list` and `status` first on a rerun; reuse installed teams and preserve edits, notes, and manual pauses rather than creating duplicates.
+2. **Save the campaign and agent records.** Use `write_file` or `patch` for the campaign config and each `oma/agents/<agent-id>/config.yaml` and `SOUL.md`. Record canonical `id`, `name`, `description`, and `campaign_id` for each role; use the same ID for the future profile. Give the orchestrator responsibility for deciding Kanban tasks and handoffs rather than hardcoding a pipeline. Choose only needed toolsets and existing shared skills; use `oma_skills` for exact package IDs to install, or `[]` for none. Keep `saves/` and link each persona to its own absolute saves path. Never copy credentials or grant authority inferred from a website.
+3. **Decide which work needs cron.** Assign each genuine recurring obligation to exactly one role. Choose its cadence from the campaign's goals, freshness needs, and external constraints. An orchestrator can own a periodic review when warranted; a specialist can own an independent recurring check it can actually perform. Leave one-off work, handoffs, and event-driven work on Kanban. Do not create a job for every role or a second timer for an existing obligation. Save `jobs: []` for unscheduled agents. For each job use a stable `id`, a native Hermes `schedule`, and a bounded `prompt` with clear stop conditions; add `timezone` or positive `repeat` only when needed. Do not add per-job skills, scripts, or remote delivery.
+4. **Provision and verify.** Run `install <id>` using the saved records. Check `status <id>` for the expected orchestrator, board, and complete `present_profiles` list before enabling any jobs. The helper wires the same board into the team without switching the shared current board. It does not start turns, copy launch credentials, create jobs, or seed tasks. Use `configure <id>` to recover missing campaign metadata for an existing installation without reinstalling.
+5. **Register eligible jobs.** Use each verified owning profile's native cron commands in the next section when provisioning includes scheduling. When editing only goals or plans, patch those fields without registering jobs or starting campaign work.
+
+## Register Campaign Cron Jobs
+
+1. Match each saved job to its owning agent and that agent's `declared_jobs` in `status`. List the owning profile's jobs with `terminal` and `hermes -p <agent-id> cron list --all`. Match by the exact existing declaration ID or the stable native name `oma:<declared-id>`. Preserve active, completed, and operator-paused jobs. If identity or state is unclear, report it instead of creating a duplicate or resuming a job.
+2. Use `hermes -p <agent-id> cron create --name 'oma:<declared-id>' --deliver local -- <schedule> <prompt>` for a missing eligible job. Pass schedule and prompt as separate literal arguments. Put any validated `--timezone` or `--repeat` before `--`; omit unset options. Do not use `cron run` or edit the job store by hand. Register only work the owning profile can perform. Only enable jobs that make external changes if the integration, target, and standing authorization are already verified; otherwise leave them unscheduled and report why. A URL alone does not authorize publication, messaging, or external modifications.
+3. Read back the job and its state in the owning profile with `cron list --all`; check scheduler health with `cron status`. If the gateway is not serving that profile, report the schedule as waiting without starting or restarting services.
 
 ## Pitfalls
 
-- If the local definition or a declared skill is missing, report the missing input. Do not look for a remote source or a cached release.
+- A missing optional skill does not prevent authoring a team that does not need it. Never look for another campaign template or fetch a cached release.
 - Installing an already recorded campaign does not replace its board, tasks, or profiles. Older campaigns installed without a board are not retrofitted by `configure`. If a board slug is already occupied by another board or an installation is incomplete, report the conflict; do not delete anything to retry.
 
 ## Verification
 
-For provisioning, reopen the campaign config, confirm its routing metadata matches the installation ledger, and verify the `agents` list against the present profiles. For config edits, verify the changed values. Summarize what was installed or changed and mention blockers. An installed team is not necessarily running or connected to the user's services.
+Verify the campaign config, the canonical roster, the agent records and saves paths, and the routing in `$HERMES_HOME/playbooks/<id>/installation.yaml`. Report what was provisioned, which jobs were registered or skipped, and any blockers. A saved job, an enabled job, a healthy scheduler, and an observed run are separate outcomes.

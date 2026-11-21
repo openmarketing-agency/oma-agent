@@ -263,6 +263,19 @@ def test_member_uv_lock_travels_with_its_member(tmp_path):
     assert not (destination / "uv.lock").exists(), "the root lock is seeded by lock_and_sync, not copied"
 
 
+def test_default_soul_template_travels_with_runtime_snapshot(tmp_path):
+    core = tmp_path / "core"
+    core.mkdir()
+    (core / "pyproject.toml").write_text('[project]\nname="core"\nversion="1"\n', encoding="utf-8")
+    template = b"# Persona\n\nThis is the repository starter.\n"
+    (core / "SOUL.md").write_bytes(template)
+
+    destination = tmp_path / "stage"
+    workspace._copy_core_inputs(core, destination)
+
+    assert (destination / "SOUL.md").read_bytes() == template
+
+
 def test_nested_dist_travels_but_root_dist_stays_out(tmp_path):
     """Bundled dashboard plugins ship a tracked dashboard/dist/ the snapshot's code serves."""
     core = tmp_path / "core"

@@ -102,7 +102,7 @@ def _copy_core_inputs(source: Path, destination: Path) -> None:
     package_roots = {pattern.split(".", 1)[0] for pattern in patterns}
     # A ``where`` root (``src``) holds packages the include patterns name below it, not by its own name.
     where_roots = {Path(where).parts[0] for where in find.get("where", ["."]) if Path(where).parts}
-    files = {"pyproject.toml", "setup.py", "setup.cfg"}
+    files = {"pyproject.toml", "setup.py", "setup.cfg", "SOUL.md"}
     readme = project.get("readme")
     if isinstance(readme, str):
         files.add(readme)

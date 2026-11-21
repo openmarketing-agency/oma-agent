@@ -66,7 +66,7 @@ strategy: |-
 ## Pitfalls
 
 - Neither drafting nor saving a strategy authorizes executing it. Do not install campaigns, create jobs, or start agent turns as part of saving a record.
-- Do not confuse these records with campaign definitions under `$HERMES_HOME/oma-bundle/campaigns` or installation records under `$HERMES_HOME/playbooks/`. Use `oma-campaigns` for campaign installation, not playbook authoring.
+- Do not confuse the strategy with editable campaign records under `$HERMES_HOME/oma/campaigns` or installation records under `$HERMES_HOME/playbooks/`. Use `oma-campaigns` to design and provision teams from the saved strategy.
 - Older per-ID playbooks are not used as current records. If the user wants to carry one over, confirm which one and verify that its strategy applies to the saved brand. Do not move, merge, or overwrite legacy records automatically.
 
 ## Verification

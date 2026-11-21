@@ -46,7 +46,28 @@ def test_index_rows_carry_each_name_once_and_never_a_half_word(monkeypatch, tmp_
     kept = shown[:-3]
     assert LONG.startswith(kept) and LONG[len(kept)] in " ,"  # cut lands between words
     # The turn-delta parser reads flattened rows like nested ones.
-    assert set(index_entries(prompt)) == {"ascii-art", "pixel-art", "computer-use", "hermes-release"}
+    assert set(index_entries(prompt)) == {"ascii-art", "pixel-art", "hermes-release", "computer-use"}
+
+
+@pytest.mark.parametrize("oneshot", [False, True], ids=["interactive", "oneshot"])
+@pytest.mark.parametrize("has_listed_skill", [False, True], ids=["empty-index", "with-index"])
+def test_prompt_guides_search_for_unlisted_oma_skills(monkeypatch, tmp_path, oneshot, has_listed_skill):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("HERMES_SINGLE_QUERY_SESSION", "1" if oneshot else "0")
+    _skill(tmp_path / "oma-bundle" / "skills", "research/global-research", "Research from the shared bundle.")
+    if has_listed_skill:
+        _skill(tmp_path / "skills", "writing/local-writing", "Write locally.")
+
+    prompt = build_skills_system_prompt(available_tools={"skill_view", "search_skills"})
+    assert prompt.startswith("## Skills\n")
+    assert "shared OMA skills repository" in prompt and "use search_skills(query)" in prompt
+    assert "load a relevant match with skill_view(name)" in prompt
+    assert "global-research" not in prompt
+    assert set(index_entries(prompt)) == ({"local-writing"} if has_listed_skill else set())
+
+    without_search = build_skills_system_prompt(available_tools={"skill_view"})
+    assert "search_skills" not in without_search
+    assert bool(without_search) == has_listed_skill
 
 
 @pytest.mark.parametrize("sep", ["\t", "\u00a0"], ids=["tab", "nbsp"])

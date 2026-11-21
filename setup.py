@@ -27,6 +27,7 @@ use ``build_editable``, which does NOT call ``bdist_wheel`` — it calls
 import os
 
 from setuptools import setup
+from setuptools.command.build_py import build_py
 from setuptools.command.sdist import sdist
 
 _ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -53,7 +54,15 @@ class _GuardedSdist(sdist):
         return super().run(*args, **kwargs)
 
 
-cmdclass = {"sdist": _GuardedSdist}
+class _BuildPy(build_py):
+    def run(self):
+        super().run()
+        if _IN_NIX_BUILD and not self.editable_mode:
+            # A Nix wheel has no checkout. Ship the template beside the root modules.
+            self.copy_file(os.path.join(_ROOT, "SOUL.md"), os.path.join(self.build_lib, "SOUL.md"))
+
+
+cmdclass = {"sdist": _GuardedSdist, "build_py": _BuildPy}
 
 # bdist_wheel is only available when the `wheel` package is installed.
 # setuptools.build_meta.build_wheel() calls it internally, so the guard

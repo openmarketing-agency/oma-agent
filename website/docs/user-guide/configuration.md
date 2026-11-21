@@ -67,24 +67,26 @@ copying `.env.example`. Docker still persists a generated `API_SERVER_KEY` for
 the gateway when no key is supplied. Existing `.env` contents and explicit
 profile cloning behavior are unchanged.
 
-The bundled `oma-campaigns` skill installs from `$HERMES_HOME/oma-bundle/campaigns`
-and `$HERMES_HOME/oma-bundle/skills`. Docker seeds `/opt/data/oma-bundle` from the
-image if it is missing, including on existing data volumes. On a non-Docker
-checkout, copy the repository's `oma-bundle/` into the default Hermes home.
-Existing bundles are preserved. The helper does not fetch, query a catalog, or
-check versions. `list` and `status` inspect installed campaigns in
-`$HERMES_HOME/playbooks/`; changing the local source does not update installed
-profiles.
+The default agent uses `oma-campaigns` to design campaigns and roles from the
+saved brand and playbook. The helper provisions the saved OMA records. The
+`oma-bundle/skills/` directory contains reusable skill packages, not templates.
+Docker seeds a missing bundle at `/opt/data/oma-bundle`; on a native checkout
+the bundle can be copied to the default Hermes home. Existing bundles are
+preserved and old templates are ignored. `list` and `status` inspect installs
+under `$HERMES_HOME/playbooks/`.
 
 Editable campaign records live at `$HERMES_HOME/oma/campaigns/<id>/config.yaml`.
 They contain `id`, `name`, `description`, `version`, and inline `goals` and `plans`.
-New installs create the record; `configure <id>` creates it for an existing
-installation without reinstalling or replacing user edits. The installation
-ledger and agent scratch directories stay in their existing locations.
+The agent writes the record before provisioning. For older installs,
+`configure <id>` can create a missing record without reinstalling or replacing
+user edits. The installation ledger and scratch paths stay in place.
 
-The `oma-campaigns` and `oma-agents` skills record verified campaign members in
-the editable record's `agents` list using full profile IDs. This list does not
-provision profiles.
+Each campaign has one `<campaign-id>__orchestrator` and an ordered `agents`
+list of full profile IDs. Each agent has `config.yaml`, `SOUL.md`, and `saves/`
+under `oma/agents/<agent-id>/`. The agent decides which recurring jobs are
+needed and saves them in each owning agent's `jobs` list. Saving a declaration
+does not schedule a job; onboarding registers eligible jobs with native cron
+after verifying the provisioned profiles.
 
 The default profile manages one brand with `oma-brand` and one playbook with
 `oma-playbook`. The brand lives at `$HERMES_HOME/oma/brand/config.yaml` and stores
@@ -95,11 +97,10 @@ at these fixed locations, without `playbook` or `brand_id` links between the
 records. Older per-ID records are not migrated automatically.
 
 For initial setup, `oma-onboarding` only asks for a website or GitHub repository
-URL. It builds the brand and playbook from that source, chooses and installs
-matching local campaigns, and enables eligible jobs from those teams' agent
-configs in their owning profiles. Cron activation is an onboarding step, not
-part of campaign installation. Jobs run on their declared schedule when a
-healthy Hermes gateway serves the profile.
+URL. It builds the brand and playbook from that source, then designs and
+provisions campaigns and agents that fit. It chooses which recurring work
+needs a schedule and registers eligible jobs in their owning profiles. Jobs
+run on their declared schedule when a healthy Hermes gateway serves the profile.
 
 OMA starter configs skip interactive approval prompts, auto-approve flagged
 commands in cron, single-query, and unattended sessions, and skip the MCP reload

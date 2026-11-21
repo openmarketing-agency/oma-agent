@@ -429,19 +429,10 @@ if [ -f "$HERMES_HOME/.install_method" ]; then
     fi
 fi
 
-# --- Seed config files (only on first boot) ---
-seed_one() {
-    dest=$1
-    src=$2
-    if [ ! -f "$HERMES_HOME/$dest" ] && [ -f "$INSTALL_DIR/$src" ]; then
-        if refuse_symlinked_path "seed" "$HERMES_HOME/$dest"; then
-            :
-        else
-            as_hermes cp "$INSTALL_DIR/$src" "$HERMES_HOME/$dest"
-        fi
-    fi
-}
-seed_one "SOUL.md" "docker/SOUL.md"
+# --- Seed missing starter files ---
+if [ ! -f "$HERMES_HOME/SOUL.md" ] && ! refuse_symlinked_path "seed" "$HERMES_HOME/SOUL.md"; then
+    as_hermes cp "$INSTALL_DIR/SOUL.md" "$HERMES_HOME/SOUL.md"
+fi
 if [ ! -f "$HERMES_HOME/config.yaml" ] && ! refuse_symlinked_path "seed" "$HERMES_HOME/config.yaml"; then
     (cd "$INSTALL_DIR" && umask 077 && as_hermes "$INSTALL_DIR/.venv/bin/python" -c \
         'from hermes_cli.config_home import seed_install_config; seed_install_config()') \
