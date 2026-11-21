@@ -14,6 +14,7 @@ from hermes_cli.config import atomic_config_replace, atomic_config_write, read_u
 from hermes_cli.config_backend import require_file_tooling
 from hermes_cli.config_defaults import DEFAULT_CONFIG
 from hermes_cli.config_home import OMA_PLAYBOOK_SKILL
+from hermes_cli.oma_playbooks.settings import read_agent_record, record_with_effective, resolve_settings, settings_from
 from hermes_cli.oma_playbooks.source import Agent, Playbook, campaign_fields, checked_id, read_mapping, resolve
 from hermes_cli.profile_provision import ProfileCreateRequest, provision_profile
 from hermes_cli.profiles import get_profile_dir, profile_exists
@@ -264,9 +265,12 @@ def install(home: Path, campaign_id: str) -> dict:
         policies = _check_profiles(home, playbook)
         paths = {agent.id: (_agent_data_dir(home, agent.id, "saves"), _agent_data_dir(home, agent.id, "tmp"))
                  for agent in playbook.agents}
+        defaults = settings_from(config, campaign_id)
+        effective = {agent.id: resolve_settings(defaults, settings_from(agent.config, agent.id))
+                     for agent in playbook.agents}
         board = f"campaign-{playbook.id}"
         configs = {
-            agent.id: _with_kanban({**agent.config, "skills": policies[agent.id],
+            agent.id: _with_kanban({**agent.config, **effective[agent.id], "skills": policies[agent.id],
                                    "_config_version": DEFAULT_CONFIG["_config_version"]},
                                   board, playbook.orchestrator, agent.id)
             for agent in playbook.agents
@@ -279,6 +283,11 @@ def install(home: Path, campaign_id: str) -> dict:
         except sqlite3.Error as exc:
             raise ValueError(f"Could not initialize campaign Kanban board {board!r}: {exc}") from exc
         _publish_profiles(playbook, configs, paths, board, config_path)
+        for agent_id, settings in effective.items():
+            path, agent_record = read_agent_record(home, campaign_id, agent_id)
+            updated = record_with_effective(agent_record, settings)
+            if updated != agent_record:
+                atomic_config_replace(path, updated)
         current = read_mapping(config_path)
         current.setdefault("kanban_board_name", board_metadata["name"])
         current["installation_state"] = "installed"

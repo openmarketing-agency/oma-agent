@@ -126,6 +126,10 @@ def _read_agent(root: Path, campaign_id: str, agent_id: str, index: dict[str, li
     _text(data, "name", agent_id)
     del data["name"]
     data.pop("version", None)  # Legacy template metadata is not a native setting.
+    data.pop("effective", None)  # Materialized OMA view, not an authored override.
+    # OMA credential metadata stays in the record, not the native profile.
+    data.pop("all-keys", None)
+    data.pop("available-keys", None)
     description = _text(data, "description", agent_id)
     del data["description"]
     soul = _member(path, "SOUL.md").read_text(encoding="utf-8-sig")

@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+"""Run campaign sync with the installed Hermes runtime and Docker user."""
+
+import json
+import subprocess
+import sys
+
+
+def main() -> int:
+    try:
+        result = subprocess.run(
+            ["hermes", "--print-runtime-command", "--module", "hermes_cli.oma_playbooks.sync"],
+            check=True, capture_output=True, text=True, timeout=15,
+        )
+        argv = json.loads(result.stdout)
+        if not isinstance(argv, list) or not argv or any(not isinstance(arg, str) for arg in argv):
+            raise ValueError("Invalid Hermes runtime command")
+        return subprocess.run([*argv, *sys.argv[1:]], check=False, timeout=600).returncode
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        print(f"Cannot launch sync-campaign: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

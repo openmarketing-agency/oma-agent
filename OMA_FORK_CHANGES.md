@@ -182,6 +182,8 @@ The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) designs t
 | `list` / `status <id>` | Inspect campaign records and verify the board and profiles locally. |
 | `configure <id>` | Fill missing routing fields in the existing campaign config without reinstalling. |
 
+The separate `sync-campaign <id>` script applies campaign model and MCP defaults plus per-agent overrides to the verified roster and updates the generated OMA agent view. Supplied environment values that match config references are saved to the owning profile `.env` files; absent values don't block sync. The same command records `all-keys` and `available-keys` in the OMA campaign and agent configs, listing variable names only. Toolset allowlists are unchanged.
+
 **Shared skills only:** The [repository bundle](oma-bundle/README.md) ships reusable skills, not campaign or agent templates. Docker seeds it at `$HERMES_HOME/oma-bundle` only if absent. Existing volumes are preserved and any old templates are ignored.[3][5]
 
 **Editable campaign config:** The agent writes the identity, roster, goals and plans before provisioning. Campaign and agent records are unversioned; older `version` fields are ignored and preserved in existing files. Campaigns use the single stored playbook without a `playbook` field.

@@ -1,6 +1,9 @@
 """Exercise local OMA campaign provisioning with native profile operations."""
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -126,6 +129,223 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
         assert note.read_text(encoding="utf-8") == f"Remember {agent_id}."
     assert main(["status", "demo"]) == 0
     assert json.loads(capsys.readouterr().out) == record
+
+
+def test_sync_materializes_defaults_and_agent_overrides(bundle, capsys):
+    from hermes_cli.config import atomic_config_write, read_user_config_raw
+    from hermes_cli.oma_playbooks.source import read_mapping
+    from hermes_cli.oma_playbooks.sync import main as sync
+
+    home, source, main = bundle
+    assert main(["install", "demo"]) == 0
+    capsys.readouterr()
+    campaign = source / "campaigns" / "demo" / "config.yaml"
+    worker = source / "agents" / "demo__worker" / "config.yaml"
+    orchestrator = source / "agents" / "demo__orchestrator" / "config.yaml"
+    campaign_defaults = {
+        "model": {"default": "team-model", "provider": "custom", "base_url": "https://model.invalid/v1"},
+        "mcp_servers": {
+            "docs": {"url": "https://docs.invalid/mcp", "headers": {"X-Test": "shared"}},
+            "reports": {"url": "https://reports.invalid/mcp", "timeout": 12},
+        },
+    }
+    override = {"model": "worker-model", "mcp_servers": {"docs": {"enabled": False}}}
+    atomic_config_write(campaign, {**read_mapping(campaign), **campaign_defaults})
+    atomic_config_write(worker, {**read_mapping(worker), **override})
+
+    assert sync(["demo"]) == 0
+    assert json.loads(capsys.readouterr().out)["updated_agents"] == ["demo__orchestrator", "demo__worker"]
+    for path, expected in (
+        (orchestrator, campaign_defaults),
+        (worker, {**override, "mcp_servers": {**campaign_defaults["mcp_servers"], **override["mcp_servers"]}}),
+    ):
+        authored = read_mapping(path)
+        assert authored["effective"] == expected
+        assert {key: authored[key] for key in expected if key in authored} == (override if path == worker else {})
+        native = read_user_config_raw(home / "profiles" / path.parent.name / "config.yaml")
+        assert {key: native[key] for key in expected} == expected
+        assert native["agent"]["enabled_toolsets"] == ["file", "kanban"]
+        assert "effective" not in native and "jobs" not in native
+
+    assert sync(["demo"]) == 0
+    assert json.loads(capsys.readouterr().out)["updated_agents"] == []
+
+
+@pytest.fixture
+def run_campaign_script(bundle):
+    from hermes_cli._launchers import mint_launcher
+    from hermes_cli._startup_fast import project_root_str
+
+    home, _, _ = bundle
+    root = Path(project_root_str())
+    launcher_dir = home / "bin"
+    launcher_dir.mkdir()
+    assert mint_launcher("hermes", root, launcher_dir, Path(sys.executable), None)
+
+    def run(script, *args, **values):
+        env = {**os.environ, "PATH": os.pathsep.join([str(launcher_dir), os.environ.get("PATH", os.defpath)]),
+               **values}
+        return subprocess.run([sys.executable, str(root / "scripts" / script), *args],
+                              env=env, cwd=home, capture_output=True, text=True, timeout=30, check=False)
+
+    return run
+
+
+def test_sync_campaign_script_imports_matching_env_and_skips_missing_values(bundle, capsys, monkeypatch,
+                                                                           run_campaign_script):
+    from agent.runtime_scope import bind_profile_scope
+    from agent.secret_scope import load_env_file
+    from hermes_cli.config import atomic_config_write, load_config, save_env_value
+    from hermes_cli.oma_playbooks.source import read_mapping
+
+    home, source, main = bundle
+    assert main(["install", "demo"]) == 0
+    capsys.readouterr()
+    campaign = source / "campaigns" / "demo" / "config.yaml"
+    record = source / "agents" / "demo__worker" / "config.yaml"
+    worker = home / "profiles" / "demo__worker"
+    orchestrator = home / "profiles" / "demo__orchestrator"
+    with bind_profile_scope(worker, hydrate_secrets=False):
+        save_env_value("UNRELATED_OMA_REGRESSION", "leave-alone")
+    atomic_config_write(campaign, {**read_mapping(campaign), "model": {
+        "provider": "custom", "default": "test-model", "api_key": "${TEAM_SYNC_TOKEN}",
+    }})
+    atomic_config_write(record, {**read_mapping(record), "mcp_servers": {"worker": {
+        "url": "https://worker.invalid/mcp", "headers": {"Authorization": "Bearer ${env:WORKER_SYNC_TOKEN}"},
+        "client_cert": ["${HOME}/test-cert", "test-key"],
+    }}})
+    team_value = 'dummy # with "quotes" and a \\backslash'
+    worker_value = "dummy-worker-fixture"
+    monkeypatch.delenv("TEAM_SYNC_TOKEN", raising=False)
+    monkeypatch.delenv("WORKER_SYNC_TOKEN", raising=False)
+    def run(*args, **values):
+        return run_campaign_script("sync-campaign", *args, UNLISTED_OMA_REGRESSION="do-not-copy", **values)
+
+    # Provisioning can seed an empty .env; sync without supplied values must not touch it.
+    env_paths = [profile / ".env" for profile in (orchestrator, worker)]
+    original = [path.read_bytes() if path.exists() else None for path in env_paths]
+    first = run("demo")
+    assert first.returncode == 0, first.stderr
+    assert json.loads(first.stdout)["updated_agents"] == ["demo__orchestrator", "demo__worker"]
+    assert [path.read_bytes() if path.exists() else None for path in env_paths] == original
+    assert "${env:WORKER_SYNC_TOKEN}" in (worker / "config.yaml").read_text(encoding="utf-8-sig")
+
+    result = run("demo", TEAM_SYNC_TOKEN=team_value, WORKER_SYNC_TOKEN=worker_value)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["updated_agents"] == ["demo__orchestrator", "demo__worker"]
+    assert worker_value not in result.stdout + result.stderr
+    for profile in (orchestrator, worker):
+        env = load_env_file(profile / ".env")
+        assert env["TEAM_SYNC_TOKEN"] == team_value
+        assert not {"UNLISTED_OMA_REGRESSION", "HOME"} & env.keys()
+        assert env.get("WORKER_SYNC_TOKEN") == (worker_value if profile == worker else None)
+        assert "${TEAM_SYNC_TOKEN}" in (profile / "config.yaml").read_text(encoding="utf-8-sig")
+        with bind_profile_scope(profile, hydrate_secrets=False):
+            assert load_config()["model"]["api_key"] == team_value
+    assert load_env_file(worker / ".env")["UNRELATED_OMA_REGRESSION"] == "leave-alone"
+    assert worker_value not in record.read_text(encoding="utf-8-sig")
+
+    again = run("demo", WORKER_SYNC_TOKEN="")
+    assert again.returncode == 0, again.stderr
+    assert json.loads(again.stdout)["updated_agents"] == []
+    assert load_env_file(worker / ".env")["WORKER_SYNC_TOKEN"] == worker_value
+    assert run("demo", "--secret", "TEAM_SYNC_TOKEN").returncode == 2
+
+
+def test_sync_records_available_keys_in_campaign_and_agent_configs(bundle, capsys, run_campaign_script):
+    from agent.runtime_scope import bind_profile_scope
+    from hermes_cli.config import atomic_config_replace, atomic_config_write, remove_env_value, save_env_value
+    from hermes_cli.oma_playbooks.source import read_mapping
+
+    home, source, main = bundle
+    campaign = source / "campaigns" / "demo" / "config.yaml"
+    worker_record = source / "agents" / "demo__worker" / "config.yaml"
+    atomic_config_write(campaign, {**read_mapping(campaign), "model": {
+        "default": "fixture", "api_key": "${TEAM_STATUS_TOKEN}",
+    }})
+    atomic_config_write(worker_record, {**read_mapping(worker_record), "mcp_servers": {
+        "worker": {"url": "https://docs.invalid/mcp", "args": ["${HOME}/cert", "${env:WORKER_STATUS_TOKEN}"]},
+        "disabled": {"enabled": False, "headers": {"Authorization": "${DISABLED_STATUS_TOKEN}"}},
+    }})
+    assert main(["install", "demo"]) == 0
+    capsys.readouterr()
+    owner_record = source / "agents" / "demo__orchestrator" / "config.yaml"
+    profile = home / "profiles" / "demo__orchestrator"
+    worker = home / "profiles" / "demo__worker"
+    with bind_profile_scope(profile, hydrate_secrets=False):
+        save_env_value("TEAM_STATUS_TOKEN", "test-stored-value")
+        save_env_value("UNRELATED_STATUS_TOKEN", "test-unrelated-value")
+    with bind_profile_scope(worker, hydrate_secrets=False):
+        for name in ("WORKER_STATUS_TOKEN", "DISABLED_STATUS_TOKEN"):
+            save_env_value(name, "test-stored-value")
+
+    def check(campaign_keys, owner_keys, worker_keys, *, worker_uses_mcp=True, **env):
+        result = run_campaign_script("sync-campaign", "demo", **env)
+        assert result.returncode == 0, result.stderr
+        assert "test-stored-value" not in result.stdout + result.stderr
+        worker_refs = ["TEAM_STATUS_TOKEN", "WORKER_STATUS_TOKEN"] if worker_uses_mcp else ["TEAM_STATUS_TOKEN"]
+        assert read_mapping(campaign)["all-keys"] == worker_refs
+
+        assert read_mapping(owner_record)["all-keys"] == ["TEAM_STATUS_TOKEN"]
+        assert read_mapping(worker_record)["all-keys"] == worker_refs
+        for path, keys in zip((campaign, owner_record, worker_record), (campaign_keys, owner_keys, worker_keys)):
+            record = read_mapping(path)
+            assert record["available-keys"] == keys
+            assert "configured-keys" not in record
+            assert "test-stored-value" not in path.read_text(encoding="utf-8-sig")
+        for directory in (profile, worker):
+            assert not {"all-keys", "available-keys"} & read_mapping(directory / "config.yaml").keys()
+
+    check(["WORKER_STATUS_TOKEN"], ["TEAM_STATUS_TOKEN"], ["WORKER_STATUS_TOKEN"])
+    check(["TEAM_STATUS_TOKEN", "WORKER_STATUS_TOKEN"], ["TEAM_STATUS_TOKEN"],
+          ["TEAM_STATUS_TOKEN", "WORKER_STATUS_TOKEN"], TEAM_STATUS_TOKEN="test-stored-value")
+
+    # Losing a saved key and removing a reference both invalidate the stored status.
+    with bind_profile_scope(profile, hydrate_secrets=False):
+        remove_env_value("TEAM_STATUS_TOKEN")
+    config = read_mapping(worker_record)
+    config.pop("mcp_servers")
+    atomic_config_replace(worker_record, config)
+    check([], [], ["TEAM_STATUS_TOKEN"], worker_uses_mcp=False)
+
+    # A model override introduces a campaign-visible key even before the value is supplied.
+    config = read_mapping(worker_record)
+    atomic_config_write(worker_record, {**config, "model": {
+        "default": "other-fixture", "api_key": "${PRIVATE_MODEL_STATUS_TOKEN}",
+    }})
+    result = run_campaign_script("sync-campaign", "demo")
+    assert result.returncode == 0, result.stderr
+    assert read_mapping(campaign)["all-keys"] == ["PRIVATE_MODEL_STATUS_TOKEN", "TEAM_STATUS_TOKEN"]
+    assert read_mapping(campaign)["available-keys"] == []
+    result = run_campaign_script("sync-campaign", "demo", PRIVATE_MODEL_STATUS_TOKEN="test-stored-value")
+    assert result.returncode == 0, result.stderr
+    assert read_mapping(campaign)["available-keys"] == ["PRIVATE_MODEL_STATUS_TOKEN"]
+    assert read_mapping(worker_record)["all-keys"] == ["PRIVATE_MODEL_STATUS_TOKEN"]
+    assert read_mapping(worker_record)["available-keys"] == ["PRIVATE_MODEL_STATUS_TOKEN"]
+
+
+def test_install_materializes_campaign_defaults_and_sync_can_remove_them(bundle, capsys):
+    from hermes_cli.config import atomic_config_replace, atomic_config_write, read_user_config_raw
+    from hermes_cli.oma_playbooks.source import read_mapping
+    from hermes_cli.oma_playbooks.sync import main as sync
+
+    home, source, main = bundle
+    campaign = source / "campaigns" / "demo" / "config.yaml"
+    defaults = {"model": "team-model", "mcp_servers": {"docs": {"url": "https://docs.invalid/mcp"}}}
+    atomic_config_write(campaign, {**read_mapping(campaign), **defaults})
+    assert main(["install", "demo"]) == 0
+    capsys.readouterr()
+    native = home / "profiles" / "demo__worker" / "config.yaml"
+    agent = source / "agents" / "demo__worker" / "config.yaml"
+    assert read_mapping(agent)["effective"] == defaults
+    assert {key: read_user_config_raw(native)[key] for key in defaults} == defaults
+
+    current = read_mapping(campaign)
+    atomic_config_replace(campaign, {key: value for key, value in current.items() if key not in defaults})
+    assert sync(["demo"]) == 0
+    assert json.loads(capsys.readouterr().out)["updated_agents"] == ["demo__orchestrator", "demo__worker"]
+    assert not defaults.keys() & read_user_config_raw(native).keys()
+    assert "effective" not in read_mapping(agent)
 
 
 def test_bundle_templates_are_ignored_and_profile_conflicts_do_not_publish(bundle, capsys):

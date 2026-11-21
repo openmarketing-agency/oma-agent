@@ -90,6 +90,65 @@ needed and saves them in each owning agent's `jobs` list. Saving a declaration
 does not schedule a job; onboarding registers eligible jobs with native cron
 after verifying the provisioned profiles.
 
+### Sync campaign model and MCP settings
+
+Put native Hermes `model` and `mcp_servers` settings in the campaign config as
+defaults. Put exceptions in the same top-level keys in an agent's own config.
+An agent's `model` replaces the entire campaign model (a model name or a
+mapping). `mcp_servers` combines entries by name: an agent can add a server,
+replace a named server's entire definition, or set `enabled: false` for that
+server. Omit an override to inherit; an empty agent `mcp_servers: {}` adds no
+overrides. The helper passes through the native settings, including nested
+options, rather than maintaining a separate OMA schema for them.
+
+Provisioning applies these settings to new profiles. After an edit, run
+`sync-campaign` from the default OMA home to update an installed campaign.
+The script is on `PATH` in the Docker image; in a source checkout use
+`scripts/sync-campaign` with that installation's `hermes` on `PATH`.
+
+```sh
+sync-campaign my-campaign
+```
+
+For a Next.js integration, save the authored YAML atomically and invoke this
+command server-side with the campaign ID as its only argument and no shell.
+Pass credentials only in the child's environment; don't forward unrelated
+application credentials. YAML keeps references like `${CAMPAIGN_MODEL_KEY}` or
+`Authorization: "Bearer ${CAMPAIGN_MCP_TOKEN}"`. The script saves nonempty
+matching values to the corresponding profiles' `.env` files. Missing or empty
+values don't block sync and don't change existing `.env` entries. Use distinct
+variable names for distinct credentials in the same invocation. An endpoint
+that can edit MCP configurations must be
+restricted to trusted administrators: native stdio MCP entries can launch
+programs under the Hermes service account.
+
+After sync, the campaign and OMA agent configs contain two generated lists:
+
+- `all-keys`: environment variable names referenced by the effective model and
+  enabled MCP servers, excluding runtime variables such as `HOME`. The
+  campaign lists the union across its agents.
+- `available-keys`: the subset with nonempty values saved in the profile's
+  `.env`. At campaign level a key is available only if every agent that
+  references it has a saved value.
+
+The difference between the lists is what's missing. Keys introduced by an
+agent override appear in the campaign lists too. The lists contain names only,
+don't verify provider authentication, and refresh on each `sync-campaign` run.
+
+The helper updates `effective` in each roster member's OMA agent config and
+the two native settings in `profiles/<agent-id>/config.yaml`. Don't edit
+`effective`: it's generated and records which settings to remove when a
+previously synced setting is deleted from both sources. Other profile settings
+and toolset allowlists are preserved. On profiles with an explicit
+`agent.enabled_toolsets` list, list `mcp-<server-name>` there separately to
+make its tools available. Sync does not restart the gateway or force an open
+conversation to reload. Serialize save-and-sync requests and rerun sync if a
+filesystem error interrupts publication; replacement is atomic per file,
+not across the whole roster. The CLI returns JSON on stdout (`id`, `agents`,
+`updated_agents`) and progress or errors on stderr.
+
+### Shared brand and playbook
+
 The default profile manages one brand with `oma-brand` and one playbook with
 `oma-playbook`. The brand lives at `$HERMES_HOME/oma/brand/config.yaml` and stores
 paths relative to `oma/brand/` for logos, fonts, illustrations, icons,
