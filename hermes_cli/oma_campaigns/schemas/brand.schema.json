@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OMA Brand",
+  "type": "object",
+  "required": ["id", "name", "description"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])" },
+    "name": { "$ref": "#/$defs/text" },
+    "description": { "$ref": "#/$defs/text" },
+    "knowledge_base_file": { "$ref": "#/$defs/markdown" },
+    "knowledge_base": { "type": "string", "description": "Legacy inline knowledge. Prefer knowledge_base_file for new records." },
+    "logos": { "type": "object", "additionalProperties": { "type": "string", "$ref": "#/$defs/path", "pattern": "^logos/" } },
+    "fonts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "$ref": "#/$defs/path", "pattern": "^fonts/" } },
+    "illustrations": { "type": "array", "uniqueItems": true, "items": { "type": "string", "$ref": "#/$defs/path", "pattern": "^illustrations/" } },
+    "icons": { "type": "array", "uniqueItems": true, "items": { "type": "string", "$ref": "#/$defs/path", "pattern": "^icons/" } },
+    "backgrounds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "$ref": "#/$defs/path", "pattern": "^backgrounds/" } },
+    "images": { "type": "array", "uniqueItems": true, "items": { "type": "string", "$ref": "#/$defs/path", "pattern": "^images/" } },
+    "palette": { "type": "object", "additionalProperties": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}(?![\\s\\S])" } },
+    "design_system": {
+      "type": "object", "required": ["guidelines"], "additionalProperties": false,
+      "properties": { "guidelines": { "$ref": "#/$defs/markdown" }, "source_url": { "$ref": "#/$defs/url" } }
+    },
+    "website": { "$ref": "#/$defs/discovery" },
+    "channels": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "social": { "type": "array", "items": { "$ref": "#/$defs/platform_discovery" } },
+        "blog": { "$ref": "#/$defs/discovery" },
+        "newsletter": { "$ref": "#/$defs/discovery" }
+      }
+    },
+    "launches": { "type": "array", "items": { "$ref": "#/$defs/platform_discovery" } },
+    "integrations": {
+      "type": "object",
+      "description": "Public website signals keyed by provider ID, not connected accounts.",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*(?![\\s\\S])" },
+      "additionalProperties": {
+        "type": "object", "required": ["status"], "additionalProperties": false,
+        "properties": {
+          "status": { "enum": ["not_checked", "not_detected", "observed"] },
+          "signal": { "$ref": "#/$defs/text" },
+          "evidence": { "$ref": "#/$defs/evidence_path" }
+        },
+        "if": { "properties": { "status": { "const": "observed" } }, "required": ["status"] },
+        "then": { "required": ["evidence"] }
+      }
+    },
+    "research": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "market_report": { "$ref": "#/$defs/markdown" },
+        "competitor_report": { "$ref": "#/$defs/markdown" },
+        "competitors": {
+          "type": "array",
+          "items": {
+            "type": "object", "required": ["id", "name"], "additionalProperties": false,
+            "properties": {
+              "id": { "$ref": "#/properties/id" },
+              "name": { "$ref": "#/$defs/text" },
+              "website": { "$ref": "#/$defs/url" },
+              "report": { "$ref": "#/$defs/markdown" },
+              "sources": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/url" } }
+            }
+          }
+        }
+      }
+    },
+    "repositories": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["id", "url"], "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/properties/id" },
+          "url": { "$ref": "#/$defs/url" },
+          "analyzed_commit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})(?![\\s\\S])" },
+          "internal_docs": { "$ref": "#/$defs/markdown" }
+        },
+        "dependentRequired": { "analyzed_commit": ["internal_docs"], "internal_docs": ["analyzed_commit"] }
+      }
+    },
+    "documentation": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "public": { "$ref": "#/$defs/discovery" },
+        "internal_reference": {
+          "type": "object", "required": ["index", "mode"], "additionalProperties": false,
+          "properties": { "index": { "$ref": "#/$defs/markdown" }, "mode": { "enum": ["summarized", "mirrored"] } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "text": { "type": "string", "pattern": "\\S" },
+    "url": { "type": "string", "pattern": "^https?://[^/\\s@:#?]+(?::[0-9]+)?(?:[/?#][^\\s]*)?(?![\\s\\S])" },
+    "path": {
+      "type": "string",
+      "pattern": "^(?!(?:\\.{1,2})(?:/|$))[^/\\\\:#?%\\x00-\\x1f]+(?:/(?!(?:\\.{1,2})(?:/|$))[^/\\\\:#?%\\x00-\\x1f]+)*(?![\\s\\S])"
+    },
+    "markdown": { "type": "string", "$ref": "#/$defs/path", "pattern": "\\.md(?![\\s\\S])" },
+    "evidence_path": {
+      "type": "string",
+      "pattern": "^(?!(?:\\.{1,2})(?:/|$))[^/\\\\:#?%\\x00-\\x1f]+(?:/(?!(?:\\.{1,2})(?:/|$))[^/\\\\:#?%\\x00-\\x1f]+)*\\.md(?:#[a-zA-Z0-9_-]+)?(?![\\s\\S])"
+    },
+    "discovery": {
+      "type": "object", "required": ["status"],
+      "properties": {
+        "status": { "enum": ["not_checked", "not_found", "verified"] },
+        "url": { "$ref": "#/$defs/url" },
+        "feed_url": { "$ref": "#/$defs/url" },
+        "signup_url": { "$ref": "#/$defs/url" }
+      },
+      "if": { "properties": { "status": { "const": "verified" } }, "required": ["status"] },
+      "then": { "required": ["url"] },
+      "else": { "not": { "anyOf": [{ "required": ["url"] }, { "required": ["feed_url"] }, { "required": ["signup_url"] }] } },
+      "unevaluatedProperties": false
+    },
+    "platform_discovery": {
+      "type": "object", "required": ["platform"],
+      "properties": { "platform": { "$ref": "#/properties/id" } },
+      "allOf": [{ "$ref": "#/$defs/discovery_core" }],
+      "unevaluatedProperties": false
+    },
+    "discovery_core": {
+      "type": "object", "required": ["status"],
+      "properties": {
+        "status": { "enum": ["not_checked", "not_found", "verified"] },
+        "url": { "$ref": "#/$defs/url" }
+      },
+      "if": { "properties": { "status": { "const": "verified" } }, "required": ["status"] },
+      "then": { "required": ["url"] },
+      "else": { "not": { "required": ["url"] } }
+    }
+  }
+}

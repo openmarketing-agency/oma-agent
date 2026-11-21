@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OMA Campaign",
+  "type": "object",
+  "required": ["id", "name", "description", "orchestrator", "agents"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])" },
+    "name": { "$ref": "#/$defs/text" },
+    "description": { "$ref": "#/$defs/text" },
+    "orchestrator": { "$ref": "#/$defs/orchestrator" },
+    "agents": {
+      "type": "array", "uniqueItems": true,
+      "items": { "$ref": "#/$defs/agent_id" },
+      "contains": { "$ref": "#/$defs/orchestrator" },
+      "maxContains": 1
+    },
+    "goals": { "$ref": "#/$defs/text_list" },
+    "plans": { "$ref": "#/$defs/text_list" },
+    "kanban_board": { "type": "string", "pattern": "^campaign-[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])" },
+    "kanban_board_name": { "$ref": "#/$defs/text" },
+    "installation_state": { "enum": [null, "installing", "installed"], "readOnly": true },
+    "model": { "type": ["string", "object"], "description": "Native Hermes model shorthand or mapping." },
+    "mcp_servers": { "type": "object", "propertyNames": { "minLength": 1 }, "additionalProperties": { "type": "object" } },
+    "all-keys": { "$ref": "#/$defs/key_names", "readOnly": true },
+    "available-keys": { "$ref": "#/$defs/key_names", "readOnly": true },
+    "version": { "description": "Legacy template metadata. Not required or authored on new records." },
+    "playbook": { "description": "Legacy field; ignored. New records use the singleton playbook." }
+  },
+  "$defs": {
+    "text": { "type": "string", "pattern": "\\S" },
+    "text_list": { "type": "array", "items": { "$ref": "#/$defs/text" } },
+    "agent_id": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*__[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])" },
+    "orchestrator": { "type": "string", "$ref": "#/$defs/agent_id", "pattern": "__orchestrator(?![\\s\\S])" },
+    "key_names": {
+      "type": "array", "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(?![\\s\\S])" }
+    }
+  }
+}

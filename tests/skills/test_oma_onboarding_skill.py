@@ -26,7 +26,7 @@ def test_oma_onboarding_loads_with_its_workflow_skills(tmp_path, monkeypatch):
         loaded = json.loads(skill_view(name))
         assert loaded["success"], loaded
         assert Path(loaded["skill_dir"]).resolve() == oma_dir / name
-    assert (oma_dir / "oma-campaigns" / "scripts" / "playbook.py").is_file()
+    assert (oma_dir / "oma-campaigns" / "scripts" / "campaign.py").is_file()
     assert not (tmp_path / "oma").exists()
 
 
@@ -51,7 +51,7 @@ def test_named_profile_sync_excludes_oma_and_hides_retained_copies(tmp_path, mon
         for name in OMA_SKILLS:
             assert not json.loads(skill_view(name))["success"]
             assert not json.loads(skill_view(f"oma/{name}"))["success"]
-        assert not json.loads(skill_view("oma-campaigns", file_path="scripts/playbook.py"))["success"]
+        assert not json.loads(skill_view("oma-campaigns", file_path="scripts/campaign.py"))["success"]
         assert (home / "skills" / "oma" / "oma-campaigns" / "SKILL.md").is_file()
     finally:
         reset_hermes_home_override(token)

@@ -1,0 +1,22 @@
+id: seo
+name: SEO
+description: Improve discovery of the workspace through useful search content.
+orchestrator: seo__orchestrator
+agents: [seo__orchestrator, seo__researcher]
+goals: [Increase qualified organic traffic.]
+plans: [Research search intent and identify documentation gaps.]
+kanban_board: campaign-seo
+kanban_board_name: SEO
+installation_state: installed
+model:
+  default: fixture-model
+  provider: custom
+  base_url: https://models.example.invalid/v1
+  api_key: ${MODEL_API_KEY}
+mcp_servers:
+  docs:
+    url: https://docs.example.invalid/mcp
+    headers:
+      Authorization: Bearer ${DOCS_TOKEN}
+all-keys: [DOCS_TOKEN, MODEL_API_KEY]
+available-keys: [MODEL_API_KEY]

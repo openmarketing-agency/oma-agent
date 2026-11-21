@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OMA Playbook",
+  "type": "object",
+  "required": ["id", "name", "description", "strategy"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])" },
+    "name": { "type": "string", "pattern": "\\S" },
+    "description": { "type": "string", "pattern": "\\S" },
+    "strategy": { "type": "string", "description": "Inline strategy. Empty string means unset." },
+    "brand_id": { "type": "string", "description": "Legacy field; ignored. New records use the singleton brand." }
+  }
+}

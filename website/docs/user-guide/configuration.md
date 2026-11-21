@@ -22,10 +22,10 @@ OMA Agent does not offer, collect, or send Nous Shared Metrics. Legacy
 `telemetry.shared_metrics` settings cannot turn collection or sending back on.
 
 A fresh OMA install or a profile created without cloning starts with a minimal
-`config.yaml`. It enables `file`, `terminal`, `browser`, `web`, `skills`,
+`config.yaml`. It enables `file`, `terminal`, `browser`, `camofox`, `web`, `skills`,
 `memory`, and `session_search` under `agent.enabled_toolsets`. `file`, `terminal`, `skills`, and
 `memory` are eager: their tool schemas are available directly from the first
-turn. `browser`, `web`, and `session_search` are deferred and discoverable
+turn. `browser`, `camofox`, `web`, and `session_search` are deferred and discoverable
 through Tool Search. `session_search` searches past conversations.
 The tool-search bridge stays visible, with its upfront catalog listing off.
 The built-in `default` profile also starts with `clarify` enabled and eager on
@@ -42,13 +42,19 @@ Ordinary new named profiles do not enable either toolset by default. Existing
 `agent.enabled_toolsets` without adding it to the starter eager list.
 
 A fresh file-backed OMA install also creates a `maintenance` profile. It enables
-`file`, `terminal`, `skills`, `memory`, `session_search`, `web`, and `browser`.
+`file`, `terminal`, `skills`, `memory`, `session_search`, `web`, `browser`, and `camofox`.
 Only `file` and `terminal` are eager; the others are available through Tool
 Search where supported. Use `hermes -p maintenance` to select the profile. The
 installer uses `hermes_cli/data/profiles/maintenance/` for its tool config,
 `SOUL.md`, and `omactl` skill. The live profile is stored under
 `$HERMES_HOME/profiles/maintenance/` and is not overwritten on upgrade. The
 `omactl` CLI is a separate runtime prerequisite.
+
+The `camofox` selection only makes an installed and configured plugin eligible;
+it does not install the plugin, configure its endpoint, or start its server.
+New campaign profiles also select it by default, preserving explicit toolset
+opt-outs and authored disclosure policies. The prompt mentions it as an alternate
+browser for authorized pages only when the session can actually use it.
 
 No skills are auto-loaded by default. The five bundled `oma-*` management
 skills are available on demand only in the `default` profile, whose stock
@@ -156,6 +162,51 @@ backgrounds, and images. The playbook lives at `$HERMES_HOME/oma/playbook/config
 with an inline `strategy`. Campaigns and their agents use the brand and playbook
 at these fixed locations, without `playbook` or `brand_id` links between the
 records. Older per-ID records are not migrated automatically.
+
+### OMA record schemas
+
+The four JSON Schema 2020-12 files in `hermes_cli/oma_campaigns/schemas/` are
+the machine-readable contract for these YAML records. Example YAML for each
+contract lives in `tests/hermes_cli/fixtures/oma_records/`.
+
+| Relative to `$HERMES_HOME/oma/` | Schema | Record contents |
+| --- | --- | --- |
+| `brand/config.yaml` | `brand.schema.json` | Brand identity, assets, website, channels and launches, integration observations, research, repositories, and documentation. |
+| `playbook/config.yaml` | `playbook.schema.json` | Identity and inline `strategy`; an empty string means unset. |
+| `campaigns/<id>/config.yaml` | `campaign.schema.json` | Goals, plans, roster, board and provisioning state, campaign model/MCP defaults, and computed credential-name lists. |
+| `agents/<id>/config.yaml` | `agent.schema.json` | Campaign membership (`null` for standalone), job and skill declarations, native Hermes settings, and computed settings/key status. |
+
+For new brands, write longer knowledge to `oma/brand/knowledge-base.md` and
+set `knowledge_base_file: knowledge-base.md` in the brand YAML. A reader
+should prefer that file if both fields are present and fall back to legacy
+inline `knowledge_base` only when no file is configured. Existing records are
+not rewritten. Reports, design guidelines, and internal docs are separate
+Markdown files referenced relative to `oma/brand/`, for example
+`research/market.md`, `design/DESIGN.md`, and `docs/public/index.md`.
+
+An absent research section does not mean a check ran. `not_checked`,
+`not_found`, and `verified` distinguish unknown, checked with no result, and
+verified links. An integration with status `observed` must point to written
+evidence; detecting a tag is not an account connection. Repository-derived
+docs reference the analyzed commit. These fields describe findings; the schema
+does not run research, fetch URLs, clone repositories, or connect accounts.
+
+Validate a file read-only with `python -m hermes_cli.oma_campaigns validate
+<brand|playbook|campaign|agent> <path>` in the Hermes environment. Provisioning
+and `sync-campaign` validate campaign and roster agent records before updating
+profiles. Native Hermes sections (including options inside `model` and each
+`mcp_servers` entry) are not redefined. Hermes still checks roster ownership,
+board/profile state, and native settings separately from the JSON Schema.
+
+In a Next.js server, bundle the four schema files from the matching OMA
+revision and compile them with a 2020-12 validator (for example `Ajv2020` from
+`ajv/dist/2020` with `allowUnionTypes: true`). Parse YAML as data, rejecting
+duplicate keys, and validate without coercion or removing unknown keys. Quote
+ambiguous strings such as `"off"` or date-like text for YAML compatibility.
+Resolve file references against the owning directory and confirm the resolved
+real path stays inside it before serving anything; the schema validates path
+syntax, not files or symlinks. Treat `readOnly` metadata as generated and leave
+`.env` and resolved credentials outside the UI payload.
 
 For initial setup, `oma-onboarding` only asks for a website or GitHub repository
 URL. It builds the brand and playbook from that source, then designs and

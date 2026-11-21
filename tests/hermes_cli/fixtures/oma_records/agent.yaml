@@ -1,0 +1,23 @@
+id: seo__researcher
+name: SEO Researcher
+description: Find and cite evidence about search intent and documentation gaps.
+campaign_id: seo
+agent:
+  enabled_toolsets: [file, web, skills]
+oma_skills: []
+jobs:
+  - id: weekly-review
+    schedule: "0 9 * * 1"
+    timezone: UTC
+    prompt: Review new evidence and report material changes on the campaign board.
+model: fixture-research-model
+mcp_servers:
+  docs:
+    enabled: false
+effective:
+  model: fixture-research-model
+  mcp_servers:
+    docs:
+      enabled: false
+all-keys: []
+available-keys: []

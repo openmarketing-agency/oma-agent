@@ -1,4 +1,4 @@
-"""Resolve a playbook and exactly the OMA skills its agents declare."""
+"""Resolve a campaign and exactly the OMA skills its agents declare."""
 
 import re
 from dataclasses import dataclass
@@ -7,10 +7,11 @@ from pathlib import Path
 import hermes_yaml as yaml
 from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS
 from hermes_constants import PROFILE_ID_RE
-from hermes_cli.oma_playbooks.bundle import bundle_dir
+from hermes_cli.oma_campaigns.bundle import bundle_dir
+from hermes_cli.oma_campaigns.schema import validate_record
 from tools.skill_usage import read_skill_name
 
-PLAYBOOK_ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+_SOURCE_SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 
 @dataclass(frozen=True)
@@ -23,7 +24,7 @@ class Agent:
 
 
 @dataclass(frozen=True)
-class Playbook:
+class Campaign:
     id: str
     name: str
     description: str
@@ -32,8 +33,8 @@ class Playbook:
 
 
 def checked_id(value: str) -> str:
-    if not isinstance(value, str) or not PLAYBOOK_ID.fullmatch(value):
-        raise ValueError("Expected a lowercase playbook ID, e.g. social-media")
+    if not isinstance(value, str) or not _SOURCE_SLUG.fullmatch(value):
+        raise ValueError("Expected a lowercase campaign ID, e.g. social-media")
     return value
 
 
@@ -78,7 +79,7 @@ def campaign_fields(data: dict, campaign_id: str) -> dict:
     if fields["orchestrator"] != orchestrator or orchestrator not in ids:
         raise ValueError(f"{campaign_id}: roster must contain the canonical orchestrator {orchestrator}")
     prefix = f"{campaign_id}__"
-    if any(not agent.startswith(prefix) or not PLAYBOOK_ID.fullmatch(agent[len(prefix):])
+    if any(not agent.startswith(prefix) or not _SOURCE_SLUG.fullmatch(agent[len(prefix):])
            or not PROFILE_ID_RE.fullmatch(agent) for agent in ids):
         raise ValueError(f"{campaign_id}: roster must use canonical campaign-prefixed IDs")
     return {**fields, "agents": ids}
@@ -118,20 +119,20 @@ def _job_ids(value: object, context: str) -> list[str]:
 
 def _read_agent(root: Path, campaign_id: str, agent_id: str, index: dict[str, list[Path]]) -> Agent:
     path = _member(root, agent_id)
-    data = read_mapping(_member(path, "config.yaml"))
-    if data.pop("id", None) != agent_id:
+    config_path = _member(path, "config.yaml")
+    data = read_mapping(config_path)
+    if data.get("id") != agent_id:
         raise ValueError(f"{agent_id}: config id does not match the roster")
-    if data.pop("campaign_id", None) != campaign_id:
+    if data.get("campaign_id") != campaign_id:
         raise ValueError(f"{agent_id}: campaign_id must match {campaign_id}")
-    _text(data, "name", agent_id)
-    del data["name"]
+    validate_record("agent", data, config_path)
+    del data["id"], data["campaign_id"], data["name"]
     data.pop("version", None)  # Legacy template metadata is not a native setting.
     data.pop("effective", None)  # Materialized OMA view, not an authored override.
     # OMA credential metadata stays in the record, not the native profile.
     data.pop("all-keys", None)
     data.pop("available-keys", None)
-    description = _text(data, "description", agent_id)
-    del data["description"]
+    description = data.pop("description")
     soul = _member(path, "SOUL.md").read_text(encoding="utf-8-sig")
     if not soul.strip():
         raise ValueError(f"{agent_id}: SOUL.md is empty")
@@ -140,15 +141,15 @@ def _read_agent(root: Path, campaign_id: str, agent_id: str, index: dict[str, li
     return Agent(agent_id, description, data, soul, skills)
 
 
-def resolve(home: Path, playbook_id: str) -> Playbook:
+def resolve(home: Path, campaign_id: str) -> Campaign:
     """Resolve authored campaign and agent records, not shipped templates."""
     oma = _member(home.resolve(), "oma")
     campaigns_dir = _member(oma, "campaigns")
-    directory = _member(campaigns_dir, checked_id(playbook_id))
+    directory = _member(campaigns_dir, checked_id(campaign_id))
     manifest = _member(directory, "config.yaml")
-    data = campaign_fields(read_mapping(manifest), playbook_id)
+    data = campaign_fields(read_mapping(manifest), campaign_id)
     ids = data.pop("agents")
     index = _skill_index(_member(bundle_dir(home.resolve()), "skills"))
     agents_root = _member(oma, "agents")
-    agents = tuple(_read_agent(agents_root, playbook_id, agent, index) for agent in ids)
-    return Playbook(**data, agents=agents)
+    agents = tuple(_read_agent(agents_root, campaign_id, agent, index) for agent in ids)
+    return Campaign(**data, agents=agents)

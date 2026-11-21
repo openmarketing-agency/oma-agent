@@ -9,7 +9,7 @@ import sys
 def main() -> int:
     try:
         result = subprocess.run(
-            ["hermes", "--print-runtime-command", "--module", "hermes_cli.oma_playbooks"],
+            ["hermes", "--print-runtime-command", "--module", "hermes_cli.oma_campaigns"],
             check=True, capture_output=True, text=True, timeout=15,
         )
         argv = json.loads(result.stdout)

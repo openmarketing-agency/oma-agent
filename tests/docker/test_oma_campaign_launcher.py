@@ -11,7 +11,7 @@ def test_campaign_helper_uses_image_runtime(built_image, user):
     result = subprocess.run(
         ["docker", "run", "--rm", "--network", "none", "--user", user,
          "--entrypoint", "/bin/sh", built_image, "-ec",
-         'python3 /opt/hermes/skills/oma/oma-campaigns/scripts/playbook.py list'],
+         'python3 /opt/hermes/skills/oma/oma-campaigns/scripts/campaign.py list'],
         capture_output=True, text=True, timeout=30, check=False,
     )
     assert result.returncode == 0, result.stderr

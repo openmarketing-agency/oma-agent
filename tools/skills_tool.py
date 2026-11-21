@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from hermes_constants import get_hermes_home
 from tools.registry import registry, tool_error
 from hermes_cli.config import cfg_get
-from hermes_cli.oma_playbooks.bundle import shared_skill_dir
+from hermes_cli.oma_campaigns.bundle import shared_skill_dir
 from agent.skill_selection import get_enabled_skill_names, is_enabled_entry, profile_excluded_skills, skill_is_selected
 from agent.skill_utils import (
     EXCLUDED_SKILL_DIRS as _EXCLUDED_SKILL_DIRS, TIER_EXTERNAL, TIER_LOCAL,
