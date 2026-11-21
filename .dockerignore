@@ -65,6 +65,7 @@ htmlcov/
 
 # Documentation
 *.md
+!/SOUL.md
 !skills/**/*.md
 !optional-skills/**/*.md
 !oma-bundle/**/*.md

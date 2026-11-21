@@ -5,7 +5,7 @@ user docs: `website/docs/user-guide/features/skills.md`, `curator.md`.
 
 ## Two surfaces
 
-- **`skills/`** — OMA Agent's bundled `computer-use` and `hermes-agent` skills, plus `oma-agents`, `oma-brands`, `oma-campaigns`, `oma-onboarding`, and `oma-playbooks` under `skills/oma/`.
+- **`skills/`** — OMA Agent's bundled `computer-use` and `hermes-agent` skills, plus `oma-agents`, `oma-brand`, `oma-campaigns`, `oma-onboarding`, and `oma-playbook` under `skills/oma/`.
 - **`optional-skills/`** — heavier/niche skills shipped but NOT active; installed via
   `hermes skills install official/<category>/<skill>` (adapter `tools/skills_hub_official.py`
   `OptionalSkillSource`). Categories: `autonomous-ai-agents, blockchain, communication, creative,

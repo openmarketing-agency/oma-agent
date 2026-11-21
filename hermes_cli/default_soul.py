@@ -2,10 +2,19 @@
 
 from pathlib import Path
 
+from hermes_cli._startup_fast import project_root_str
 from hermes_constants import get_default_hermes_root
 
 DEFAULT_SOUL_MD = "You are OMA Agent built by Open Marketing Agency powered by Hermes Agent."
-_ROOT_SOUL_WITH_OMA_SKILLS = DEFAULT_SOUL_MD + "\n\n" + (
+
+
+def starter_soul(home: Path) -> str:
+    if home.resolve() != get_default_hermes_root(home=home).resolve():
+        return DEFAULT_SOUL_MD
+    return (Path(project_root_str()) / "SOUL.md").read_text(encoding="utf-8-sig")
+
+
+_LEGACY_ROOT_SOUL_WITH_OMA_SKILLS = DEFAULT_SOUL_MD + "\n\n" + (
     "Choose the OMA skill that matches the user's request:\n\n"
     "- `oma-onboarding`: Get started, or add campaigns or agents to existing OMA work.\n"
     "- `oma-brands`: Create or update brands, logos, and brand knowledge.\n"
@@ -13,28 +22,11 @@ _ROOT_SOUL_WITH_OMA_SKILLS = DEFAULT_SOUL_MD + "\n\n" + (
     "- `oma-campaigns`: Install or inspect campaigns and manage their goals, plans, and playbook links.\n"
     "- `oma-agents`: Manage agent records, personas, settings, and saved files."
 )
-_ROOT_SOUL_WITH_CLARIFY = _ROOT_SOUL_WITH_OMA_SKILLS + "\n\n" + (
+_LEGACY_ROOT_SOUL_WITH_CLARIFY = _LEGACY_ROOT_SOUL_WITH_OMA_SKILLS + "\n\n" + (
     "Use `clarify` when you need the user's feedback, preferences, or a decision, especially during OMA onboarding. "
     "Ask focused questions and offer choices when helpful. If `clarify` is not listed, look for it with Tool Search. "
     "If it is unavailable, ask in chat. Do not treat a skipped or unanswered question as agreement."
 )
-# Keep the root-only persona in sync with docker/SOUL.md.
-DEFAULT_ROOT_SOUL_MD = _ROOT_SOUL_WITH_CLARIFY + "\n\n" + (
-    "Talk like a helpful person, not a system log. Give the user a short, plain-language overview of what happened: "
-    "“Brand set up,” “Playbook created,” or “SEO campaign added.” Mention any blocker that affects them. "
-    "Verify the details privately and leave out save paths, filenames, config keys, and other implementation details "
-    "unless the user asks for them. Apply this to skill summaries too.\n\n"
-    "When the user asks you to queue campaign work, use Tool Search for Kanban. Verify the installed campaign's "
-    "recorded board and orchestrator, then create one task on that board for the orchestrator. Let the orchestrator "
-    "plan and assign specialist work. For a maintenance request, verify that the `maintenance` profile exists and "
-    "queue diagnostics on the designated operations board, or on the `default` board if none is designated. "
-    "Always name the board explicitly. Queuing a task does not authorize destructive changes, credential changes, or restarts. "
-    "Report queued work as queued, not completed."
-)
-
-
-def starter_soul(home: Path) -> str:
-    return DEFAULT_ROOT_SOUL_MD if home.resolve() == get_default_hermes_root(home=home).resolve() else DEFAULT_SOUL_MD
 
 _SCAFFOLD_HEAD = (
     "# Hermes Agent Persona\n\n<!--\nThis file defines the agent's personality and tone.\n"
@@ -46,15 +38,15 @@ _SCAFFOLD_TAIL = (
 )
 
 # Auto-seeded SOUL.md content that carries zero user intent, so a matching file is safe to upgrade
-# to DEFAULT_SOUL_MD in place: comment-only scaffolds older installers (install.sh / install.ps1 /
-# docker/SOUL.md) wrote, plus earlier generations of the auto-seeded default text. Compared on
+# to the current starter: comment-only scaffolds older installers wrote, plus earlier generations
+# of the auto-seeded default text. Compared on
 # normalized content (stripped, line endings unified). NEVER add anything here a user might have
 # intentionally written -- that is the whole safety guarantee.
 _LEGACY_TEMPLATE_SOULS = (
     DEFAULT_SOUL_MD + "\n\nUse the `oma-playbooks` skill to manage playbooks.",
     DEFAULT_SOUL_MD + "\n\nUse the `oma-campaigns` skill to manage playbooks.",
-    _ROOT_SOUL_WITH_OMA_SKILLS,
-    _ROOT_SOUL_WITH_CLARIFY,
+    _LEGACY_ROOT_SOUL_WITH_OMA_SKILLS,
+    _LEGACY_ROOT_SOUL_WITH_CLARIFY,
     _SCAFFOLD_HEAD + (
         "Examples:\n"
         '  - "You are a warm, playful assistant who uses kaomoji occasionally."\n'

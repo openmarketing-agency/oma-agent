@@ -7,11 +7,13 @@ now replaces such a link with the default identity file; a link that resolves is
 wiring and stays a link.
 """
 
+from pathlib import Path
+
 import pytest
 
 from hermes_cli.config import _ensure_default_soul_md
 from hermes_cli.config_home import initialize_home
-from hermes_cli.default_soul import DEFAULT_ROOT_SOUL_MD
+
 
 _SUBDIRS = ("cron", "sessions", "logs", "memories")
 
@@ -26,7 +28,8 @@ def test_initialize_home_replaces_unwritable_soul_symlink(tmp_path, target):
     initialize_home(home, _SUBDIRS, set())
 
     assert not soul.is_symlink()
-    assert soul.read_text(encoding="utf-8") == DEFAULT_ROOT_SOUL_MD
+    template = Path(__file__).resolve().parents[2] / "SOUL.md"
+    assert soul.read_text(encoding="utf-8") == template.read_text(encoding="utf-8")
     assert not [p for p in home.iterdir() if p.name.startswith(".SOUL.md.")]
 
 
