@@ -13,9 +13,10 @@ from hermes_cli import kanban_db
 from hermes_cli.config import atomic_config_replace, atomic_config_write, read_user_config_raw
 from hermes_cli.config_backend import require_file_tooling
 from hermes_cli.config_defaults import DEFAULT_CONFIG
-from hermes_cli.config_home import OMA_PLAYBOOK_SKILL
-from hermes_cli.oma_playbooks.settings import read_agent_record, record_with_effective, resolve_settings, settings_from
-from hermes_cli.oma_playbooks.source import Agent, Playbook, campaign_fields, checked_id, read_mapping, resolve
+from hermes_cli.config_home import OMA_CAMPAIGN_SKILL
+from hermes_cli.oma_campaigns.schema import validate_record
+from hermes_cli.oma_campaigns.settings import read_agent_record, record_with_effective, resolve_settings, settings_from
+from hermes_cli.oma_campaigns.source import Agent, Campaign, campaign_fields, checked_id, read_mapping, resolve
 from hermes_cli.profile_provision import ProfileCreateRequest, provision_profile
 from hermes_cli.profiles import get_profile_dir, profile_exists
 from hermes_constants import get_hermes_home
@@ -25,13 +26,13 @@ from tools.skills_sync import bundled_skill_names, sync_skills
 def default_home() -> Path:
     home = get_hermes_home().resolve()
     if home != get_profile_dir("default").resolve():
-        raise ValueError("Playbook management must run from the default OMA Agent profile")
+        raise ValueError("Campaign management must run from the default OMA Agent profile")
     return home
 
 
 def _real_path(path: Path) -> Path:
     if path.is_symlink():
-        raise ValueError(f"Refusing symlinked playbook state: {path}")
+        raise ValueError(f"Refusing symlinked campaign state: {path}")
     return path
 
 
@@ -109,6 +110,7 @@ def configure(home: Path, campaign_id: str) -> dict:
         record = _status(home, campaign_id, config)
         if record["state"] != "installed":
             raise ValueError(f"Campaign {campaign_id!r} is not fully installed")
+        validate_record("campaign", config, path)
         missing = {key: record[key] for key in ("kanban_board", "kanban_board_name") if key not in config}
         if missing:
             atomic_config_write(path, {**config, **missing})
@@ -139,7 +141,7 @@ def _readiness(agent: Agent, bundled: set[str]) -> dict:
         if field in skills and not (field == "enabled" and skills[field] is None):
             if not isinstance(skills[field], list) or any(not isinstance(n, str) for n in skills[field]):
                 raise ValueError(f"{agent.id}: skills.{field} must be a list of names")
-    disabled = set(skills.get("disabled", [])) | {OMA_PLAYBOOK_SKILL}
+    disabled = set(skills.get("disabled", [])) | {OMA_CAMPAIGN_SKILL}
     needed = set(agent.skills) | set(skills.get("auto_load", []))
     unavailable = (needed & (disabled | OMA_DEFAULT_ONLY_SKILLS)) | (needed - (bundled | set(agent.skills)))
     if skills.get("enabled") is not None:
@@ -149,13 +151,13 @@ def _readiness(agent: Agent, bundled: set[str]) -> dict:
     return {**skills, "disabled": sorted(disabled)}
 
 
-def _check_profiles(home: Path, playbook: Playbook) -> dict[str, dict]:
+def _check_profiles(home: Path, campaign: Campaign) -> dict[str, dict]:
     policies = {}
     root = home / "profiles"
     if root.is_symlink():
         raise ValueError(f"Refusing symlinked profiles directory: {root}")
     bundled = set(bundled_skill_names())
-    for agent in playbook.agents:
+    for agent in campaign.agents:
         path = get_profile_dir(agent.id)
         if path.resolve() != root / agent.id or path.is_symlink() or path.exists():
             raise ValueError(f"Profile {agent.id} already exists or does not resolve under this OMA home")
@@ -174,16 +176,19 @@ def _with_kanban(config: dict, board: str, orchestrator: str, agent_id: str) -> 
     if any(set(resolve_toolset(name)) & set(resolve_toolset("kanban")) for name in disabled):
         raise ValueError(f"{agent_id}: agent.disabled_toolsets conflicts with campaign Kanban tools")
     config = {**config, "kanban": {**kanban, "profile_board": board, "orchestrator_profile": orchestrator}}
+    # Select the plugin if present without changing an authored eager policy or toolset opt-out.
+    optional = [] if "camofox" in disabled else ["camofox"]
     enabled = agent_config.get("enabled_toolsets")
     if enabled is not None:
         if not isinstance(enabled, list) or any(not isinstance(name, str) or not name for name in enabled):
             raise ValueError(f"{agent_id}: agent.enabled_toolsets must be a list of toolset names or null")
-        config["agent"] = {**agent_config, "enabled_toolsets": list(dict.fromkeys([*enabled, "kanban"]))}
+        config["agent"] = {**agent_config, "enabled_toolsets": list(dict.fromkeys([*enabled, "kanban", *(optional if enabled else [])]))}
     else:
         config["toolsets"] = list(dict.fromkeys([*parse_config_string_list(config.get("toolsets")), "kanban"]))
         if isinstance(platforms := config.get("platform_toolsets"), dict):
             config["platform_toolsets"] = {
-                platform: list(dict.fromkeys([*selected, "kanban"])) if isinstance(selected, list) else selected
+                platform: list(dict.fromkeys([*selected, "kanban", *(optional if selected else [])]))
+                if isinstance(selected, list) else selected
                 for platform, selected in platforms.items()
             }
     return config
@@ -225,22 +230,22 @@ def _campaign_context_soul(config_path: Path) -> str:
     )
 
 
-def _publish_profiles(playbook: Playbook, configs: dict[str, dict], paths: dict[str, tuple[Path, Path]],
+def _publish_profiles(campaign: Campaign, configs: dict[str, dict], paths: dict[str, tuple[Path, Path]],
                       board: str, campaign_config: Path) -> None:
     campaign_context = _campaign_context_soul(campaign_config)
-    roster = ", ".join(f"`{agent.id}`" for agent in playbook.agents)
-    for agent in playbook.agents:
+    roster = ", ".join(f"`{agent.id}`" for agent in campaign.agents)
+    for agent in campaign.agents:
         saves, scratch = paths[agent.id]
         scratch.mkdir(mode=0o700, parents=True, exist_ok=True)
         saves.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if agent.id == playbook.orchestrator:
+        if agent.id == campaign.orchestrator:
             board_role = f"Coordinate the team's work here. Assign tasks only within your campaign roster: {roster}."
         else:
-            board_role = f"Your orchestrator is `{playbook.orchestrator}`. Return handoffs on your assigned task."
+            board_role = f"Your orchestrator is `{campaign.orchestrator}`. Return handoffs on your assigned task."
         soul = (f"{agent.soul.rstrip()}\n\n{campaign_context}\n## Campaign Kanban board\n\n"
                 f"Use only `{board}` for this campaign's Kanban work. {board_role}\n\n"
-                "## Playbook scratch directory\n\n"
-                f"Use `{scratch}` for this profile's temporary playbook files.\n\n"
+                "## Campaign scratch directory\n\n"
+                f"Use `{scratch}` for this profile's temporary campaign files.\n\n"
                 "## Saved context\n\n"
                 f"Use `{saves}` to remember context for future sessions. Save useful decisions, "
                 "preferences, findings, blockers, and next steps as concise Markdown (`.md`) "
@@ -261,28 +266,29 @@ def install(home: Path, campaign_id: str) -> dict:
             return record
         if record["state"] == "incomplete":
             raise ValueError(f"Campaign {campaign_id!r} has an incomplete installation; no profiles were changed")
-        playbook = resolve(home, campaign_id)
-        policies = _check_profiles(home, playbook)
+        validate_record("campaign", config, config_path)
+        campaign = resolve(home, campaign_id)
+        policies = _check_profiles(home, campaign)
         paths = {agent.id: (_agent_data_dir(home, agent.id, "saves"), _agent_data_dir(home, agent.id, "tmp"))
-                 for agent in playbook.agents}
+                 for agent in campaign.agents}
         defaults = settings_from(config, campaign_id)
         effective = {agent.id: resolve_settings(defaults, settings_from(agent.config, agent.id))
-                     for agent in playbook.agents}
-        board = f"campaign-{playbook.id}"
+                     for agent in campaign.agents}
+        board = f"campaign-{campaign.id}"
         configs = {
             agent.id: _with_kanban({**agent.config, **effective[agent.id], "skills": policies[agent.id],
                                    "_config_version": DEFAULT_CONFIG["_config_version"]},
-                                  board, playbook.orchestrator, agent.id)
-            for agent in playbook.agents
+                                  board, campaign.orchestrator, agent.id)
+            for agent in campaign.agents
         }
         if (board_dir := kanban_db.board_dir(board)).exists() or board_dir.is_symlink():
             raise ValueError(f"Kanban board {board!r} already exists; refusing to reuse an unrelated board")
         atomic_config_write(config_path, {**config, "kanban_board": board, "installation_state": "installing"})
         try:
-            board_metadata = kanban_db.create_board(board, name=playbook.name, description=playbook.description)
+            board_metadata = kanban_db.create_board(board, name=campaign.name, description=campaign.description)
         except sqlite3.Error as exc:
             raise ValueError(f"Could not initialize campaign Kanban board {board!r}: {exc}") from exc
-        _publish_profiles(playbook, configs, paths, board, config_path)
+        _publish_profiles(campaign, configs, paths, board, config_path)
         for agent_id, settings in effective.items():
             path, agent_record = read_agent_record(home, campaign_id, agent_id)
             updated = record_with_effective(agent_record, settings)

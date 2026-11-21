@@ -147,8 +147,9 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
         soul = (maintenance / "SOUL.md").read_text(encoding="utf-8")
         assert "OMA Maintenance" in soul and "`omactl`" in soul
         maintenance_config = load_user_config_effective(maintenance / "config.yaml")
+        assert "camofox" in maintenance_config["agent"]["enabled_toolsets"]
         assert _get_platform_tools(maintenance_config, "cli") == {
-            "file", "terminal", "skills", "memory", "session_search", "web", "browser",
+            "file", "terminal", "skills", "memory", "session_search", "web", "browser", "camofox",
         }
         assert maintenance_config["tools"]["tool_search"]["eager_toolsets"] == ["file", "terminal"]
         assert maintenance_config["tools"]["tool_search"]["listing"] == "off"
@@ -174,7 +175,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     assert not (home / "skills" / "omactl").exists()
     path = home / "config.yaml"
     content = path.read_text(encoding="utf-8")
-    enabled = ["file", "terminal", "browser", "web", "skills", "memory", "session_search"]
+    enabled = ["file", "terminal", "browser", "camofox", "web", "skills", "memory", "session_search"]
     eager = ["file", "terminal", "skills", "memory"]
     if entry == "install":
         enabled.extend(["clarify", "kanban"])

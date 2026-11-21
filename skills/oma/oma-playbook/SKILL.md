@@ -13,37 +13,62 @@ metadata:
 
 # OMA Playbook Skill
 
-Create, inspect, and update the single OMA playbook for the saved brand. It records the user's strategy; it is not an installable campaign or a running workflow.
+Create, inspect, and update the single marketing playbook for the saved brand. It records the overall strategy: who to reach, what to focus on, why, and how to measure progress. It guides campaign selection without owning campaign goals, execution plans, or agent rosters.
 
 ## When to Use
 
 - The user asks to save, find, revise, or remove a playbook or its strategy.
 - The user asks for the brand's approved strategy.
+- Onboarding needs an initial strategy and campaign recommendations grounded in the compiled brand.
 
 ## Prerequisites
 
-Use the default profile's Hermes home as the base for `oma/playbook/`. On the local CLI, `hermes config path` identifies that home. Use `read_file`, `write_file`, and `patch` for the record. Read brand context directly from `oma/brand/config.yaml` when needed; if it is missing, offer to set it up with `oma-brand` first.
+Use the default profile's Hermes home as the base for `oma/playbook/`. On the local CLI, `hermes -p default config path` identifies that home. Use `read_file`, `write_file`, and `patch` for the record. Before drafting or reassessing strategy, read `oma/brand/config.yaml` and its relevant compiled research. If the brand is missing, offer to set it up with `oma-brand` first.
 
 ## Record Format
 
 Save the one playbook at `oma/playbook/config.yaml`. Keep its stable lowercase, hyphen-separated `id` independent of the display `name`; campaigns use the fixed path, not an ID link. Do not add a `brand_id` field: this playbook applies to the single brand in the same Hermes home.
 
 ```yaml
-id: product-launch
-name: Product Launch
-description: Plan the marketing rollout for a new product.
+id: marketing-strategy
+name: Marketing Strategy
+description: Shared marketing priorities for the brand.
 strategy: |-
-  Focus on existing customers first. Use their feedback to refine the
-  messaging before expanding outreach. Measure qualified sign-ups.
+  Focus on reaching teams already looking for a solution in this category.
+  Prioritize a clear product site and measurable sign-up path before a public
+  launch. Use verified social channels to test positioning; defer channels
+  without an audience or a clear role. Measure qualified sign-ups.
 ```
 
 `strategy` is the strategy text itself. Use a YAML block scalar for multiline content, not a filename or link to a separate strategy document. If the user has not supplied or asked you to draft a strategy, use `strategy: ""` and report it as unset.
 
+## Build Strategy from the Compiled Brand
+
+1. **Inventory the brand evidence.** Read the file referenced by `knowledge_base_file` (fall back to legacy inline `knowledge_base`), plus relevant market, competitor, and integration reports and summaries of product or repository documentation. Review the audience, positioning, product readiness, and usable assets. Check `website` and its conversion path; `channels.social`, `channels.blog`, and `channels.newsletter`; `documentation` and whether docs are public or internal; `integrations` for analytics, tracking, ads, and other tooling; and `launches` for Product Hunt and other launch platforms or marketplaces. Read referenced files only within `oma/brand/`.
+2. **Distinguish facts from gaps.** An omitted or unchecked channel or launch is unknown, not absent. Use a recorded `not_found` only within the scope of the research, and check stale or decision-critical gaps through `oma-brand` or flag them for verification. An observed analytics tag is evidence of instrumentation on a page, not proof of authorized account access, working reporting, or active ads. Base measurement on available data; if access or baselines are missing, make that a prerequisite rather than assuming they exist.
+3. **Choose and prioritize.** Define the audience, positioning, primary outcome, the channels and assets to prioritize or defer, and how to measure progress. Use the brand's evidence and the user's constraints to explain the choices. Identify dependencies and assumptions, and leave weaker opportunities for later rather than treating every gap as work to start now.
+
+### Recommend campaigns from the strategy
+
+Recommend the smallest set of campaigns that would advance the priorities, with the brand finding and reason for each, what must come first, and what to defer. For example:
+
+| Brand finding | Campaign to consider |
+| --- | --- |
+| No verified website after checking, and the audience needs a destination | A website or landing-page campaign before sending traffic there. |
+| No Product Hunt or other relevant launch found, and the audience and product are ready | A product-launch campaign on the platform that fits the audience; validate readiness and the conversion path first. |
+| No blog or newsletter covering an audience need, with a viable publishing path | A blog or newsletter campaign; start with whichever serves the objective. |
+| Verified social channels where the intended audience is active | A social campaign on those channels, building on existing accounts rather than automatically opening new ones. |
+| Public docs are missing or weak and users need them to adopt the product | A documentation campaign, or a docs milestone within a broader website or launch campaign. |
+| The priority outcome cannot be measured with current access | Make measurement setup or verification a prerequisite; use a separate campaign only if the work warrants one. |
+
+These are examples, not required campaigns. Include recommended priorities and their rationale in the inline strategy, then hand off campaign selection and execution design to `oma-campaigns`. Do not create rosters, campaign records, or jobs when only drafting the playbook.
+
 ## Procedure
 
 1. **Read the singleton record.** Check `oma/playbook/config.yaml` first. Create it only when the user asks to set up the playbook and the record is absent. If the user asks for another, explain the one-playbook limit and confirm whether they intend to replace the existing strategy. Do not create a second record.
-2. **Save the requested changes.** Create or patch the fixed `config.yaml` path. Preserve the ID and fields the user did not ask to change. Ignore any legacy `brand_id` when reading the record; do not rewrite old records just to remove that field. Keep strategy in the `strategy` value; do not create a separate Markdown file.
-3. **Inspect or remove on request.** Read the fixed record for lookups. Remove it only on explicit request. Do not follow paths or symlinks that escape `oma/playbook/`.
+2. **Draft or revise when requested.** Use the compiled brand to form the strategy and recommend campaigns as above. Honor user-supplied priorities. Reuse the strategy on onboarding reruns unless revision is in scope; do not replace it just because new evidence was found.
+3. **Save the requested changes.** Create or patch the fixed `config.yaml` path. Preserve the ID and fields the user did not ask to change. Ignore any legacy `brand_id` when reading the record; do not rewrite old records just to remove that field. Keep strategy in the `strategy` value; do not create a separate Markdown file.
+4. **Inspect or remove on request.** Read the fixed record for lookups. Remove it only on explicit request. Do not follow paths or symlinks that escape `oma/playbook/`.
 
 ## Pitfalls
 
@@ -53,4 +78,4 @@ strategy: |-
 
 ## Verification
 
-Reopen `oma/playbook/config.yaml`. Confirm the ID, name, and description are present and `strategy` contains the requested text or is explicitly unset. Report what changed.
+Reopen `oma/playbook/config.yaml`. Confirm the ID, name, and description are present and `strategy` contains the requested text or is explicitly unset. For a drafted strategy, report the focus, what the evidence supports, which campaigns are recommended and why, and any open prerequisites. Do not report recommendations as provisioned campaigns.

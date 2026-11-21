@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OMA Agent",
+  "description": "An OMA agent record plus native Hermes profile settings. Additional native/plugin fields are passed through.",
+  "type": "object",
+  "required": ["id", "name", "description", "campaign_id"],
+  "properties": {
+    "id": { "$ref": "#/$defs/profile_id" },
+    "name": { "$ref": "#/$defs/text" },
+    "description": { "$ref": "#/$defs/text" },
+    "campaign_id": { "type": ["string", "null"], "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])" },
+    "oma_skills": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/profile_id" } },
+    "jobs": { "type": "array", "items": { "$ref": "#/$defs/job" } },
+    "model": { "$ref": "#/$defs/model" },
+    "mcp_servers": { "$ref": "#/$defs/mcp_servers" },
+    "effective": {
+      "type": "object", "additionalProperties": false, "readOnly": true,
+      "properties": { "model": { "$ref": "#/$defs/model" }, "mcp_servers": { "$ref": "#/$defs/mcp_servers" } }
+    },
+    "all-keys": { "$ref": "#/$defs/key_names", "readOnly": true },
+    "available-keys": { "$ref": "#/$defs/key_names", "readOnly": true },
+    "version": { "description": "Legacy template metadata. Not required or copied to the native profile." }
+  },
+  "if": { "properties": { "campaign_id": { "type": "string" } }, "required": ["campaign_id"] },
+  "then": { "properties": { "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*__[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])" } } },
+  "$defs": {
+    "text": { "type": "string", "pattern": "\\S" },
+    "profile_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}(?![\\s\\S])" },
+    "model": { "type": ["string", "object"], "description": "Native Hermes model shorthand or mapping." },
+    "mcp_servers": { "type": "object", "propertyNames": { "minLength": 1 }, "additionalProperties": { "type": "object" } },
+    "key_names": {
+      "type": "array", "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(?![\\s\\S])" }
+    },
+    "job": {
+      "type": "object", "required": ["id", "schedule", "prompt"], "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/text" },
+        "name": { "$ref": "#/$defs/text" },
+        "schedule": { "$ref": "#/$defs/text" },
+        "prompt": { "$ref": "#/$defs/text" },
+        "timezone": { "$ref": "#/$defs/text" },
+        "repeat": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

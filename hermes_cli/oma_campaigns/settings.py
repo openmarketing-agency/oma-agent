@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from hermes_cli.oma_playbooks.source import _member, read_mapping
+from hermes_cli.oma_campaigns.schema import validate_record
+from hermes_cli.oma_campaigns.source import _member, read_mapping
 
 
 SETTINGS = ("model", "mcp_servers")
@@ -14,6 +15,7 @@ def read_agent_record(home: Path, campaign_id: str, agent_id: str) -> tuple[Path
     config = read_mapping(path)
     if config.get("id") != agent_id or config.get("campaign_id") != campaign_id:
         raise ValueError(f"{agent_id}: config id and campaign_id must match the roster")
+    validate_record("agent", config, path)
     return path, config
 
 

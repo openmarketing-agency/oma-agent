@@ -28,7 +28,9 @@ from agent.prompt_builder import (
 )
 from agent import prompt_builder as _pb
 from agent.runtime_cwd import resolve_agent_cwd, resolve_context_cwd
+from agent.tool_executor import _tool_search_scoped_names
 from hermes_constants import get_default_hermes_root, get_hermes_home
+from tools.registry import registry
 from utils import is_truthy_value
 
 logger = logging.getLogger(__name__)
@@ -286,6 +288,24 @@ def _profile_name_for_home(home: Path) -> str:
         return "default"
 
 
+def _camofox_guidance(agent: Any) -> str:
+    """Guide only sessions that actually have the optional browser backend in scope."""
+    names = agent.valid_tool_names or set()
+    if registry.get_toolset_for_tool("browser_navigate") != "camofox":
+        return ""
+    direct = "browser_navigate" in names
+    deferred = not direct and {"tool_search", "tool_call"}.issubset(names) and (
+        "browser_navigate" in _tool_search_scoped_names(agent)
+    )
+    if not (direct or deferred):
+        return ""
+    guidance = (
+        "If the regular browser cannot render an authorized page, Camofox is available as an alternate browser. "
+        "If the site denies access or presents a bot challenge, respect that restriction and use a permitted source instead."
+    )
+    return guidance + (" Find its tools with Tool Search." if deferred else "")
+
+
 def _tool_guidance_block(agent: Any) -> Optional[str]:
     """Tool-aware behavioral guidance, injected only when the tools are loaded."""
     names = agent.valid_tool_names
@@ -309,6 +329,7 @@ def _tool_guidance_block(agent: Any) -> Optional[str]:
         SESSION_SEARCH_GUIDANCE if "session_search" in names else None,
         SKILLS_GUIDANCE if "skill_manage" in names else None,
         _kanban_guidance,
+        _camofox_guidance(agent),
     ]
     return " ".join(g for g in tool_guidance if g) or None
 

@@ -1,0 +1,68 @@
+id: fieldnote
+name: Fieldnote
+description: A workspace for collecting and sharing customer research.
+knowledge_base_file: knowledge-base.md
+logos:
+  primary: logos/primary.svg
+fonts: [fonts/Inter-Regular.woff2]
+images: [images/workspace.png]
+palette:
+  primary: "#16324F"
+design_system:
+  guidelines: design/DESIGN.md
+  source_url: https://fieldnote.example.invalid/brand
+website:
+  status: verified
+  url: https://fieldnote.example.invalid/
+channels:
+  social:
+    - platform: linkedin
+      status: verified
+      url: https://linkedin.example.invalid/company/fieldnote
+    - platform: x
+      status: not_found
+  blog:
+    status: verified
+    url: https://fieldnote.example.invalid/blog
+    feed_url: https://fieldnote.example.invalid/blog/rss.xml
+  newsletter:
+    status: verified
+    url: https://fieldnote.example.invalid/newsletter
+    signup_url: https://fieldnote.example.invalid/newsletter/subscribe
+launches:
+  - platform: product-hunt
+    status: verified
+    url: https://producthunt.example.invalid/products/fieldnote
+integrations:
+  google_analytics:
+    status: observed
+    evidence: research/website-integrations.md#google-analytics
+  mixpanel:
+    status: not_detected
+  meta_ads:
+    status: observed
+    signal: meta_pixel
+    evidence: research/website-integrations.md#meta-pixel
+  google_adsense:
+    status: not_checked
+research:
+  market_report: research/market.md
+  competitor_report: research/competitors.md
+  competitors:
+    - id: insight-hub
+      name: Insight Hub
+      website: https://insight-hub.example.invalid/
+      report: research/competitors/insight-hub.md
+      sources: ["https://insight-hub.example.invalid/pricing"]
+repositories:
+  - id: fieldnote-app
+    url: https://github.example.invalid/fieldnote/app
+    analyzed_commit: "0123456789abcdef0123456789abcdef01234567"
+    internal_docs: docs/repository/fieldnote-app/index.md
+documentation:
+  public:
+    status: verified
+    url: https://docs.fieldnote.example.invalid/
+  internal_reference:
+    index: docs/public/index.md
+    mode: summarized

@@ -54,6 +54,7 @@ dependencies = [
   "tomli-w==1.2.0; python_version >= '3.14'",  # Preserve relative dependency paths in staged plugin metadata.
   # 0.18.17 requires ruamel.yaml.clib on 3.14, which has no Windows ARM64 wheel.
   "ruamel.yaml==0.18.16; python_version >= '3.14'",
+  "jsonschema==4.26.0; python_version >= '3.14'",  # Validate the shared OMA record contracts.
   # 0.18.16 only pulls in its C parser below 3.14, so every 3.14 install parsed YAML
   # (plugin manifests, config) in pure Python: ~5 s of gateway startup on 1 vCPU.
   # Declared where clib ships a cp314 wheel; elsewhere hermes_yaml falls back to pure.
@@ -744,6 +745,7 @@ include = [
 [tool.setuptools.package-data]
 hermes_cli = [
   "observability/schemas/*.json",
+  "oma_campaigns/schemas/*.json",
   "data/*.json",
   "data/profiles/maintenance/config.yaml",
   "data/profiles/maintenance/SOUL.md",

@@ -16,9 +16,10 @@ from hermes_cli.config import (
 )
 from hermes_cli.config_backend import require_file_tooling
 from hermes_cli.config_credential_values import refuse_redacted_env_value
-from hermes_cli.oma_playbooks.install import _campaign_config_path, _campaigns_dir, _install_lock, _real_path, _status, default_home
-from hermes_cli.oma_playbooks.settings import SETTINGS, read_agent_record, record_with_effective, resolve_settings, settings_from
-from hermes_cli.oma_playbooks.source import read_mapping
+from hermes_cli.oma_campaigns.install import _campaign_config_path, _campaigns_dir, _install_lock, _real_path, _status, default_home
+from hermes_cli.oma_campaigns.schema import validate_record
+from hermes_cli.oma_campaigns.settings import SETTINGS, read_agent_record, record_with_effective, resolve_settings, settings_from
+from hermes_cli.oma_campaigns.source import read_mapping
 
 _REFERENCE = re.compile(r"\$\{\s*(?:env:\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\}")
 
@@ -132,6 +133,7 @@ def sync_campaign(home: Path, campaign_id: str) -> dict:
         status = _status(home, campaign_id, campaign)
         if status["state"] != "installed":
             raise ValueError(f"Campaign {campaign_id!r} is not fully installed; no settings were synced")
+        validate_record("campaign", campaign, campaign_path)
         defaults = settings_from(campaign, campaign_id)
         plans = [_plan_agent(home, campaign_id, agent_id, defaults) for agent_id in status["agents"]]
         updates = [plan for plan in plans if plan.native is not None or plan.record is not None or plan.credentials]

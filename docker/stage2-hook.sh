@@ -443,7 +443,7 @@ fi
 # data volume get it too. Run as hermes; never replace an existing bundle.
 if [ ! -e "$HERMES_HOME/oma-bundle" ] && ! refuse_symlinked_path "seed" "$HERMES_HOME/oma-bundle"; then
     (cd "$INSTALL_DIR" && umask 077 && as_hermes "$INSTALL_DIR/.venv/bin/python" -c \
-        'import sys; from pathlib import Path; from hermes_cli.oma_playbooks.bundle import seed_bundle; seed_bundle(Path(sys.argv[1]), Path(sys.argv[2]))' \
+        'import sys; from pathlib import Path; from hermes_cli.oma_campaigns.bundle import seed_bundle; seed_bundle(Path(sys.argv[1]), Path(sys.argv[2]))' \
         "$INSTALL_DIR/oma-bundle" "$HERMES_HOME") \
         || echo "[stage2] Warning: could not seed the OMA bundle"
 fi

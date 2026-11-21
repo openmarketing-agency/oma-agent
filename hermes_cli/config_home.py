@@ -7,7 +7,7 @@ from pathlib import Path
 from hermes_constants import get_default_hermes_root
 from hermes_dir_acl import make_user_dir
 
-OMA_PLAYBOOK_SKILL = "oma-campaigns"
+OMA_CAMPAIGN_SKILL = "oma-campaigns"
 MAINTENANCE_TEMPLATE = Path(__file__).parent / "data" / "profiles" / "maintenance"
 
 
@@ -106,7 +106,7 @@ def seed_config_file(config_path: Path, *, model_seed: dict | None = None) -> bo
     if config_exists(config_path) or config_path.is_symlink():
         return False
 
-    enabled_toolsets = ["file", "terminal", "browser", "web", "skills", "memory", "session_search"]
+    enabled_toolsets = ["file", "terminal", "browser", "camofox", "web", "skills", "memory", "session_search"]
     eager_toolsets = ["file", "terminal", "skills", "memory"]
     home = config_path.parent
     is_default = home.resolve() == get_default_hermes_root(home=home).resolve()

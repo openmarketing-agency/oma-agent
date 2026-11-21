@@ -40,6 +40,23 @@ def _make_agent(**overrides):
     return SimpleNamespace(**base)
 
 
+@pytest.mark.parametrize(("toolset", "direct", "deferred", "expected"), [
+    ("camofox", {"browser_navigate"}, set(), True),
+    ("camofox", {"tool_search", "tool_call"}, {"browser_navigate"}, True),
+    ("camofox", {"tool_search", "tool_call"}, set(), False),
+    ("browser", {"browser_navigate"}, set(), False),
+])
+def test_camofox_hint_requires_available_plugin_tools(monkeypatch, toolset, direct, deferred, expected):
+    from tools.registry import registry
+
+    monkeypatch.setattr(registry, "get_toolset_for_tool", lambda name: toolset if name == "browser_navigate" else None)
+    monkeypatch.setattr("agent.system_prompt._tool_search_scoped_names", lambda _agent: frozenset(deferred))
+    parts = build_system_prompt_parts(_make_agent(valid_tool_names=direct, skip_context_files=True))
+    assert ("Camofox" in parts["stable"]) == expected
+    if expected and deferred:
+        assert "Find its tools with Tool Search" in parts["stable"]
+
+
 def _captured_context_cwd(agent):
     """The cwd build_system_prompt_parts hands to build_context_files_prompt."""
     captured = {}

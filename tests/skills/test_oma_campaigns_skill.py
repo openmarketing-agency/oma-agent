@@ -11,7 +11,7 @@ import pytest
 
 @pytest.fixture
 def bundle(tmp_path, monkeypatch):
-    from hermes_cli.oma_playbooks import __main__ as cli
+    from hermes_cli.oma_campaigns import __main__ as cli
 
     home = tmp_path / ".hermes"
     home.mkdir()
@@ -51,8 +51,8 @@ def bundle(tmp_path, monkeypatch):
 def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     from agent.runtime_scope import bind_profile_scope
     from hermes_cli.config import read_user_config_raw
-    from hermes_cli.oma_playbooks.install import default_home
-    from hermes_cli.oma_playbooks.source import read_mapping
+    from hermes_cli.oma_campaigns.install import default_home
+    from hermes_cli.oma_campaigns.source import read_mapping
     from tools.file_tools import read_file_tool, write_file_tool
 
     home, source, main = bundle
@@ -91,6 +91,7 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
         saves = source / "agents" / agent_id / "saves"
         soul = (profile / "SOUL.md").read_text(encoding="utf-8")
         assert soul.startswith(f"I am the {agent_id.split('__')[1]}.\n")
+        assert "## Campaign scratch directory" in soul
         assert scratch.is_dir() and str(scratch.resolve()) in soul
         assert saves.is_dir() and f"`{saves.resolve()}`" in soul
         assert "Markdown (`.md`)" in soul and "read the relevant notes" in soul
@@ -133,8 +134,8 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
 
 def test_sync_materializes_defaults_and_agent_overrides(bundle, capsys):
     from hermes_cli.config import atomic_config_write, read_user_config_raw
-    from hermes_cli.oma_playbooks.source import read_mapping
-    from hermes_cli.oma_playbooks.sync import main as sync
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import main as sync
 
     home, source, main = bundle
     assert main(["install", "demo"]) == 0
@@ -164,7 +165,7 @@ def test_sync_materializes_defaults_and_agent_overrides(bundle, capsys):
         assert {key: authored[key] for key in expected if key in authored} == (override if path == worker else {})
         native = read_user_config_raw(home / "profiles" / path.parent.name / "config.yaml")
         assert {key: native[key] for key in expected} == expected
-        assert native["agent"]["enabled_toolsets"] == ["file", "kanban"]
+        assert native["agent"]["enabled_toolsets"] == ["file", "kanban", "camofox"]
         assert "effective" not in native and "jobs" not in native
 
     assert sync(["demo"]) == 0
@@ -191,12 +192,25 @@ def run_campaign_script(bundle):
     return run
 
 
+def test_campaign_helper_uses_installed_runtime(bundle, run_campaign_script):
+    from hermes_cli._startup_fast import project_root_str
+
+    _, source, _ = bundle
+    helper = Path(project_root_str()) / "skills/oma/oma-campaigns/scripts/campaign.py"
+    result = run_campaign_script(helper, "status", "demo")
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["state"] == "draft"
+    result = run_campaign_script(helper, "validate", "campaign", str(source / "campaigns" / "demo" / "config.yaml"))
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"kind": "campaign", "valid": True}
+
+
 def test_sync_campaign_script_imports_matching_env_and_skips_missing_values(bundle, capsys, monkeypatch,
                                                                            run_campaign_script):
     from agent.runtime_scope import bind_profile_scope
     from agent.secret_scope import load_env_file
     from hermes_cli.config import atomic_config_write, load_config, save_env_value
-    from hermes_cli.oma_playbooks.source import read_mapping
+    from hermes_cli.oma_campaigns.source import read_mapping
 
     home, source, main = bundle
     assert main(["install", "demo"]) == 0
@@ -255,7 +269,7 @@ def test_sync_campaign_script_imports_matching_env_and_skips_missing_values(bund
 def test_sync_records_available_keys_in_campaign_and_agent_configs(bundle, capsys, run_campaign_script):
     from agent.runtime_scope import bind_profile_scope
     from hermes_cli.config import atomic_config_replace, atomic_config_write, remove_env_value, save_env_value
-    from hermes_cli.oma_playbooks.source import read_mapping
+    from hermes_cli.oma_campaigns.source import read_mapping
 
     home, source, main = bundle
     campaign = source / "campaigns" / "demo" / "config.yaml"
@@ -326,8 +340,8 @@ def test_sync_records_available_keys_in_campaign_and_agent_configs(bundle, capsy
 
 def test_install_materializes_campaign_defaults_and_sync_can_remove_them(bundle, capsys):
     from hermes_cli.config import atomic_config_replace, atomic_config_write, read_user_config_raw
-    from hermes_cli.oma_playbooks.source import read_mapping
-    from hermes_cli.oma_playbooks.sync import main as sync
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import main as sync
 
     home, source, main = bundle
     campaign = source / "campaigns" / "demo" / "config.yaml"
@@ -374,6 +388,7 @@ def test_bundle_templates_are_ignored_and_profile_conflicts_do_not_publish(bundl
     ("campaigns/demo/config.yaml", "demo__orchestrator, demo__worker", "demo__worker", "canonical orchestrator"),
     ("campaigns/demo/config.yaml", "demo__orchestrator, demo__worker", "demo__orchestrator, demo__orchestrator", "duplicate names"),
     ("agents/demo__worker/config.yaml", "campaign_id: demo", "campaign_id: other", "campaign_id"),
+    ("agents/demo__worker/config.yaml", "jobs: []", "jobs: [{id: review, schedule: '1d'}]", "invalid OMA agent jobs.0"),
 ])
 def test_invalid_roster_does_not_publish(bundle, capsys, file, before, after, error):
     home, source, main = bundle
@@ -385,13 +400,31 @@ def test_invalid_roster_does_not_publish(bundle, capsys, file, before, after, er
     assert not (source / "installations" / "demo").exists()
 
 
+def test_sync_rejects_malformed_campaign_before_writing_profiles(bundle, capsys):
+    from hermes_cli.config import atomic_config_write
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import main as sync
+
+    home, source, main = bundle
+    assert main(["install", "demo"]) == 0
+    capsys.readouterr()
+    campaign = source / "campaigns" / "demo" / "config.yaml"
+    profile = home / "profiles" / "demo__orchestrator" / "config.yaml"
+    initial = profile.read_bytes()
+    atomic_config_write(campaign, {**read_mapping(campaign), "goals": "wrong-shape", "model": "different"})
+
+    assert sync(["demo"]) == 1
+    assert "invalid OMA campaign goals" in capsys.readouterr().err
+    assert profile.read_bytes() == initial
+
+
 def test_generated_cron_belongs_to_the_verified_owner(bundle, capsys):
     from argparse import ArgumentParser
 
     from agent.runtime_scope import bind_profile_scope
     from cron.jobs import list_jobs
     from hermes_cli.cron import cron_create
-    from hermes_cli.oma_playbooks.source import read_mapping
+    from hermes_cli.oma_campaigns.source import read_mapping
     from hermes_cli.subcommands.cron import build_cron_parser
 
     home, source, main = bundle
@@ -474,7 +507,7 @@ def test_saves_path_conflict_does_not_publish_profiles(bundle, capsys):
 
 
 def test_configure_recovers_routing_without_reinstalling_unversioned_campaign(bundle, capsys):
-    from hermes_cli.oma_playbooks.source import read_mapping
+    from hermes_cli.oma_campaigns.source import read_mapping
 
     home, source, main = bundle
     assert main(["install", "demo"]) == 0
@@ -499,7 +532,7 @@ def test_configure_recovers_routing_without_reinstalling_unversioned_campaign(bu
 
 
 def test_legacy_versions_do_not_affect_provisioning(bundle, capsys):
-    from hermes_cli.oma_playbooks.source import read_mapping
+    from hermes_cli.oma_campaigns.source import read_mapping
 
     home, source, main = bundle
     campaign = source / "campaigns" / "demo" / "config.yaml"
@@ -514,8 +547,8 @@ def test_legacy_versions_do_not_affect_provisioning(bundle, capsys):
 
 
 def test_interrupted_provisioning_is_recorded_in_campaign_config(bundle, capsys, monkeypatch):
-    from hermes_cli.oma_playbooks import install as provisioning
-    from hermes_cli.oma_playbooks.source import read_mapping
+    from hermes_cli.oma_campaigns import install as provisioning
+    from hermes_cli.oma_campaigns.source import read_mapping
 
     home, source, main = bundle
     provision = provisioning.provision_profile
