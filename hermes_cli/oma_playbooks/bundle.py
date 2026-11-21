@@ -25,13 +25,16 @@ def bundle_dir(home: Path) -> Path:
 
 
 def seed_bundle(source: Path, home: Path) -> None:
-    """Publish a complete starter bundle without replacing operator-owned data."""
+    """Publish shared skill packages without replacing operator-owned data."""
     destination = bundle_dir(home)
     if destination.exists():
         return
     # Stage on the home filesystem so a failed copy never leaves a partial bundle.
     with tempfile.TemporaryDirectory(prefix=".oma-bundle-", dir=home) as staging:
         staged = Path(staging) / destination.name
-        shutil.copytree(source, staged, symlinks=True)
+        shutil.copytree(source / "skills", staged / "skills", symlinks=True)
+        for filename in ("LICENSE", "README.md"):
+            if (source / filename).is_file():
+                shutil.copy2(source / filename, staged / filename)
         if not bundle_dir(home).exists():
             staged.rename(destination)

@@ -7,6 +7,7 @@ from pathlib import Path
 import hermes_yaml as yaml
 from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS
 from hermes_constants import PROFILE_ID_RE
+from hermes_cli.oma_playbooks.bundle import bundle_dir
 from tools.skill_usage import read_skill_name
 
 PLAYBOOK_ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
@@ -114,11 +115,15 @@ def _job_ids(value: object, context: str) -> list[str]:
     return _names([job.get("id") for job in value], f"{context}.jobs")
 
 
-def _read_agent(root: Path, agent_id: str, index: dict[str, list[Path]]) -> Agent:
+def _read_agent(root: Path, campaign_id: str, agent_id: str, index: dict[str, list[Path]]) -> Agent:
     path = _member(root, agent_id)
     data = read_mapping(_member(path, "config.yaml"))
     if data.pop("id", None) != agent_id:
         raise ValueError(f"{agent_id}: config id does not match the roster")
+    if data.pop("campaign_id", None) != campaign_id:
+        raise ValueError(f"{agent_id}: campaign_id must match {campaign_id}")
+    _text(data, "name", agent_id)
+    del data["name"]
     version = data.pop("version", None)
     description = _text(data, "description", agent_id)
     del data["description"]
@@ -130,8 +135,10 @@ def _read_agent(root: Path, agent_id: str, index: dict[str, list[Path]]) -> Agen
     return Agent(agent_id, version, description, data, soul, skills, jobs)
 
 
-def resolve(campaigns_dir: Path, skills_dir: Path, playbook_id: str) -> Playbook:
-    campaigns_dir = _member(campaigns_dir.parent.resolve(), campaigns_dir.name)
+def resolve(home: Path, playbook_id: str) -> Playbook:
+    """Resolve authored campaign and agent records, not shipped templates."""
+    oma = _member(home.resolve(), "oma")
+    campaigns_dir = _member(oma, "campaigns")
     directory = _member(campaigns_dir, checked_id(playbook_id))
     manifest = _member(directory, "config.yaml")
     data = _source_manifest(manifest, playbook_id)
@@ -143,8 +150,7 @@ def resolve(campaigns_dir: Path, skills_dir: Path, playbook_id: str) -> Playbook
     if any(not agent.startswith(prefix) or not PLAYBOOK_ID.fullmatch(agent[len(prefix):])
            or not PROFILE_ID_RE.fullmatch(agent) for agent in ids):
         raise ValueError(f"{playbook_id}: roster must use canonical playbook-prefixed IDs")
-    shared_skills = _member(skills_dir.parent.resolve(), skills_dir.name)
-    index = _skill_index(shared_skills, _member(directory, "skills"))
-    agents_root = _member(directory, "agents")
-    agents = tuple(_read_agent(agents_root, agent, index) for agent in ids)
+    index = _skill_index(_member(bundle_dir(home.resolve()), "skills"))
+    agents_root = _member(oma, "agents")
+    agents = tuple(_read_agent(agents_root, playbook_id, agent, index) for agent in ids)
     return Playbook(**data, agents=agents, source_manifest=manifest)

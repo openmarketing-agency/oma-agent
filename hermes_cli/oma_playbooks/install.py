@@ -15,7 +15,7 @@ from hermes_cli.config import atomic_config_replace, atomic_config_write
 from hermes_cli.config_backend import FileBackend, require_file_tooling
 from hermes_cli.config_defaults import DEFAULT_CONFIG
 from hermes_cli.config_home import OMA_PLAYBOOK_SKILL
-from hermes_cli.oma_playbooks.source import Agent, Playbook, checked_id, read_mapping
+from hermes_cli.oma_playbooks.source import Agent, Playbook, checked_id, read_mapping, resolve
 from hermes_cli.profile_provision import ProfileCreateRequest, provision_profile
 from hermes_cli.profiles import get_profile_dir, profile_exists
 from hermes_constants import get_hermes_home
@@ -262,18 +262,19 @@ def _publish_profiles(playbook: Playbook, configs: dict[str, dict], saves_paths:
         atomic_yaml_write(path, record)
 
 
-def install(home: Path, playbook: Playbook) -> dict:
+def install(home: Path, campaign_id: str) -> dict:
     require_file_tooling("OMA playbook installation")
     registry = _registry(home)
-    path = _record_path(registry, playbook.id)
+    path = _record_path(registry, campaign_id)
     with _install_lock(registry):
-        config_path = _campaign_config_path(home, playbook.id)
+        config_path = _campaign_config_path(home, campaign_id)
         if path.exists():
-            record = installed(home, playbook.id)[0]
+            record = installed(home, campaign_id)[0]
             if record.get("state") == "installed":
                 _ensure_campaign_config(config_path, record)
                 return record
             raise ValueError(f"An installation record already exists at {path}; no profiles were changed")
+        playbook = resolve(home, campaign_id)
         policies = _check_profiles(home, playbook)
         saves_paths = {agent.id: _agent_saves_path(home, agent.id) for agent in playbook.agents}
         board = f"campaign-{playbook.id}"

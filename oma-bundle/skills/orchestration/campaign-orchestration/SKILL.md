@@ -1,17 +1,17 @@
 ---
-name: playbook-orchestration
-description: Coordinate dynamic playbook work through durable tasks.
+name: campaign-orchestration
+description: Coordinate dynamic campaign work through durable tasks.
 version: 0.1.0
 author: Open Marketing Agency (OMA)
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [orchestration, playbooks, kanban, coordination]
+    tags: [orchestration, campaigns, kanban, coordination]
     related_skills: []
 ---
 
-# Dynamic Playbook Orchestration
+# Dynamic Campaign Orchestration
 
 Operate a standing mission through native Hermes Kanban. Decide what work is justified from current evidence; do not compile or follow a predefined pipeline. This procedure governs planning, not deployment provisioning or a replacement scheduler.
 
@@ -24,7 +24,7 @@ Operate a standing mission through native Hermes Kanban. Decide what work is jus
 ## Prerequisites
 
 - An authorized mission with scope, success criteria, autonomy limits, and pause/stop state.
-- A deployment-bound Kanban board, installed specialist profiles, and a resolved roster with canonical agent IDs and permissions. Source agent directories and declared IDs already use `[playbook id]__[role id]`, such as `seo__researcher` or `social-media__interactor`; the Hermes profile name is that same ID, not another prefixed copy. Skill IDs remain independent and unchanged.
+- A campaign-bound Kanban board, installed specialist profiles, and a verified roster with canonical agent IDs and permissions. Agent records and declared IDs use `<campaign_id>__<role_id>`, such as `seo__researcher`; the Hermes profile name is that same ID, not another prefixed copy.
 - Available `kanban` and `file` tools; use `read_file` for mission and artifact inspection. Discover the current `kanban_*` tool schemas before invoking them.
 - Bootstrap owns the canonical session, task-event subscriptions, and policy-selected session heartbeat. A config or skill does not establish these runtime objects.
 

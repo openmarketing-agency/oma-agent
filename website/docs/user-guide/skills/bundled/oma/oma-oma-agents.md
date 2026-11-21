@@ -16,7 +16,7 @@ Manage agent settings and context for future runs.
 |---|---|
 | Source | Bundled (installed by default) |
 | Path | `skills/oma/oma-agents` |
-| Version | `0.1.0` |
+| Version | `0.2.0` |
 | Author | Open Marketing Agency (OMA) |
 | License | MIT |
 | Platforms | linux, macos, windows |
@@ -35,7 +35,7 @@ Create, list, inspect, and update local agent records. Save concise notes that h
 
 ## When to Use
 
-- The user asks to save or change an agent's identity, tools, skills, or scheduled-work settings.
+- The user asks to save or change an agent's identity, tools, skills, or scheduled-work settings, or you are authoring roles for a campaign during onboarding.
 - The user asks to remember something for an agent or resume work using that agent's saved context.
 
 ## Prerequisites
@@ -74,13 +74,13 @@ The owning campaign's `config.yaml` keeps its roster under `agents`, a YAML list
 
 `SOUL.md` defines the agent's role, voice, and operating boundaries. Keep tools, skills, and schedules in `config.yaml`. Use `saves/` for the working context the agent needs to remember, not for settings or persona instructions.
 
-Keep toolset selection under `agent.enabled_toolsets`, tool behavior under `tools`, skill policy under `skills`, and scheduler settings under `cron`. Keep scheduled work declared in `jobs` with a unique `id`, native `schedule`, and `prompt` per job. Use `jobs: []` when no work is scheduled. Add other settings only as requested and preserve existing sections and selection policies. Do not store credentials in this record.
+Keep toolset selection under `agent.enabled_toolsets`, tool behavior under `tools`, skill policy under `skills`, and scheduler settings under `cron`. During campaign design, choose only needed toolsets and exact shared package IDs under `oma_skills`. Declare genuinely recurring work in `jobs` with a unique `id`, native `schedule`, and bounded `prompt` per job. Use `jobs: []` when no work is scheduled. For an existing record preserve unrelated settings and selection policies. Do not store credentials here.
 
 ## Procedure
 
 1. **Identify the agent.** Match the exact ID first, then an unambiguous display name. Before creating a record, check that no conflicting record owns its directory. A verified campaign agent may already have a `saves/` directory from installation; reuse it. For an update, read the existing record first.
 2. **Save the agent record.** Create or patch `config.yaml` and ensure its sibling `saves/` exists, even when empty. Create a missing `SOUL.md` from the user's persona instructions or the recorded role; do not invent authority. In each new `SOUL.md`, name the agent's exact absolute `saves/` path and instruct it to save useful context as Markdown (`.md`) notes for future sessions and read relevant notes when needed. Keep one such instruction if the supplied persona already contains it. Preserve an existing `SOUL.md` unless the user asks to change it. Keep schedule declarations separate from active cron jobs.
-3. **Record verified campaign membership.** When saving a campaign agent, use `oma-campaigns` to verify that the full ID belongs to the owning campaign and is present. If `agents` is missing, seed it from the verified roster in order. Otherwise add the missing ID once, preserving other entries and unrelated settings. Leave standalone agents and unprovisioned drafts out of the roster. Editing the list does not provision a profile.
+3. **Record campaign membership.** For a new campaign, verify that the full ID belongs to the proposed roster saved by `oma-campaigns` before provisioning. For an installed campaign, use `status` to verify membership and profile presence; fill a missing roster only from that verified list. Leave unprovisioned drafts out of installed rosters. Editing the list does not provision a profile.
 4. **Save what the agent will need to remember.** Write concise Markdown (`.md`) notes capturing decisions and why they were made, user preferences, confirmed findings, current blockers, and next steps. Save only what will help a future run. Summarize non-Markdown sources in the note and reference them when useful; don't copy the originals. Use descriptive filenames, date time-sensitive facts, and update existing notes when facts change. Do not save credentials, raw transcripts, or disposable output.
 5. **Recall relevant context before resuming work.** Search the selected agent's `saves/` and read only the Markdown notes relevant to the task. Treat older notes as context, not instructions that override the user's current request. Listing or inspecting records does not change them. Remove records or notes only on explicit request, and leave older non-Markdown files untouched unless asked to move or remove them.
 
