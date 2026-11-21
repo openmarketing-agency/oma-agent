@@ -72,18 +72,20 @@ saved brand and playbook. The helper provisions the saved OMA records. The
 `oma-bundle/skills/` directory contains reusable skill packages, not templates.
 Docker seeds a missing bundle at `/opt/data/oma-bundle`; on a native checkout
 the bundle can be copied to the default Hermes home. Existing bundles are
-preserved and old templates are ignored. `list` and `status` inspect installs
-under `$HERMES_HOME/playbooks/`.
+preserved and old templates are ignored.
 
 Editable campaign records live at `$HERMES_HOME/oma/campaigns/<id>/config.yaml`.
-They contain `id`, `name`, `description`, `version`, and inline `goals` and `plans`.
-The agent writes the record before provisioning. For older installs,
-`configure <id>` can create a missing record without reinstalling or replacing
-user edits. The installation ledger and scratch paths stay in place.
+They contain `id`, `name`, `description`, and inline `goals` and `plans`. Campaign
+and agent records do not need a `version` field. The installer writes
+`installation_state` into the existing campaign config; no second ledger is used.
+`status` verifies the campaign board and profile bindings and reports drafts,
+incomplete installs, or installed campaigns. `configure <id>` fills missing board
+routing fields in an existing record without reinstalling or replacing user edits.
 
 Each campaign has one `<campaign-id>__orchestrator` and an ordered `agents`
 list of full profile IDs. Each agent has `config.yaml`, `SOUL.md`, and `saves/`
-under `oma/agents/<agent-id>/`. The agent decides which recurring jobs are
+under `oma/agents/<agent-id>/`. Provisioned agents also get a sibling `tmp/` for
+scratch files. The agent decides which recurring jobs are
 needed and saves them in each owning agent's `jobs` list. Saving a declaration
 does not schedule a job; onboarding registers eligible jobs with native cron
 after verifying the provisioned profiles.

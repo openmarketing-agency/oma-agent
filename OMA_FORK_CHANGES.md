@@ -179,28 +179,28 @@ The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) designs t
 | Helper verb | Effect |
 | --- | --- |
 | `install <id>` | Provision a team from saved campaign and agent records. Does not start agent turns or replace an existing installation. |
-| `list` / `status <id>` | Inspect local installation records and which profiles still exist; no network access. |
-| `configure <id>` | Create a missing editable config for an existing installation without reinstalling or overwriting it. |
+| `list` / `status <id>` | Inspect campaign records and verify the board and profiles locally. |
+| `configure <id>` | Fill missing routing fields in the existing campaign config without reinstalling. |
 
 **Shared skills only:** The [repository bundle](oma-bundle/README.md) ships reusable skills, not campaign or agent templates. Docker seeds it at `$HERMES_HOME/oma-bundle` only if absent. Existing volumes are preserved and any old templates are ignored.[3][5]
 
-**Editable campaign config:** The agent writes the identity, version, goals and plans before provisioning. For an older installation, `configure <id>` seeds a missing record from the ledger without touching profiles or scratch paths. Campaigns use the single stored playbook without a `playbook` field.
+**Editable campaign config:** The agent writes the identity, roster, goals and plans before provisioning. Campaign and agent records are unversioned; older `version` fields are ignored and preserved in existing files. Campaigns use the single stored playbook without a `playbook` field.
 
 The campaign and agent skills verify the proposed `agents` list against the profiles actually provisioned. The brand skill records brand-relative references to logos, fonts, illustrations, icons, backgrounds, and images in the brand’s `config.yaml`.
 
-**What installation leaves on disk:** `$HERMES_HOME/playbooks/<id>/installation.yaml` contains the roster, states, declared job IDs, scratch paths, and any supplied version metadata. Each agent gets a `tmp` directory whose absolute path appears in its installed SOUL. Optional packages in `oma_skills` resolve by exact name from `$HERMES_HOME/oma-bundle/skills`; ambiguous names and collisions are rejected. The installer does not copy launch credentials, seed Kanban tasks, or start the team.[3][5]
+**What installation leaves on disk:** The existing `$HERMES_HOME/oma/campaigns/<id>/config.yaml` holds `installation_state`; the installer does not create a separate ledger. Each new agent gets a `tmp` directory under `$HERMES_HOME/oma/agents/<agent-id>/`; its absolute path appears in the installed SOUL. Optional packages in `oma_skills` resolve by exact name from `$HERMES_HOME/oma-bundle/skills`; ambiguous names and collisions are rejected. The installer does not copy launch credentials, seed Kanban tasks, or start the team. Older ledgers and existing scratch paths are left untouched.[3][5]
 
 **Saved agent context:** Newly provisioned campaign profiles also get `$HERMES_HOME/oma/agents/<agent-id>/saves/` under the default home. Their `SOUL.md` names the absolute path and tells each agent to save useful context as Markdown notes and consult them when needed. The installer preserves existing notes and does not rewrite previously installed profiles.
 
 **Campaign context:** Each new campaign profile's `SOUL.md` points directly to its own campaign config and the shared playbook and brand configs at `oma/playbook/config.yaml` and `oma/brand/config.yaml`. No ID links are needed between those records. Editable agent records still use `campaign_id` to identify the campaign they belong to.
 
-**Campaign Kanban:** A new install creates an empty `campaign-<id>` board without changing the shared current board. It records the campaign's `orchestrator`, the `kanban_board` slug, and the `kanban_board_name` display name in both the editable campaign config and the installation ledger. The team profiles' native Kanban tools use that board; the orchestrator's SOUL names its own roster. `configure` fills missing routing metadata from the ledger but does not create boards or rewire older profiles.
+**Campaign Kanban:** A new install creates an empty `campaign-<id>` board without changing the shared current board. The campaign config contains the `orchestrator`, `kanban_board` slug, and `kanban_board_name` display name. The team profiles' native Kanban tools use that board; the orchestrator's SOUL names its own roster. `configure` fills missing routing fields from the verified board and profiles but does not create boards or rewire older profiles.
 
 The `default` starter uses this routing to queue one task for the installed orchestrator on its recorded board. The orchestrator plans the work. Diagnostics go to the installed `maintenance` profile on an explicitly named operations board if configured, otherwise the `default` board. Neither onboarding nor enabling the toolset creates a task or starts a dispatcher. For an existing `default` with an explicit allowlist, add `kanban` to `agent.enabled_toolsets` and keep it out of the starter eager list; the upgrade preserves saved settings.
 
 When the built-in decomposer runs under `default`, `kanban.orchestrator_profile: default` assigns the parent task back to `default` after decomposition. This does not change who runs child tasks, or redirect ordinary tasks assigned directly to campaign orchestrators.
 
-**Campaign installation does not register jobs.** An agent’s `jobs` list contains mappings with unique `id` values. The built-in installer records those IDs as `declared_jobs`; it neither validates the rest of the schedule as native cron configuration nor registers or runs jobs. See [source validation](hermes_cli/oma_playbooks/source.py) and [installation](hermes_cli/oma_playbooks/install.py).
+**Campaign installation does not register jobs.** An agent’s `jobs` list contains mappings with unique `id` values. These declarations stay in the agent record. The installer checks the declared IDs but neither validates the rest of the schedule as native cron configuration nor registers or runs jobs. See [source validation](hermes_cli/oma_playbooks/source.py) and [installation](hermes_cli/oma_playbooks/install.py).
 
 **URL-only onboarding:** The [`oma-onboarding` skill](skills/oma/oma-onboarding/SKILL.md) uses one website or GitHub repository URL as brand and strategy evidence. The agent decides which campaigns and roles fit and which roles need recurring jobs, choosing each cadence and prompt. It registers eligible jobs through native Hermes cron in the owning profiles after verifying the team. This preserves operator pauses, does not force an immediate run, and skips jobs requiring unverified external permissions. Due jobs need a healthy gateway scheduler.
 

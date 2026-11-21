@@ -56,6 +56,9 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     assert main(["list"]) == 0
     assert not (home / "oma-bundle" / "campaigns").exists()
     assert json.loads(capsys.readouterr().out) == []
+    assert main(["status", "demo"]) == 0
+    draft = json.loads(capsys.readouterr().out)
+    assert draft["state"] == "draft" and draft["present_profiles"] == []
     existing = home / "oma" / "agents" / "demo__worker" / "saves" / "handoff.md"
     existing.parent.mkdir(parents=True)
     existing.write_text("Keep this handoff.", encoding="utf-8")
@@ -63,26 +66,26 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     assert existing.read_text(encoding="utf-8") == "Keep this handoff."
     record = json.loads(capsys.readouterr().out)
     assert record["description"] == "Test team."
+    assert "version" not in record
     assert record["state"] == "installed"
     assert record["present_profiles"] == ["demo__orchestrator", "demo__worker"]
-    directory = home / "playbooks" / "demo"
-    ledger = directory / "installation.yaml"
-    saved = read_mapping(ledger)
-    config_path = home / "oma" / "campaigns" / "demo" / "config.yaml"
+    assert not (home / "playbooks").exists()
+    assert not (source / "installations").exists()
+    config_path = source / "campaigns" / "demo" / "config.yaml"
+    assert set(config_path.parent.iterdir()) == {config_path}
+    saved = config_path.read_bytes()
     assert read_mapping(config_path) == {
         "id": "demo", "name": "Demo", "description": "Test team.",
         "goals": ["Measure demand"], "plans": ["Review evidence"],
         "agents": ["demo__orchestrator", "demo__worker"],
         "orchestrator": "demo__orchestrator", "kanban_board": "campaign-demo",
-        "kanban_board_name": "Demo",
+        "kanban_board_name": "Demo", "installation_state": "installed",
     }
-    manifest = (source / "campaigns" / "demo" / "config.yaml").resolve()
-    assert saved["source_manifest"] == str(manifest)
-    assert not (directory / "config.yaml").exists()
-    for agent_id, row in saved["agents"].items():
+    assert record["agents"] == ["demo__orchestrator", "demo__worker"]
+    for agent_id in record["agents"]:
         profile = home / "profiles" / agent_id
-        scratch = directory / row["scratch_dir"]
-        saves = home / "oma" / "agents" / agent_id / "saves"
+        scratch = source / "agents" / agent_id / "tmp"
+        saves = source / "agents" / agent_id / "saves"
         soul = (profile / "SOUL.md").read_text(encoding="utf-8")
         assert soul.startswith(f"I am the {agent_id.split('__')[1]}.\n")
         assert scratch.is_dir() and str(scratch.resolve()) in soul
@@ -95,8 +98,6 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
         assert "`brand_id`" not in soul and "`playbook`" not in soul
         assert "Do not scan other records" in soul
         agent_record = read_mapping(source / "agents" / agent_id / "config.yaml")
-        assert row["state"] == "installed"
-        assert row["declared_jobs"] == [job["id"] for job in agent_record["jobs"]]
         assert agent_record["campaign_id"] == "demo"
         assert not (profile / "cron" / "jobs.json").exists()
         assert not (profile / "skills" / "unused").exists()
@@ -117,12 +118,10 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     assert (orchestrator_skills / "shared" / "support.txt").read_text(encoding="utf-8") == "Support file."
     assert not (home / "profiles" / "demo__worker" / "skills" / "shared").exists()
 
-    with manifest.open("a", encoding="utf-8") as stream:
-        stream.write("version: 9.9.9\n")
     assert main(["install", "demo"]) == 0
     assert json.loads(capsys.readouterr().out) == record
-    assert read_mapping(ledger) == saved
-    for agent_id in saved["agents"]:
+    assert config_path.read_bytes() == saved
+    for agent_id in record["agents"]:
         note = home / "oma" / "agents" / agent_id / "saves" / "context.md"
         assert note.read_text(encoding="utf-8") == f"Remember {agent_id}."
     assert main(["status", "demo"]) == 0
@@ -148,7 +147,7 @@ def test_bundle_templates_are_ignored_and_profile_conflicts_do_not_publish(bundl
     assert main(["install", "demo"]) == 1
     assert "already exists" in capsys.readouterr().err
     assert not (home / "profiles" / "demo__orchestrator").exists()
-    assert not (home / "playbooks" / "demo").exists()
+    assert not (source / "installations" / "demo").exists()
 
 
 @pytest.mark.parametrize(("file", "before", "after", "error"), [
@@ -163,7 +162,7 @@ def test_invalid_roster_does_not_publish(bundle, capsys, file, before, after, er
     assert main(["install", "demo"]) == 1
     assert error in capsys.readouterr().err
     assert not (home / "profiles").exists()
-    assert not (home / "playbooks" / "demo").exists()
+    assert not (source / "installations" / "demo").exists()
 
 
 def test_generated_cron_belongs_to_the_verified_owner(bundle, capsys):
@@ -180,7 +179,7 @@ def test_generated_cron_belongs_to_the_verified_owner(bundle, capsys):
     team = json.loads(capsys.readouterr().out)
     owner = team["orchestrator"]
     job, = read_mapping(source / "agents" / owner / "config.yaml")["jobs"]
-    assert team["agents"][owner]["declared_jobs"] == [job["id"]]
+    assert owner in team["present_profiles"]
     parser = ArgumentParser()
     build_cron_parser(parser.add_subparsers(), cmd_cron=cron_create)
     args = parser.parse_args(["cron", "create", "--name", f"oma:{job['id']}", "--deliver", "local",
@@ -243,7 +242,7 @@ def test_campaign_agents_share_their_own_kanban_board(bundle, capsys):
 
 
 def test_saves_path_conflict_does_not_publish_profiles(bundle, capsys):
-    home, _, main = bundle
+    home, source, main = bundle
     conflict = home / "oma" / "agents" / "demo__worker" / "saves"
     conflict.write_text("Keep this file.", encoding="utf-8")
 
@@ -251,46 +250,87 @@ def test_saves_path_conflict_does_not_publish_profiles(bundle, capsys):
     assert "Expected an agent saves directory" in capsys.readouterr().err
     assert conflict.read_text(encoding="utf-8") == "Keep this file."
     assert not (home / "profiles").exists()
-    assert not (home / "playbooks" / "demo").exists()
+    assert not (source / "installations" / "demo").exists()
 
 
-def test_configure_backfills_from_installed_campaign_without_reinstalling(bundle, capsys):
+def test_configure_recovers_routing_without_reinstalling_unversioned_campaign(bundle, capsys):
     from hermes_cli.oma_playbooks.source import read_mapping
 
     home, source, main = bundle
-    (source / "campaigns").rename(source / "unavailable")
-    ledger = home / "playbooks" / "demo" / "installation.yaml"
-    ledger.parent.mkdir(parents=True)
-    ledger.write_text(
-        "id: demo\nname: Installed Demo\ndescription: Existing campaign.\nversion: 1.2.3\n"
-        "state: installed\norchestrator: demo__orchestrator\nagents: {demo__orchestrator: {}}\n", encoding="utf-8",
-    )
-    original = ledger.read_bytes()
-    config_path = home / "oma" / "campaigns" / "demo" / "config.yaml"
-    assert main(["status", "demo"]) == 0
+    assert main(["install", "demo"]) == 0
     capsys.readouterr()
-    assert not config_path.exists()
+    config_path = source / "campaigns" / "demo" / "config.yaml"
+    lines = config_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    kept = "".join(line for line in lines if not line.startswith(("installation_state:", "kanban_board_name:")))
+    config_path.write_text("# Keep my comment\n" + kept, encoding="utf-8")
+    profile = home / "profiles" / "demo__orchestrator" / "SOUL.md"
+    original_soul = profile.read_bytes()
+    assert main(["status", "demo"]) == 0
+    assert json.loads(capsys.readouterr().out)["state"] == "installed"
     assert main(["configure", "demo"]) == 0
     assert Path(json.loads(capsys.readouterr().out)["config_path"]).resolve() == config_path.resolve()
-    assert read_mapping(config_path) == {
-        "id": "demo", "name": "Installed Demo", "description": "Existing campaign.",
-        "version": "1.2.3", "goals": [], "plans": [],
-        "orchestrator": "demo__orchestrator",
-    }
-    custom = "# Keep my comment\nid: demo\ngoals: [Measure sign-ups]\nplans: [Review weekly]\nplaybook: product-launch\n"
-    config_path.write_text(custom, encoding="utf-8")
-    assert main(["configure", "demo"]) == 0
     updated = config_path.read_bytes()
     assert updated.startswith(b"# Keep my comment")
-    assert read_mapping(config_path) == {
-        "id": "demo", "goals": ["Measure sign-ups"], "plans": ["Review weekly"],
-        "playbook": "product-launch", "orchestrator": "demo__orchestrator",
-    }
+    assert read_mapping(config_path)["kanban_board_name"] == "Demo"
+    assert read_mapping(config_path)["goals"] == ["Measure demand"]
     assert main(["configure", "demo"]) == 0
     assert config_path.read_bytes() == updated
-    assert ledger.read_bytes() == original
-    assert not (home / "profiles").exists()
-    assert not (home / "kanban").exists()
+    assert profile.read_bytes() == original_soul
+
+
+def test_legacy_versions_do_not_affect_provisioning(bundle, capsys):
+    from hermes_cli.oma_playbooks.source import read_mapping
+
+    home, source, main = bundle
+    campaign = source / "campaigns" / "demo" / "config.yaml"
+    agent = source / "agents" / "demo__worker" / "config.yaml"
+    for path in (campaign, agent):
+        with path.open("a", encoding="utf-8") as stream:
+            stream.write("version: 9.9.9\n")
+    assert main(["install", "demo"]) == 0
+    assert "version" not in json.loads(capsys.readouterr().out)
+    assert "version" not in read_mapping(home / "profiles" / "demo__worker" / "config.yaml")
+    assert all(read_mapping(path)["version"] == "9.9.9" for path in (campaign, agent))
+
+
+def test_interrupted_provisioning_is_recorded_in_campaign_config(bundle, capsys, monkeypatch):
+    from hermes_cli.oma_playbooks import install as provisioning
+    from hermes_cli.oma_playbooks.source import read_mapping
+
+    home, source, main = bundle
+    provision = provisioning.provision_profile
+
+    def fail_worker(request, **kwargs):
+        if request.name == "demo__worker":
+            raise OSError("Worker could not be provisioned")
+        return provision(request, **kwargs)
+
+    monkeypatch.setattr(provisioning, "provision_profile", fail_worker)
+    assert main(["install", "demo"]) == 1
+    assert "Worker could not be provisioned" in capsys.readouterr().err
+    config = source / "campaigns" / "demo" / "config.yaml"
+    original = config.read_bytes()
+    assert read_mapping(config)["installation_state"] == "installing"
+    assert set(config.parent.iterdir()) == {config}
+    assert main(["status", "demo"]) == 0
+    status = json.loads(capsys.readouterr().out)
+    assert status["state"] == "incomplete"
+    assert status["present_profiles"] == ["demo__orchestrator"]
+    assert main(["install", "demo"]) == 1
+    assert "incomplete installation" in capsys.readouterr().err
+    assert config.read_bytes() == original
+    assert not (home / "profiles" / "demo__worker").exists()
+
+
+def test_list_ignores_legacy_installation_state(bundle, capsys):
+    home, _, main = bundle
+    legacy = home / "playbooks" / "demo" / "installation.yaml"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("id: demo\nstate: installed\nagents: {demo__orchestrator: {}}\n", encoding="utf-8")
+    original = legacy.read_bytes()
+    assert main(["list"]) == 0
+    assert json.loads(capsys.readouterr().out) == []
+    assert legacy.read_bytes() == original
 
 
 @pytest.mark.parametrize("argv", [["catalog"], ["check"], ["fetch"], ["plan", "demo"],

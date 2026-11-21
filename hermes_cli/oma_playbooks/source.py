@@ -16,23 +16,19 @@ PLAYBOOK_ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 @dataclass(frozen=True)
 class Agent:
     id: str
-    version: str | None
     description: str
     config: dict
     soul: str
     skills: dict[str, Path]
-    jobs: list[str]
 
 
 @dataclass(frozen=True)
 class Playbook:
     id: str
     name: str
-    version: str | None
     description: str
     orchestrator: str
     agents: tuple[Agent, ...]
-    source_manifest: Path
 
 
 def checked_id(value: str) -> str:
@@ -73,14 +69,19 @@ def _names(value: object, context: str) -> list[str]:
     return value
 
 
-def _source_manifest(path: Path, campaign_id: str) -> dict:
-    data = read_mapping(path)
+def campaign_fields(data: dict, campaign_id: str) -> dict:
     if data.get("id") != campaign_id:
         raise ValueError(f"{campaign_id}: manifest id does not match its directory")
-    return {key: _text(data, key, campaign_id) for key in ("id", "name", "description", "orchestrator")} | {
-        "version": data.get("version"),
-        "agents": _names(data.get("agents"), f"{campaign_id}.agents"),
-    }
+    fields = {key: _text(data, key, campaign_id) for key in ("id", "name", "description", "orchestrator")}
+    ids = _names(data.get("agents"), f"{campaign_id}.agents")
+    orchestrator = f"{campaign_id}__orchestrator"
+    if fields["orchestrator"] != orchestrator or orchestrator not in ids:
+        raise ValueError(f"{campaign_id}: roster must contain the canonical orchestrator {orchestrator}")
+    prefix = f"{campaign_id}__"
+    if any(not agent.startswith(prefix) or not PLAYBOOK_ID.fullmatch(agent[len(prefix):])
+           or not PROFILE_ID_RE.fullmatch(agent) for agent in ids):
+        raise ValueError(f"{campaign_id}: roster must use canonical campaign-prefixed IDs")
+    return {**fields, "agents": ids}
 
 
 def _skill_index(*roots: Path) -> dict[str, list[Path]]:
@@ -124,15 +125,15 @@ def _read_agent(root: Path, campaign_id: str, agent_id: str, index: dict[str, li
         raise ValueError(f"{agent_id}: campaign_id must match {campaign_id}")
     _text(data, "name", agent_id)
     del data["name"]
-    version = data.pop("version", None)
+    data.pop("version", None)  # Legacy template metadata is not a native setting.
     description = _text(data, "description", agent_id)
     del data["description"]
     soul = _member(path, "SOUL.md").read_text(encoding="utf-8-sig")
     if not soul.strip():
         raise ValueError(f"{agent_id}: SOUL.md is empty")
     skills = _resolve_skills(data, agent_id, index)
-    jobs = _job_ids(data.pop("jobs", []), agent_id)
-    return Agent(agent_id, version, description, data, soul, skills, jobs)
+    _job_ids(data.pop("jobs", []), agent_id)
+    return Agent(agent_id, description, data, soul, skills)
 
 
 def resolve(home: Path, playbook_id: str) -> Playbook:
@@ -141,16 +142,9 @@ def resolve(home: Path, playbook_id: str) -> Playbook:
     campaigns_dir = _member(oma, "campaigns")
     directory = _member(campaigns_dir, checked_id(playbook_id))
     manifest = _member(directory, "config.yaml")
-    data = _source_manifest(manifest, playbook_id)
+    data = campaign_fields(read_mapping(manifest), playbook_id)
     ids = data.pop("agents")
-    orchestrator = f"{playbook_id}__orchestrator"
-    if data["orchestrator"] != orchestrator or orchestrator not in ids:
-        raise ValueError(f"{playbook_id}: roster must contain the canonical orchestrator {orchestrator}")
-    prefix = f"{playbook_id}__"
-    if any(not agent.startswith(prefix) or not PLAYBOOK_ID.fullmatch(agent[len(prefix):])
-           or not PROFILE_ID_RE.fullmatch(agent) for agent in ids):
-        raise ValueError(f"{playbook_id}: roster must use canonical playbook-prefixed IDs")
     index = _skill_index(_member(bundle_dir(home.resolve()), "skills"))
     agents_root = _member(oma, "agents")
     agents = tuple(_read_agent(agents_root, playbook_id, agent, index) for agent in ids)
-    return Playbook(**data, agents=agents, source_manifest=manifest)
+    return Playbook(**data, agents=agents)
