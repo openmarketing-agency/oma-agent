@@ -185,6 +185,12 @@ docs-lint-diagrams:
 termux-payload payload +packages:
     scripts/termux/stage_payload.sh "$@"
 
+# Sync model, MCP, and credential status for an installed OMA campaign
+[group('dev')]
+[positional-arguments]
+sync-campaign campaign_id:
+    scripts/sync-campaign "$1"
+
 # Refresh uv.lock after a pyproject.toml change, then re-sync the environment
 [group('deps')]
 lock:

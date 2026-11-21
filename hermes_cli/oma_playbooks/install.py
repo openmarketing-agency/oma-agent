@@ -1,7 +1,6 @@
-"""Install validated definitions and keep an installation-local YAML ledger."""
+"""Provision campaigns using the existing campaign and agent records."""
 
 from contextlib import contextmanager
-from datetime import UTC, datetime
 from functools import partial
 import shutil
 import sqlite3
@@ -11,18 +10,17 @@ from agent.runtime_scope import bind_profile_scope
 from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS
 from agent.skill_utils import parse_config_string_list
 from hermes_cli import kanban_db
-from hermes_cli.config import atomic_config_replace, atomic_config_write
-from hermes_cli.config_backend import FileBackend, require_file_tooling
+from hermes_cli.config import atomic_config_replace, atomic_config_write, read_user_config_raw
+from hermes_cli.config_backend import require_file_tooling
 from hermes_cli.config_defaults import DEFAULT_CONFIG
 from hermes_cli.config_home import OMA_PLAYBOOK_SKILL
-from hermes_cli.oma_playbooks.source import Agent, Playbook, checked_id, read_mapping, resolve
+from hermes_cli.oma_playbooks.settings import read_agent_record, record_with_effective, resolve_settings, settings_from
+from hermes_cli.oma_playbooks.source import Agent, Playbook, campaign_fields, checked_id, read_mapping, resolve
 from hermes_cli.profile_provision import ProfileCreateRequest, provision_profile
 from hermes_cli.profiles import get_profile_dir, profile_exists
 from hermes_constants import get_hermes_home
 from toolsets import resolve_toolset
 from tools.skills_sync import bundled_skill_names, sync_skills
-from utils import atomic_yaml_write
-
 
 def default_home() -> Path:
     home = get_hermes_home().resolve()
@@ -37,79 +35,96 @@ def _real_path(path: Path) -> Path:
     return path
 
 
-def _registry(home: Path) -> Path:
-    return _real_path(home / "playbooks")
+def _campaigns_dir(home: Path) -> Path:
+    return _real_path(_real_path(home / "oma") / "campaigns")
 
 
-def _record_path(registry: Path, playbook_id: str) -> Path:
-    directory = _real_path(registry / checked_id(playbook_id))
-    return _real_path(directory / "installation.yaml")
+def _campaign_config_path(campaigns: Path, campaign_id: str) -> Path:
+    directory = _real_path(campaigns / checked_id(campaign_id))
+    return _real_path(directory / "config.yaml")
 
 
-def installed(home: Path, playbook_id: str | None = None) -> list[dict]:
-    registry = _registry(home)
-    ids = ([checked_id(playbook_id)] if playbook_id else
-           sorted(item.name for item in registry.iterdir() if item.is_dir() and not item.name.startswith("."))
-           if registry.is_dir() else [])
+def _profile_matches(home: Path, agent_id: str, board: str, orchestrator: str) -> bool:
+    profile = get_profile_dir(agent_id)
+    expected = home / "profiles" / agent_id
+    config = profile / "config.yaml"
+    if profile.resolve() != expected or profile.is_symlink() or config.is_symlink() or not profile_exists(agent_id):
+        return False
+    routing = read_user_config_raw(config).get("kanban")
+    return (isinstance(routing, dict) and routing.get("profile_board") == board
+            and routing.get("orchestrator_profile") == orchestrator)
+
+
+def _status(home: Path, campaign_id: str, config: dict) -> dict:
+    record = campaign_fields(config, campaign_id)
+    board = f"campaign-{campaign_id}"
+    marker = config.get("installation_state")
+    if marker not in (None, "installing", "installed"):
+        raise ValueError(f"{campaign_id}: invalid installation_state")
+    if "kanban_board" in config and config["kanban_board"] != board:
+        raise ValueError(f"{campaign_id}: campaign config kanban_board conflicts with {board!r}")
+    recorded = marker is not None or config.get("kanban_board") == board
+    present = [agent for agent in record["agents"]
+               if recorded and _profile_matches(home, agent, board, record["orchestrator"])]
+    metadata = kanban_db.read_board_metadata(board) if recorded and kanban_db.board_exists(board) else None
+    ready = (metadata is not None and not metadata.get("archived") and present == record["agents"])
+    if marker == "installing" or (marker == "installed" and not ready):
+        state = "incomplete"
+    else:
+        state = "installed" if ready else "draft"
+    return {**record, "state": state, "present_profiles": present,
+            "kanban_board": board if recorded else None,
+            "kanban_board_name": metadata["name"] if metadata else None}
+
+
+def installed(home: Path, campaign_id: str | None = None) -> list[dict]:
+    campaigns = _campaigns_dir(home)
+    if campaign_id is not None:
+        return [_status(home, campaign_id, read_mapping(_campaign_config_path(campaigns, campaign_id)))]
+    if not campaigns.is_dir():
+        return []
     records = []
-    for name in ids:
-        path = _record_path(registry, name)
-        if not path.is_file() and not playbook_id:
+    for directory in sorted(campaigns.iterdir()):
+        if directory.name.startswith(".") or not directory.is_dir():
             continue
-        record = read_mapping(path)
-        agents = record.get("agents")
-        if record.get("id") != name or not isinstance(agents, dict):
-            raise ValueError(f"Invalid installation record: {path}")
-        record["present_profiles"] = [agent for agent in agents if profile_exists(agent)]
-        records.append(record)
+        path = _campaign_config_path(campaigns, directory.name)
+        if not path.is_file():
+            continue
+        config = read_mapping(path)
+        if config.get("installation_state") is None and "kanban_board" not in config:
+            continue
+        record = _status(home, directory.name, config)
+        if record["state"] != "draft":
+            records.append(record)
     return records
 
 
-def _campaign_config_path(home: Path, campaign_id: str) -> Path:
-    oma = _real_path(home / "oma")
-    campaigns = _real_path(oma / "campaigns")
-    directory = _real_path(campaigns / checked_id(campaign_id))
-    path = _real_path(directory / "config.yaml")
-    if FileBackend().exists(directory) and read_mapping(path).get("id") != campaign_id:
-        raise ValueError(f"Campaign config ID does not match its installation: {path}")
-    return path
-
-
-def _ensure_campaign_config(path: Path, record: dict) -> Path:
-    routing = {key: record[key] for key in ("orchestrator", "kanban_board", "kanban_board_name") if record.get(key)}
-    if FileBackend().exists(path.parent):
+def configure(home: Path, campaign_id: str) -> dict:
+    """Backfill missing routing metadata from a verified board and roster."""
+    require_file_tooling("OMA campaign configuration")
+    campaigns = _campaigns_dir(home)
+    path = _campaign_config_path(campaigns, campaign_id)
+    with _install_lock(path):
         config = read_mapping(path)
-        missing = {key: value for key, value in routing.items() if key not in config}
+        record = _status(home, campaign_id, config)
+        if record["state"] != "installed":
+            raise ValueError(f"Campaign {campaign_id!r} is not fully installed")
+        missing = {key: record[key] for key in ("kanban_board", "kanban_board_name") if key not in config}
         if missing:
             atomic_config_write(path, {**config, **missing})
-        return path
-    config = {key: record.get(key) for key in ("id", "name", "description", "version")}
-    config.update(goals=[], plans=[], **routing)
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    atomic_yaml_write(path, config, create_mode=0o600)  # config-writer: ok — campaign data, not Hermes settings
-    return path
-
-
-def configure(home: Path, campaign_id: str) -> dict:
-    """Seed config or missing routing metadata without reading source files."""
-    require_file_tooling("OMA campaign configuration")
-    registry = _registry(home)
-    with _install_lock(registry):
-        record = installed(home, campaign_id)[0]
-        if record.get("state") != "installed":
-            raise ValueError(f"Campaign {campaign_id!r} is not fully installed")
-        path = _ensure_campaign_config(_campaign_config_path(home, campaign_id), record)
         return {"id": campaign_id, "config_path": str(path)}
 
 
 @contextmanager
-def _install_lock(registry: Path):
-    registry.mkdir(mode=0o700, exist_ok=True)
-    lock = registry / ".install-lock"
+def _install_lock(config_path: Path):
+    campaigns = config_path.parent.parent
+    if not campaigns.is_dir():
+        raise FileNotFoundError(f"Missing campaign config: {config_path}")
+    lock = campaigns / ".install-lock"
     try:
         lock.mkdir(mode=0o700)
     except FileExistsError:
-        raise ValueError(f"An installation is running or was interrupted; inspect {lock}") from None
+        raise ValueError(f"A campaign operation is running or was interrupted; inspect {lock}") from None
     try:
         yield
     finally:
@@ -185,35 +200,13 @@ def _initialize(agent: Agent, config: dict, staging: Path) -> None:
         shutil.copytree(source, staging / "skills" / name)
 
 
-def _scratch_path(agent_id: str) -> Path:
-    return Path("agents", agent_id, "tmp")
-
-
-def _agent_saves_path(home: Path, agent_id: str) -> Path:
+def _agent_data_dir(home: Path, agent_id: str, name: str) -> Path:
     path = home
-    for part in ("oma", "agents", agent_id, "saves"):
+    for part in ("oma", "agents", agent_id, name):
         path = _real_path(path / part)
         if path.exists() and not path.is_dir():
-            raise ValueError(f"Expected an agent saves directory, found a non-directory: {path}")
+            raise ValueError(f"Expected an agent {name} directory, found a non-directory: {path}")
     return path
-
-
-def _new_record(playbook: Playbook, board: str) -> dict:
-    return {
-        "id": playbook.id,
-        "name": playbook.name,
-        "version": playbook.version,
-        "description": playbook.description,
-        "source_manifest": str(playbook.source_manifest),
-        "orchestrator": playbook.orchestrator,
-        "kanban_board": board,
-        "state": "installing",
-        "started_at": datetime.now(UTC).isoformat(),
-        "agents": {agent.id: {"version": agent.version, "profile": agent.id,
-                              "oma_skills": sorted(agent.skills), "declared_jobs": agent.jobs,
-                              "scratch_dir": _scratch_path(agent.id).as_posix(),
-                              "state": "pending"} for agent in playbook.agents},
-    }
 
 
 def _campaign_context_soul(config_path: Path) -> str:
@@ -232,15 +225,13 @@ def _campaign_context_soul(config_path: Path) -> str:
     )
 
 
-def _publish_profiles(playbook: Playbook, configs: dict[str, dict], saves_paths: dict[str, Path],
-                      record: dict, path: Path, campaign_config: Path) -> None:
+def _publish_profiles(playbook: Playbook, configs: dict[str, dict], paths: dict[str, tuple[Path, Path]],
+                      board: str, campaign_config: Path) -> None:
     campaign_context = _campaign_context_soul(campaign_config)
-    board = record["kanban_board"]
     roster = ", ".join(f"`{agent.id}`" for agent in playbook.agents)
     for agent in playbook.agents:
-        scratch = path.parent / _scratch_path(agent.id)
-        scratch.mkdir(mode=0o700, parents=True)
-        saves = saves_paths[agent.id]
+        saves, scratch = paths[agent.id]
+        scratch.mkdir(mode=0o700, parents=True, exist_ok=True)
         saves.mkdir(mode=0o700, parents=True, exist_ok=True)
         if agent.id == playbook.orchestrator:
             board_role = f"Coordinate the team's work here. Assign tasks only within your campaign roster: {roster}."
@@ -258,50 +249,47 @@ def _publish_profiles(playbook: Playbook, configs: dict[str, dict], saves_paths:
         request = ProfileCreateRequest(name=agent.id, alias=False, mirror_credentials=False,
                                        description=agent.description, soul=soul)
         provision_profile(request, initialize=partial(_initialize, agent, configs[agent.id]))
-        record["agents"][agent.id]["state"] = "installed"
-        atomic_yaml_write(path, record)
-
 
 def install(home: Path, campaign_id: str) -> dict:
-    require_file_tooling("OMA playbook installation")
-    registry = _registry(home)
-    path = _record_path(registry, campaign_id)
-    with _install_lock(registry):
-        config_path = _campaign_config_path(home, campaign_id)
-        if path.exists():
-            record = installed(home, campaign_id)[0]
-            if record.get("state") == "installed":
-                _ensure_campaign_config(config_path, record)
-                return record
-            raise ValueError(f"An installation record already exists at {path}; no profiles were changed")
+    require_file_tooling("OMA campaign installation")
+    campaigns = _campaigns_dir(home)
+    config_path = _campaign_config_path(campaigns, campaign_id)
+    with _install_lock(config_path):
+        config = read_mapping(config_path)
+        record = _status(home, campaign_id, config)
+        if record["state"] == "installed":
+            return record
+        if record["state"] == "incomplete":
+            raise ValueError(f"Campaign {campaign_id!r} has an incomplete installation; no profiles were changed")
         playbook = resolve(home, campaign_id)
         policies = _check_profiles(home, playbook)
-        saves_paths = {agent.id: _agent_saves_path(home, agent.id) for agent in playbook.agents}
+        paths = {agent.id: (_agent_data_dir(home, agent.id, "saves"), _agent_data_dir(home, agent.id, "tmp"))
+                 for agent in playbook.agents}
+        defaults = settings_from(config, campaign_id)
+        effective = {agent.id: resolve_settings(defaults, settings_from(agent.config, agent.id))
+                     for agent in playbook.agents}
         board = f"campaign-{playbook.id}"
-        record = _new_record(playbook, board)
-        if FileBackend().exists(config_path.parent):
-            existing = read_mapping(config_path)
-            for key in ("orchestrator", "kanban_board"):
-                if key in existing and existing[key] != record[key]:
-                    raise ValueError(f"Campaign config {key} conflicts with the installation: {config_path}")
         configs = {
-            agent.id: _with_kanban({**agent.config, "skills": policies[agent.id],
+            agent.id: _with_kanban({**agent.config, **effective[agent.id], "skills": policies[agent.id],
                                    "_config_version": DEFAULT_CONFIG["_config_version"]},
                                   board, playbook.orchestrator, agent.id)
             for agent in playbook.agents
         }
         if (board_dir := kanban_db.board_dir(board)).exists() or board_dir.is_symlink():
             raise ValueError(f"Kanban board {board!r} already exists; refusing to reuse an unrelated board")
-        path.parent.mkdir(mode=0o700)
-        atomic_yaml_write(path, record)
+        atomic_config_write(config_path, {**config, "kanban_board": board, "installation_state": "installing"})
         try:
             board_metadata = kanban_db.create_board(board, name=playbook.name, description=playbook.description)
         except sqlite3.Error as exc:
             raise ValueError(f"Could not initialize campaign Kanban board {board!r}: {exc}") from exc
-        record["kanban_board_name"] = board_metadata["name"]
-        _ensure_campaign_config(config_path, record)
-        _publish_profiles(playbook, configs, saves_paths, record, path, config_path)
-        record["state"] = "installed"
-        record["installed_at"] = datetime.now(UTC).isoformat()
-        atomic_yaml_write(path, record)
-        return installed(home, playbook.id)[0]
+        _publish_profiles(playbook, configs, paths, board, config_path)
+        for agent_id, settings in effective.items():
+            path, agent_record = read_agent_record(home, campaign_id, agent_id)
+            updated = record_with_effective(agent_record, settings)
+            if updated != agent_record:
+                atomic_config_replace(path, updated)
+        current = read_mapping(config_path)
+        current.setdefault("kanban_board_name", board_metadata["name"])
+        current["installation_state"] = "installed"
+        atomic_config_write(config_path, current)
+        return _status(home, campaign_id, current)
