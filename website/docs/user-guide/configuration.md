@@ -93,11 +93,16 @@ routing fields in an existing record without reinstalling or replacing user edit
 
 Each campaign has one `<campaign-id>__orchestrator` and an ordered `agents`
 list of full profile IDs. Each agent has `config.yaml`, `SOUL.md`, and `saves/`
-under `oma/agents/<agent-id>/`. Provisioned agents also get a sibling `tmp/` for
-scratch files. The agent decides which recurring jobs are
-needed and saves them in each owning agent's `jobs` list. Saving a declaration
-does not schedule a job; onboarding registers eligible jobs with native cron
-after verifying the provisioned profiles.
+under `oma/agents/<agent-id>/`. A missing or empty authored `SOUL.md` prevents
+installation. The installed persona lives at `profiles/<agent-id>/SOUL.md`,
+separate from the root `default` persona at `$HERMES_HOME/SOUL.md`. Provisioned
+agents also get a `tmp/` beside their authored records for scratch files.
+
+Scheduled work is declared in each owning agent's `jobs` list. For social
+reviews, the prompt names the channels and asks the orchestrator to check new
+comments, replies, mentions, and tagged posts. Saving a declaration does not
+schedule or update a job; onboarding registers eligible jobs with native cron
+after verifying the provisioned profiles and their personas.
 
 New campaign roles must specify `agent.enabled_toolsets`. Include `kanban`
 for the orchestrator and for any worker that needs it; `[]` selects no tools
