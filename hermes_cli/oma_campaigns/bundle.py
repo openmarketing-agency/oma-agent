@@ -4,7 +4,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS, OMA_MAINTENANCE_ONLY_SKILLS, OMA_RETIRED_SKILLS
+from agent.skill_selection import OMA_DEFAULT_STARTER_SKILLS, OMA_MAINTENANCE_ONLY_SKILLS
 from hermes_constants import get_default_hermes_root, get_hermes_home
 
 
@@ -44,7 +44,7 @@ def seed_bundle(source: Path, home: Path) -> None:
 def seed_role_skills(install_dir: Path, home: Path) -> None:
     """Publish missing role-only packages from their canonical shipped sources."""
     roots = {
-        install_dir / "skills" / "oma": OMA_DEFAULT_ONLY_SKILLS - OMA_RETIRED_SKILLS,
+        install_dir / "skills" / "oma": OMA_DEFAULT_STARTER_SKILLS,
         install_dir / "hermes_cli" / "data" / "profiles" / "maintenance" / "skills": OMA_MAINTENANCE_ONLY_SKILLS,
     }
     destination = bundle_dir(home) / "skills" / "oma"

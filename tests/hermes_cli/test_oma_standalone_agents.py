@@ -36,8 +36,8 @@ def test_startup_adopts_existing_profiles_and_bundles_default_only_skills(tmp_pa
     refs = OMA_DEFAULT_ONLY_SKILLS - OMA_RETIRED_SKILLS
     saved = read_mapping(default / "config.yaml")
     assert saved["model"] == "openrouter/test-model" and saved["campaign_id"] is None
-    assert set(saved["oma_skills"]) == refs
-    assert read_mapping(ops / "config.yaml")["oma_skills"] == ["omactl"]
+    assert "oma_skills" not in saved
+    assert "oma_skills" not in read_mapping(ops / "config.yaml")
     assert "model" not in read_mapping(ops / "config.yaml") and "mcp_servers" not in saved
     assert (default / "SOUL.md").read_bytes() == b"Custom default persona"
     assert (ops / "SOUL.md").read_bytes() == b"Custom ops persona"
@@ -80,7 +80,7 @@ def test_sync_applies_only_saved_settings_to_the_owning_profile(tmp_path, monkey
 
     assert sync_standalone_agent(tmp_path, role)["updated"] == [
         "model", "mcp_servers", "agent.enabled_toolsets", "agent.disabled_toolsets",
-        "tools.tool_search.eager_toolsets", "tools.tool_search.enabled", "oma_skills",
+        "tools.tool_search.eager_toolsets", "tools.tool_search.enabled",
     ]
     applied = read_user_config_raw(native / "config.yaml")
     assert {key: applied[key] for key in settings} == settings
@@ -93,6 +93,7 @@ def test_sync_applies_only_saved_settings_to_the_owning_profile(tmp_path, monkey
 
 def test_sync_updates_and_prunes_managed_packages_without_touching_unrelated_skills(tmp_path, monkeypatch):
     import json
+    import shutil
 
     from hermes_cli.oma_campaigns.standalone import seed_standalone_agents, sync_standalone_agent
     from tools import skills_tool
@@ -103,17 +104,26 @@ def test_sync_updates_and_prunes_managed_packages_without_touching_unrelated_ski
     seed_standalone_agents(tmp_path, install_dir=source)
     record = tmp_path / "oma" / "agents" / "default" / "config.yaml"
     config = read_mapping(record)
-    bundle = tmp_path / "oma-bundle" / "skills" / "oma" / "oma-brand"
+    shared = tmp_path / "oma-bundle" / "skills"
+    bundle = shared / "social-media-skills" / "social-strategy"
+    starter = tmp_path / "skills" / "oma-brand"
+    shutil.copytree(shared / "oma" / "oma-brand", starter)
+    starter_bytes = (starter / "SKILL.md").read_bytes()
     local = tmp_path / "skills" / "personal"
     local.mkdir(parents=True)
     (local / "SKILL.md").write_text("---\nname: personal\n---\nKeep me", encoding="utf-8")
-    atomic_config_replace(record, {**config, "oma_skills": ["oma-brand"]})
+    atomic_config_replace(record, {**config, "oma_skills": ["social-strategy"]})
     assert sync_standalone_agent(tmp_path, "default")["updated"] == ["oma_skills"]
-    installed = tmp_path / "skills" / "oma-brand"
+    installed = tmp_path / "skills" / "social-strategy"
+    assert (starter / "SKILL.md").read_bytes() == starter_bytes
     assert (installed / "SKILL.md").read_bytes() == (bundle / "SKILL.md").read_bytes()
     (bundle / "extra.md").write_text("Edited source package", encoding="utf-8")
     sync_standalone_agent(tmp_path, "default")
     assert (installed / "extra.md").read_text(encoding="utf-8") == "Edited source package"
+
+    atomic_config_replace(record, config)
+    assert sync_standalone_agent(tmp_path, "default")["updated"] == []
+    assert installed.is_dir()
 
     atomic_config_replace(record, {**config, "model": "don't-apply", "oma_skills": ["omactl", "unavailable"]})
     with pytest.raises(ValueError, match="eligible OMA package"):
@@ -123,10 +133,35 @@ def test_sync_updates_and_prunes_managed_packages_without_touching_unrelated_ski
     atomic_config_replace(record, {**config, "oma_skills": []})
     assert sync_standalone_agent(tmp_path, "default")["updated"] == ["oma_skills"]
     assert not installed.exists() and bundle.exists() and local.exists()
-    assert not json.loads(skills_tool.skill_view("oma-brand", preprocess=False))["success"]
-    atomic_config_replace(record, {**config, "oma_skills": ["oma-brand"]})
+    assert not json.loads(skills_tool.skill_view("social-strategy", preprocess=False))["success"]
+    assert (starter / "SKILL.md").read_bytes() == starter_bytes
+    atomic_config_replace(record, {**config, "oma_skills": ["social-strategy"]})
     sync_standalone_agent(tmp_path, "default")
-    assert json.loads(skills_tool.skill_view("oma-brand", preprocess=False))["skill_dir"] == str(installed)
+    assert json.loads(skills_tool.skill_view("social-strategy", preprocess=False))["skill_dir"] == str(installed)
+
+
+def test_legacy_inventory_does_not_own_or_hide_starters(tmp_path, monkeypatch):
+    import json
+
+    from agent.skill_selection import OMA_SKILL_INVENTORY
+    from hermes_cli.oma_campaigns.standalone import seed_standalone_agents, sync_standalone_agent
+    from tools import skills_tool
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    _profile(tmp_path, "root-model", "Default persona")
+    seed_standalone_agents(tmp_path, install_dir=Path(__file__).resolve().parents[2])
+    record = tmp_path / "oma" / "agents" / "default" / "config.yaml"
+    atomic_config_replace(record, {**read_mapping(record), "oma_skills": []})
+    starter = tmp_path / "skills" / "oma-brand" / "SKILL.md"
+    starter.parent.mkdir(parents=True)
+    starter.write_text("---\nname: oma-brand\n---\nKeep my edits", encoding="utf-8")
+    inventory = tmp_path / "skills" / OMA_SKILL_INVENTORY
+    inventory.write_text(json.dumps({"owned": {"oma-brand": "oma-brand"}, "pruned": ["oma-agents"]}), encoding="utf-8")
+
+    assert json.loads(skills_tool.skill_view("oma-agents", preprocess=False))["success"]
+    assert sync_standalone_agent(tmp_path, "default")["updated"] == ["oma_skills"]
+    assert json.loads(inventory.read_text(encoding="utf-8")) == {"owned": {}, "pruned": []}
+    assert starter.read_text(encoding="utf-8").endswith("Keep my edits")
 
 
 def test_sync_rejects_non_standalone_or_missing_profiles(tmp_path, monkeypatch):
@@ -145,7 +180,7 @@ def test_sync_rejects_non_standalone_or_missing_profiles(tmp_path, monkeypatch):
         sync_standalone_agent(tmp_path, "demo__publisher")
 
 
-def test_docker_seed_command_adopts_missing_maintenance_and_first_sync_can_remove_omactl(tmp_path, monkeypatch):
+def test_docker_seed_command_keeps_omactl_outside_extra_skill_sync(tmp_path, monkeypatch):
     from hermes_cli.oma_campaigns.standalone import main, sync_standalone_agent
 
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
@@ -155,8 +190,11 @@ def test_docker_seed_command_adopts_missing_maintenance_and_first_sync_can_remov
     installed = tmp_path / "profiles" / "maintenance" / "skills" / "omactl" / "SKILL.md"
     assert installed.is_file()
     record = tmp_path / "oma" / "agents" / "maintenance" / "config.yaml"
-    atomic_config_replace(record, {**read_mapping(record), "oma_skills": []})
-    assert sync_standalone_agent(tmp_path, "maintenance")["updated"] == ["oma_skills"]
-    assert not installed.exists()
+    config = read_mapping(record)
+    atomic_config_replace(record, {**config, "oma_skills": ["omactl"]})
+    assert sync_standalone_agent(tmp_path, "maintenance")["updated"] == []
+    atomic_config_replace(record, {**config, "oma_skills": []})
+    assert sync_standalone_agent(tmp_path, "maintenance")["updated"] == []
+    assert installed.is_file()
     assert main(["seed", "--install-dir", str(source), "--ensure-maintenance"]) == 0
-    assert not installed.exists() and read_mapping(record)["oma_skills"] == []
+    assert installed.is_file() and read_mapping(record)["oma_skills"] == []

@@ -192,7 +192,7 @@ The [OMA integration catalog](hermes_cli/oma_campaigns/schemas/integrations.json
 
 **Shared skills only:** The [repository bundle](oma-bundle/README.md) ships reusable skills, not campaign or agent templates. Docker seeds it at `$HERMES_HOME/oma-bundle` only if absent. Existing volumes are preserved and any old templates are ignored.[3][5]
 
-**Standalone agents:** Docker seeds missing `oma/agents/default` and `oma/agents/maintenance` records without applying them or replacing saved edits. Their `oma_skills` lists reference the default management packages and maintenance-only `omactl` in the local bundle. Explicit standalone sync applies model, MCP, and the same explicit toolset settings as campaign sync, and reconciles managed skill copies, including removals. It never applies the saved persona or changes unrelated skills.
+**Standalone agents:** Docker seeds missing `oma/agents/default` and `oma/agents/maintenance` records without applying them or replacing saved edits. The default management packages and maintenance-only `omactl` are implicit, not listed in starter records. Explicit standalone sync applies model, MCP, and the same explicit toolset settings as campaign sync. The `oma_skills` list reconciles extra packages only, including removals, and never changes starter or unrelated skills. Sync does not apply the saved persona.
 
 **Editable campaign config:** The agent writes the identity, roster, goals and plans before provisioning. Campaign and agent records are unversioned; older `version` fields are ignored and preserved in existing files. Campaigns use the single stored playbook without a `playbook` field.
 
