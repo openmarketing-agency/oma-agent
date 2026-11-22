@@ -27,7 +27,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DETECT_DIR = ROOT / "assets" / "gtm-recipes" / "detect"
 SNIPPET_DIR = ROOT / "assets" / "snippets"
-HEADER_RE = re.compile(r"\A/\*!.*?\*/\n", re.S)
+HEADER_RE = re.compile(r"\A/\*!.*?\*/\n", re.DOTALL)
 
 
 def expected_html(snippet_path):

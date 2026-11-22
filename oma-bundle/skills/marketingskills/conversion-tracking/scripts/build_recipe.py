@@ -126,27 +126,32 @@ def main():
         return validated(args.event_name or default, kind, "--event-name")
 
     tokens = {}
-    if args.send == "google-ads":
+
+    def google_ads_tokens():
         if not (args.conversion_id and args.conversion_label):
             fail("--send google-ads requires --conversion-id and --conversion-label")
-        conversion_id = re.sub(r"^AW-", "", args.conversion_id.strip(), flags=re.I)
+        conversion_id = re.sub(r"^AW-", "", args.conversion_id.strip(), flags=re.IGNORECASE)
         tokens["__GOOGLE_ADS_CONVERSION_ID__"] = validated(conversion_id, "google_ads_id", "--conversion-id")
         tokens["__GOOGLE_ADS_CONVERSION_LABEL__"] = validated(
             args.conversion_label.strip(), "google_ads_label", "--conversion-label")
-    elif args.send == "ga4":
+
+    def ga4_tokens():
         require(args.measurement_id, "--measurement-id")
         tokens["__GA4_MEASUREMENT_ID__"] = validated(
             args.measurement_id.strip().upper(), "ga4_id", "--measurement-id")
         tokens["__GA4_EVENT_NAME__"] = event_name("generate_lead", "ga4_event_name")
-    elif args.send == "meta":
+
+    def meta_tokens():
         require(args.pixel_id, "--pixel-id")
         tokens["__META_PIXEL_ID__"] = validated(args.pixel_id.strip(), "meta_pixel", "--pixel-id")
         tokens["__META_EVENT_NAME__"] = event_name("Lead")
-    elif args.send == "tiktok":
+
+    def tiktok_tokens():
         require(args.pixel_id, "--pixel-id")
         tokens["__TIKTOK_PIXEL_ID__"] = validated(args.pixel_id.strip().upper(), "tiktok_pixel", "--pixel-id")
         tokens["__TIKTOK_EVENT_NAME__"] = event_name("SubmitForm")
-    elif args.send == "linkedin":
+
+    def linkedin_tokens():
         require(args.partner_id, "--partner-id")
         require(args.conversion_id, "--conversion-id")
         tokens["__LINKEDIN_PARTNER_ID__"] = validated(
@@ -154,7 +159,8 @@ def main():
         # Interpolated into JavaScript unquoted, so it must be digits.
         tokens["__LINKEDIN_CONVERSION_ID__"] = validated(
             args.conversion_id.strip(), "linkedin_conversion", "--conversion-id")
-    elif args.send == "microsoft":
+
+    def microsoft_tokens():
         require(args.uet_tag_id, "--uet-tag-id")
         tokens["__MICROSOFT_UET_TAG_ID__"] = validated(args.uet_tag_id.strip(), "uet_tag", "--uet-tag-id")
         if args.event_name is not None:
@@ -164,6 +170,17 @@ def main():
                 fail(f"--event-name {args.event_name!r} is not valid (control characters are not allowed)")
             args.event_name = args.event_name.strip()
         tokens["__MICROSOFT_EVENT_ACTION__"] = event_name("submit_lead_form", "microsoft_event_action")
+
+    handlers = {
+        "google-ads": google_ads_tokens,
+        "ga4": ga4_tokens,
+        "meta": meta_tokens,
+        "tiktok": tiktok_tokens,
+        "linkedin": linkedin_tokens,
+        "microsoft": microsoft_tokens,
+    }
+    if handler := handlers.get(args.send):
+        handler()
 
     tool = events[args.tool]
     tokens["__RECIPE_LABEL__"] = tool["label"]
@@ -201,7 +218,7 @@ def main():
     if leftover:
         fail(f"unreplaced placeholder tokens remain: {leftover}")
 
-    Path(args.out).write_text(json.dumps(detect, indent=2) + "\n")
+    Path(args.out).write_text(json.dumps(detect, indent=2) + "\n", encoding="utf-8")
     print(f"wrote {args.out}")
     print(f"  detects : {tool['label']} ({tool['moment']}) via dataLayer event '{tool['event']}'")
     print(f"  sends to: {args.send}")
