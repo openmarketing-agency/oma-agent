@@ -54,6 +54,19 @@ def test_default_is_installed_once_and_a_removal_sticks(tmp_path, installs):
     assert default_plugins.install_defaults(home, entries=entries)["installed"] == ["second"]
 
 
+def test_oma_camofox_default_survives_newer_live_catalog_pin(tmp_path, installs, monkeypatch):
+    from hermes_cli import plugin_catalog
+
+    upstream = {"name": "camofox", "repo": "https://github.com/NousResearch/hermes-official-plugins",
+                "sha": "f" * 40, "description": "Browser backend", "maintainer": "NousResearch",
+                "tier": "official", "subdir": "camofox", "version": "999.0.0"}
+    monkeypatch.setattr(plugin_catalog, "fetch_live_catalog", lambda: {"entries": [upstream]})
+    entries = default_plugins.default_entries()
+    assert [(entry.name, entry.sha) for entry in entries] == [("camofox", upstream["sha"])]
+    assert default_plugins.install_defaults(tmp_path, entries=entries)["installed"] == ["camofox"]
+    assert default_plugins.install_defaults(tmp_path, entries=entries)["installed"] == []
+
+
 def test_a_refused_enable_is_retried_until_the_user_decides(tmp_path, monkeypatch):
     """Co-authored with @BearHuddleston's review patch on #154858."""
     import json

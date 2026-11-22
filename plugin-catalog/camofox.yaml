@@ -19,6 +19,7 @@ description: 'Camofox browser backend: browse with a self-hosted anti-detection 
   cores that still bundle Camofox.'
 maintainer: NousResearch
 tier: official
+default: true
 category: web
 version: "1.1.0"
 image: https://raw.githubusercontent.com/NousResearch/hermes-official-plugins/e7a218f26db88426ab3e7376f0e000b6e356f5e7/assets/camofox.jpg

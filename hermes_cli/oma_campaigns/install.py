@@ -7,11 +7,15 @@ import sqlite3
 from pathlib import Path
 
 from agent.runtime_scope import bind_profile_scope
+from agent.secret_scope import load_env_file
 from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS
 from agent.skill_utils import parse_config_string_list
 from hermes_cli import kanban_db
-from hermes_cli.config import atomic_config_replace, atomic_config_write, read_user_config_raw
+from hermes_cli.config import (
+    atomic_config_replace, atomic_config_write, read_user_config_raw, require_env_writable, save_env_value,
+)
 from hermes_cli.config_backend import require_file_tooling
+from hermes_cli.config_credential_values import refuse_redacted_env_value
 from hermes_cli.config_defaults import DEFAULT_CONFIG
 from hermes_cli.config_home import OMA_CAMPAIGN_SKILL
 from hermes_cli.oma_campaigns.schema import validate_record
@@ -19,6 +23,7 @@ from hermes_cli.oma_campaigns.settings import read_agent_record, record_with_eff
 from hermes_cli.oma_campaigns.source import Agent, Campaign, campaign_fields, checked_id, read_mapping, resolve
 from hermes_cli.profile_provision import ProfileCreateRequest, provision_profile
 from hermes_cli.profiles import get_profile_dir, profile_exists
+from hermes_cli.toolset_validation import parse_platform_toolsets_value
 from hermes_constants import get_hermes_home
 from toolsets import resolve_toolset
 from tools.skills_sync import bundled_skill_names, sync_skills
@@ -176,27 +181,89 @@ def _with_kanban(config: dict, board: str, orchestrator: str, agent_id: str) -> 
     if any(set(resolve_toolset(name)) & set(resolve_toolset("kanban")) for name in disabled):
         raise ValueError(f"{agent_id}: agent.disabled_toolsets conflicts with campaign Kanban tools")
     config = {**config, "kanban": {**kanban, "profile_board": board, "orchestrator_profile": orchestrator}}
-    # Select the plugin if present without changing an authored eager policy or toolset opt-out.
-    optional = [] if "camofox" in disabled else ["camofox"]
+
     enabled = agent_config.get("enabled_toolsets")
     if enabled is not None:
         if not isinstance(enabled, list) or any(not isinstance(name, str) or not name for name in enabled):
             raise ValueError(f"{agent_id}: agent.enabled_toolsets must be a list of toolset names or null")
-        config["agent"] = {**agent_config, "enabled_toolsets": list(dict.fromkeys([*enabled, "kanban", *(optional if enabled else [])]))}
+        config["agent"] = {**agent_config, "enabled_toolsets": list(dict.fromkeys([*enabled, "kanban"]))}
     else:
         config["toolsets"] = list(dict.fromkeys([*parse_config_string_list(config.get("toolsets")), "kanban"]))
         if isinstance(platforms := config.get("platform_toolsets"), dict):
             config["platform_toolsets"] = {
-                platform: list(dict.fromkeys([*selected, "kanban", *(optional if selected else [])]))
+                platform: list(dict.fromkeys([*selected, "kanban"]))
                 if isinstance(selected, list) else selected
                 for platform, selected in platforms.items()
             }
     return config
 
 
-def _initialize(agent: Agent, config: dict, staging: Path) -> None:
+def _camofox_requested(config: dict) -> bool:
+    agent = config.get("agent", {})
+    if "camofox" in parse_config_string_list(agent.get("disabled_toolsets")):
+        return False
+    if (enabled := agent.get("enabled_toolsets")) is not None:
+        return "camofox" in enabled
+    platforms = config.get("platform_toolsets") or {}
+    return isinstance(platforms, dict) and any(
+        "camofox" in (parse_platform_toolsets_value(selection) or []) for selection in platforms.values()
+    )
+
+
+def _without_camofox(config: dict) -> dict:
+    agent = dict(config.get("agent", {}))
+    if "camofox" in (agent.get("enabled_toolsets") or []):
+        agent["enabled_toolsets"] = [name for name in agent["enabled_toolsets"] if name != "camofox"]
+    updated = {**config, "agent": agent} if agent or "agent" in config else dict(config)
+    if isinstance(platforms := config.get("platform_toolsets"), dict):
+        updated["platform_toolsets"] = dict(platforms)
+        for platform, selection in platforms.items():
+            names = parse_platform_toolsets_value(selection) or []
+            if "camofox" in names:
+                updated["platform_toolsets"][platform] = [name for name in names if name != "camofox"]
+    return updated
+
+
+def _camofox_credentials(home: Path) -> dict[str, str]:
+    saved = load_env_file(_real_path(home / ".env"))
+    pair = {name: saved.get(name, "").strip() for name in ("CAMOFOX_URL", "CAMOFOX_API_KEY")}
+    if not all(pair.values()):
+        return {}
+    for name, value in pair.items():
+        if not value.isascii() or "\n" in value or "\r" in value:
+            raise ValueError(f"{name} must be a single-line ASCII value in the default profile's .env")
+        refuse_redacted_env_value(name, value)
+        require_env_writable(name, "set")
+    return pair
+
+
+def _configure_camofox(home: Path, configs: dict[str, dict]) -> tuple[dict[str, dict[str, str]], set[str]]:
+    requested = {agent_id for agent_id, config in configs.items() if _camofox_requested(config)}
+    pair = _camofox_credentials(home) if requested else {}
+    skipped = set()
+    for agent_id, config in configs.items():
+        if agent_id in requested and pair:
+            continue
+        if not pair:
+            stripped = _without_camofox(config)
+            if stripped != config:
+                configs[agent_id] = config = stripped
+                skipped.add(agent_id)
+        agent = config.get("agent", {})
+        if agent.get("enabled_toolsets") is None:
+            # Legacy per-platform resolution can auto-enable newly installed plugins.
+            disabled = parse_config_string_list(agent.get("disabled_toolsets"))
+            configs[agent_id] = {**config, "agent": {**agent, "disabled_toolsets": list(dict.fromkeys([*disabled, "camofox"]))}}
+    return ({agent_id: pair for agent_id in requested} if pair else {}), skipped
+
+
+def _initialize(agent: Agent, config: dict, camofox: dict[str, str], staging: Path) -> None:
     atomic_config_replace(staging / "config.yaml", config)
     with bind_profile_scope(staging, hydrate_secrets=False):
+        for name, value in camofox.items():
+            save_env_value(name, value)
+        if camofox and any(load_env_file(staging / ".env").get(name) != value for name, value in camofox.items()):
+            raise ValueError(f"{agent.id}: could not save the Camofox settings in the new profile")
         result = sync_skills(quiet=True)
     bundled_needed = set(config["skills"].get("auto_load", [])) - set(agent.skills)
     if not bundled_needed.issubset(result["copied"]):
@@ -231,7 +298,7 @@ def _campaign_context_soul(config_path: Path) -> str:
 
 
 def _publish_profiles(campaign: Campaign, configs: dict[str, dict], paths: dict[str, tuple[Path, Path]],
-                      board: str, campaign_config: Path) -> None:
+                      board: str, campaign_config: Path, camofox: dict[str, dict[str, str]]) -> None:
     campaign_context = _campaign_context_soul(campaign_config)
     roster = ", ".join(f"`{agent.id}`" for agent in campaign.agents)
     for agent in campaign.agents:
@@ -253,7 +320,7 @@ def _publish_profiles(campaign: Campaign, configs: dict[str, dict], paths: dict[
                 "them when the context changes. Do not store credentials or raw transcripts.\n")
         request = ProfileCreateRequest(name=agent.id, alias=False, mirror_credentials=False,
                                        description=agent.description, soul=soul)
-        provision_profile(request, initialize=partial(_initialize, agent, configs[agent.id]))
+        provision_profile(request, initialize=partial(_initialize, agent, configs[agent.id], camofox.get(agent.id, {})))
 
 def install(home: Path, campaign_id: str) -> dict:
     require_file_tooling("OMA campaign installation")
@@ -281,6 +348,7 @@ def install(home: Path, campaign_id: str) -> dict:
                                   board, campaign.orchestrator, agent.id)
             for agent in campaign.agents
         }
+        camofox, skipped_camofox = _configure_camofox(home, configs)
         if (board_dir := kanban_db.board_dir(board)).exists() or board_dir.is_symlink():
             raise ValueError(f"Kanban board {board!r} already exists; refusing to reuse an unrelated board")
         atomic_config_write(config_path, {**config, "kanban_board": board, "installation_state": "installing"})
@@ -288,10 +356,12 @@ def install(home: Path, campaign_id: str) -> dict:
             board_metadata = kanban_db.create_board(board, name=campaign.name, description=campaign.description)
         except sqlite3.Error as exc:
             raise ValueError(f"Could not initialize campaign Kanban board {board!r}: {exc}") from exc
-        _publish_profiles(campaign, configs, paths, board, config_path)
+        _publish_profiles(campaign, configs, paths, board, config_path, camofox)
         for agent_id, settings in effective.items():
             path, agent_record = read_agent_record(home, campaign_id, agent_id)
             updated = record_with_effective(agent_record, settings)
+            if agent_id in skipped_camofox:
+                updated = _without_camofox(updated)
             if updated != agent_record:
                 atomic_config_replace(path, updated)
         current = read_mapping(config_path)

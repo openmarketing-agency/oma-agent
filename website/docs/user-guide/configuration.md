@@ -50,11 +50,14 @@ installer uses `hermes_cli/data/profiles/maintenance/` for its tool config,
 `$HERMES_HOME/profiles/maintenance/` and is not overwritten on upgrade. The
 `omactl` CLI is a separate runtime prerequisite.
 
-The `camofox` selection only makes an installed and configured plugin eligible;
-it does not install the plugin, configure its endpoint, or start its server.
-New campaign profiles also select it by default, preserving explicit toolset
-opt-outs and authored disclosure policies. The prompt mentions it as an alternate
-browser for authorized pages only when the session can actually use it.
+OMA installs the official Camofox plugin through Hermes's default-plugin
+installer, subject to the profile's automatic-install policy. This doesn't
+configure or start a Camofox server. For a new campaign, list `camofox` in the
+desired agent's toolsets and set both `CAMOFOX_URL` and `CAMOFOX_API_KEY` in the
+default profile's saved `.env`. OMA copies only that pair to the selected new
+campaign profiles. If either value is missing or blank, it leaves Camofox out
+and copies neither value. Existing profiles, explicit opt-outs, and tool
+eagerness are unchanged.
 
 No skills are auto-loaded by default. The five bundled `oma-*` management
 skills are available on demand only in the `default` profile, whose stock

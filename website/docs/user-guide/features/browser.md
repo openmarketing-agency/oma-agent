@@ -630,6 +630,11 @@ too, so browsing stays off.
 A `browser.camofox` block with no `CAMOFOX_URL` is not a Camofox setup. A profile that sets up the
 plugin after the update keeps `browser_exec` alongside it.
 
+OMA installs Camofox as a default plugin, subject to the automatic-install
+policy. See [OMA starter configuration](../configuration.md#oma-starter-configuration)
+for how new campaigns inherit Camofox settings. Run the server separately and
+use `hermes -p <profile> camofox status` to check the connection after installation.
+
 ## Practical examples
 
 ### Filling out a web form

@@ -35,7 +35,7 @@ _BACKOFF = "default-plugins"  # memory_provider_migration failure-stamp name, in
 def default_entries() -> list:
     """Catalog entries marked default that this OS and this Hermes can run (live catalog, else in-tree).
     The tier is checked here too: the live/in-tree merge can carry ``default`` onto a community entry."""
-    from hermes_cli.plugin_catalog import DEFAULT_TIERS, load_catalog_live
+    from hermes_cli.plugin_catalog import DEFAULT_TIERS, load_catalog, load_catalog_live
     from hermes_cli.plugins_cmd import PluginOperationError
     from hermes_cli.plugins_cmd_catalog import refuse_incompatible_catalog_entry
 
@@ -45,7 +45,10 @@ def default_entries() -> list:
         except PluginOperationError:
             return False
         return True
-    return [entry for entry in load_catalog_live() if entry.default and entry.tier in DEFAULT_TIERS and runs_here(entry)]
+    # Preserve OMA's shipped defaults even when the live catalog supplies a newer pin.
+    shipped_defaults = {entry.name for entry in load_catalog() if entry.default}
+    return [entry for entry in load_catalog_live() if (entry.default or entry.name in shipped_defaults)
+            and entry.tier in DEFAULT_TIERS and runs_here(entry)]
 
 
 def _recorded(home: Path) -> set[str]:

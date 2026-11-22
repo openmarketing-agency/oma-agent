@@ -11,8 +11,10 @@ import pytest
 
 @pytest.fixture
 def bundle(tmp_path, monkeypatch):
+    from hermes_cli import default_plugins
     from hermes_cli.oma_campaigns import __main__ as cli
 
+    monkeypatch.setattr(default_plugins, "spawn_install", lambda _path: True)
     home = tmp_path / ".hermes"
     home.mkdir()
     monkeypatch.setenv("HERMES_HOME", str(home))
@@ -165,7 +167,7 @@ def test_sync_materializes_defaults_and_agent_overrides(bundle, capsys):
         assert {key: authored[key] for key in expected if key in authored} == (override if path == worker else {})
         native = read_user_config_raw(home / "profiles" / path.parent.name / "config.yaml")
         assert {key: native[key] for key in expected} == expected
-        assert native["agent"]["enabled_toolsets"] == ["file", "kanban", "camofox"]
+        assert native["agent"]["enabled_toolsets"] == ["file", "kanban"]
         assert "effective" not in native and "jobs" not in native
 
     assert sync(["demo"]) == 0
@@ -416,6 +418,68 @@ def test_sync_rejects_malformed_campaign_before_writing_profiles(bundle, capsys)
     assert sync(["demo"]) == 1
     assert "invalid OMA campaign goals" in capsys.readouterr().err
     assert profile.read_bytes() == initial
+
+
+@pytest.mark.parametrize("saved", [(), ("CAMOFOX_URL",), ("CAMOFOX_API_KEY",), ("CAMOFOX_URL", "CAMOFOX_API_KEY")])
+def test_new_campaign_camofox_requires_complete_saved_pair(bundle, capsys, monkeypatch, saved):
+    from agent.secret_scope import load_env_file
+    from hermes_cli import kanban_db
+    from hermes_cli.config import atomic_config_replace
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, main = bundle
+    record = source / "agents/demo__orchestrator/config.yaml"
+    atomic_config_replace(record, {**read_mapping(record), "agent": {"enabled_toolsets": ["file", "camofox"]}})
+    pair = {"CAMOFOX_URL": "https://browser.example.invalid", "CAMOFOX_API_KEY": "fixture-browser-token"}
+    if saved:
+        lines = [f"{key}='{pair[key] if key in saved else '   '}'" for key in pair]
+        (home / ".env").write_text("\n".join([*lines, "UNRELATED_API_KEY=fixture-unrelated-token", ""]), encoding="utf-8")
+    for key in pair:
+        monkeypatch.setenv(key, "process-env-must-not-be-used")
+
+    assert main(["install", "demo"]) == 0
+    output = capsys.readouterr()
+    assert all(value not in output.out + output.err for value in pair.values())
+    assert kanban_db.board_exists("campaign-demo")
+    orchestrator = home / "profiles/demo__orchestrator"
+    worker = home / "profiles/demo__worker"
+    configured = set(saved) == set(pair)
+    for path in (record, orchestrator / "config.yaml"):
+        assert ("camofox" in read_mapping(path)["agent"]["enabled_toolsets"]) == configured
+        assert pair["CAMOFOX_API_KEY"] not in path.read_text(encoding="utf-8")
+    assert load_env_file(orchestrator / ".env") == (pair if configured else {})
+    assert read_mapping(worker / "config.yaml")["agent"]["enabled_toolsets"] == ["file", "kanban"]
+    assert load_env_file(worker / ".env") == {}
+    (home / ".env").write_text("", encoding="utf-8")
+    assert main(["install", "demo"]) == 0
+    assert load_env_file(orchestrator / ".env") == (pair if configured else {})
+
+
+def test_new_campaign_camofox_respects_opt_out_and_legacy_selection(bundle):
+    from agent.secret_scope import load_env_file
+    from hermes_cli.config import atomic_config_replace
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, main = bundle
+    records = source / "agents"
+    orchestrator = records / "demo__orchestrator/config.yaml"
+    spec = read_mapping(orchestrator)
+    del spec["agent"]
+    atomic_config_replace(orchestrator, {**spec, "platform_toolsets": {"cli": ["file", "camofox"]}})
+    worker = records / "demo__worker/config.yaml"
+    atomic_config_replace(worker, {**read_mapping(worker), "agent": {
+        "enabled_toolsets": ["file", "camofox"], "disabled_toolsets": ["camofox"],
+    }})
+    pair = {"CAMOFOX_URL": "https://browser.example.invalid", "CAMOFOX_API_KEY": "fixture-browser-token"}
+    (home / ".env").write_text("".join(f"{key}={value}\n" for key, value in pair.items()), encoding="utf-8")
+
+    assert main(["install", "demo"]) == 0
+    profiles = home / "profiles"
+    assert load_env_file(profiles / "demo__orchestrator/.env") == pair
+    native = read_mapping(profiles / "demo__orchestrator/config.yaml")
+    assert native["platform_toolsets"]["cli"] == ["file", "camofox", "kanban"]
+    assert load_env_file(profiles / "demo__worker/.env") == {}
+    assert read_mapping(profiles / "demo__worker/config.yaml")["agent"]["disabled_toolsets"] == ["camofox"]
 
 
 def test_generated_cron_belongs_to_the_verified_owner(bundle, capsys):
