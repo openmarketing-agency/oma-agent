@@ -210,6 +210,8 @@ When the built-in decomposer runs under `default`, `kanban.orchestrator_profile:
 
 **URL-only onboarding:** The [`oma-onboarding` skill](skills/oma/oma-onboarding/SKILL.md) uses one website or GitHub repository URL as brand and strategy evidence. The agent decides which campaigns and roles fit and which roles need recurring jobs, choosing each cadence and prompt. It registers eligible jobs through native Hermes cron in the owning profiles after verifying the team. This preserves operator pauses, does not force an immediate run, and skips jobs requiring unverified external permissions. Due jobs need a healthy gateway scheduler.
 
+Before provisioning, onboarding checks that every role has a nonempty, role-specific `SOUL.md` beside its authored config. An incomplete team stays a draft. After provisioning, onboarding checks each profile's own persona before scheduling. Social & Community review prompts explicitly check new comments, replies, mentions, and tagged posts on the selected channels, not just whether the account is connected. The skill update does not rewrite saved personas, declarations, or registered cron jobs.
+
 The setup agent checks reusable brand-asset categories and records source/license evidence or concrete gaps. If a competitor’s pricing page cannot be read, it uses permitted first-party alternatives and distinguishes indexed or conflicting figures from live verification. Verified, relevant social channels prompt consideration of a focused Social & Community campaign; a public profile link is not publishing access.
 
 ## 8. Fork-added inspection commands
