@@ -1,6 +1,6 @@
 {
   "description": "Find skills by name, description, or category in this profile and the shared OMA bundle. Use skill_view to load a match.",
-  "name": "search_skills",
+  "name": "skills_search",
   "parameters": {
     "properties": {
       "query": {

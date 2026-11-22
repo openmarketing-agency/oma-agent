@@ -1310,11 +1310,12 @@ def _render_skills_index(
     """Render the ## Skills block when skills are listed or discoverable on demand. *unloadable* names (different skills
     sharing a name AND relative path within one tier — one root or several) get a rename note instead of a row skill_view would refuse."""
     search_guidance = ""
-    if available_tools is not None and {"search_skills", "skill_view"} <= available_tools:
+    if available_tools is not None and {"skills_search", "skill_view"} <= available_tools:
         search_guidance = (
             "Some skills in the shared OMA skills repository (the OMA bundle) are not listed here. "
-            "If you need a skill and no listed skill fits, use search_skills(query) to search the bundle, "
-            "then load a relevant match with skill_view(name).\n"
+            "If you need a skill and no listed skill fits, use skills_search(query) to search the bundle, "
+            "then load a relevant match with skill_view(name). "
+            "Use skills_search if a skill refers to the old search_skills name.\n"
         )
     if not skills_by_category:
         return "## Skills\n" + search_guidance.rstrip() if search_guidance else ""

@@ -319,7 +319,7 @@ def _host_skills(fn):
 
 
 @_host_skills
-def search_skills(query: str) -> str:
+def skills_search(query: str) -> str:
     """Find matching skill metadata without loading content or altering installed skills."""
     if not isinstance(query, str) or not (words := query.casefold().split()):
         return _fail("Provide a nonempty skill search query.")
@@ -798,8 +798,8 @@ def skill_view(
         return tool_error(str(e), success=False)
 
 
-SEARCH_SKILLS_SCHEMA = {
-    "name": "search_skills",
+SKILLS_SEARCH_SCHEMA = {
+    "name": "skills_search",
     "description": "Find skills by name, description, or category in this profile and the shared OMA bundle. "
                    "Use skill_view to load a match.",
     "parameters": {
@@ -810,8 +810,8 @@ SEARCH_SKILLS_SCHEMA = {
 }
 
 registry.register(
-    name="search_skills", toolset="skills", schema=SEARCH_SKILLS_SCHEMA,
-    handler=lambda args, **kw: search_skills(args.get("query", "")),
+    name="skills_search", toolset="skills", schema=SKILLS_SEARCH_SCHEMA,
+    handler=lambda args, **kw: skills_search(args.get("query", "")),
     check_fn=check_skills_requirements, emoji="📚")
 
 SKILLS_LIST_SCHEMA = {

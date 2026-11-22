@@ -3,7 +3,7 @@
     "prompt_tokens": {
       "context": 134,
       "stable": 1829,
-      "volatile": 682
+      "volatile": 699
     },
     "tool_tokens": 9547,
     "tools": [
@@ -17,10 +17,10 @@
       "patch",
       "read_file",
       "search_files",
-      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
+      "skills_search",
       "terminal",
       "tool_call",
       "tool_describe",
@@ -35,7 +35,7 @@
     "prompt_tokens": {
       "context": 0,
       "stable": 1225,
-      "volatile": 682
+      "volatile": 699
     },
     "tool_tokens": 9547,
     "tools": [
@@ -49,10 +49,10 @@
       "patch",
       "read_file",
       "search_files",
-      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
+      "skills_search",
       "terminal",
       "tool_call",
       "tool_describe",
@@ -67,7 +67,7 @@
     "prompt_tokens": {
       "context": 0,
       "stable": 1646,
-      "volatile": 681
+      "volatile": 697
     },
     "tool_tokens": 9547,
     "tools": [
@@ -81,10 +81,10 @@
       "patch",
       "read_file",
       "search_files",
-      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
+      "skills_search",
       "terminal",
       "tool_call",
       "tool_describe",
@@ -99,7 +99,7 @@
     "prompt_tokens": {
       "context": 0,
       "stable": 2420,
-      "volatile": 678
+      "volatile": 695
     },
     "tool_tokens": 9703,
     "tools": [
@@ -113,10 +113,10 @@
       "patch",
       "read_file",
       "search_files",
-      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
+      "skills_search",
       "terminal",
       "tool_call",
       "tool_describe",
@@ -131,7 +131,7 @@
     "prompt_tokens": {
       "context": 0,
       "stable": 1225,
-      "volatile": 682
+      "volatile": 699
     },
     "tool_tokens": 9547,
     "tools": [
@@ -145,10 +145,10 @@
       "patch",
       "read_file",
       "search_files",
-      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
+      "skills_search",
       "terminal",
       "tool_call",
       "tool_describe",
@@ -163,7 +163,7 @@
     "prompt_tokens": {
       "context": 0,
       "stable": 1211,
-      "volatile": 682
+      "volatile": 699
     },
     "tool_tokens": 9547,
     "tools": [
@@ -177,10 +177,10 @@
       "patch",
       "read_file",
       "search_files",
-      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
+      "skills_search",
       "terminal",
       "tool_call",
       "tool_describe",
@@ -195,7 +195,7 @@
     "prompt_tokens": {
       "context": 0,
       "stable": 1495,
-      "volatile": 683
+      "volatile": 700
     },
     "tool_tokens": 10203,
     "tools": [
@@ -210,10 +210,10 @@
       "react_to_message",
       "read_file",
       "search_files",
-      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
+      "skills_search",
       "terminal",
       "tool_call",
       "tool_describe",
@@ -228,7 +228,7 @@
     "prompt_tokens": {
       "context": 0,
       "stable": 1244,
-      "volatile": 683
+      "volatile": 700
     },
     "tool_tokens": 9547,
     "tools": [
@@ -242,10 +242,10 @@
       "patch",
       "read_file",
       "search_files",
-      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
+      "skills_search",
       "terminal",
       "tool_call",
       "tool_describe",
@@ -260,7 +260,7 @@
     "prompt_tokens": {
       "context": 0,
       "stable": 1330,
-      "volatile": 683
+      "volatile": 700
     },
     "tool_tokens": 9547,
     "tools": [
@@ -274,10 +274,10 @@
       "patch",
       "read_file",
       "search_files",
-      "search_skills",
       "skill_manage",
       "skill_view",
       "skills_list",
+      "skills_search",
       "terminal",
       "tool_call",
       "tool_describe",

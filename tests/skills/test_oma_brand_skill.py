@@ -15,4 +15,8 @@ def test_oma_brand_loads_in_a_fresh_profile(tmp_path, monkeypatch):
     assert loaded["success"], loaded
     assert loaded["name"] == "oma-brand"
     assert "`oma/brand/config.yaml`" in loaded["content"]
+    reference = "references/website-integrations.md"
+    assert reference in loaded["linked_files"]["references"]
+    assert reference in loaded["content"]
+    assert json.loads(skill_view("oma-brand", file_path=reference))["success"]
     assert not (tmp_path / "oma").exists()
