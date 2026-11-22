@@ -45,7 +45,7 @@
     "integrations": {
       "type": "object",
       "description": "Public website signals keyed by provider ID, not connected accounts.",
-      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*(?![\\s\\S])" },
+      "propertyNames": { "pattern": "^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*(?![\\s\\S])" },
       "additionalProperties": {
         "type": "object", "required": ["status"], "additionalProperties": false,
         "properties": {

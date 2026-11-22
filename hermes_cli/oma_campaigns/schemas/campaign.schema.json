@@ -17,6 +17,8 @@
     },
     "goals": { "$ref": "#/$defs/text_list" },
     "plans": { "$ref": "#/$defs/text_list" },
+    "integrations": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/properties/id" }, "description": "Canonical OMA integration IDs required to resume." },
+    "lifecycle_state": { "enum": ["paused", "pausing", "resumed"], "readOnly": true },
     "kanban_board": { "type": "string", "pattern": "^campaign-[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])" },
     "kanban_board_name": { "$ref": "#/$defs/text" },
     "installation_state": { "enum": [null, "installing", "installed"], "readOnly": true },

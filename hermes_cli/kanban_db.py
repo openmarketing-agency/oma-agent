@@ -2125,8 +2125,10 @@ def _claim_and_open_run(
     conn: sqlite3.Connection, task_id: str, source_status: str, lock: str, expires: int, now: int,
     *, event_extra: Optional[dict] = None, expect_assignee: Optional[str] = None,
 ) -> Optional[int]:
-    """CAS ``source_status -> running`` (and still ``expect_assignee``'s, when given), open a
-    run row, emit ``claimed``; None when the CAS lost. Caller holds the txn."""
+    """Open a run using a status/assignee CAS. Caller holds the write transaction."""
+    from hermes_cli.oma_campaigns.admission import board_work_paused
+    if board_work_paused(conn):
+        return None
     cur = conn.execute(
         f"""
         UPDATE tasks
@@ -2172,18 +2174,12 @@ def claim_task(
     conn: sqlite3.Connection, task_id: str, *, ttl_seconds: Optional[int] = None,
     claimer: Optional[str] = None, expect_assignee: Optional[str] = None,
 ) -> Optional[Task]:
-    """Atomically transition ``ready -> running``.
-
-    Returns the claimed ``Task`` on success, ``None`` if the task was
-    already claimed (or is not ``ready``, or no longer ``expect_assignee``'s).
-    """
+    """Atomically claim a ready task; return None when it cannot run."""
     now = int(time.time())
     lock = claimer or _claimer_id()
     expires = now + _resolve_claim_ttl_seconds(ttl_seconds)
     with write_txn(conn):
-        # Single enforcement point: never ready -> running with an undone
-        # parent, whichever writer set 'ready'. Demote to 'todo';
-        # recompute_ready re-promotes when the parents finish.
+        # Demote a task with unfinished parents until recompute_ready promotes it.
         if not _parents_satisfied(conn, task_id):
             conn.execute(
                 "UPDATE tasks SET status = 'todo' "
@@ -2207,9 +2203,7 @@ def claim_review_task(
     conn: sqlite3.Connection, task_id: str, *, ttl_seconds: Optional[int] = None,
     claimer: Optional[str] = None, expect_assignee: Optional[str] = None,
 ) -> Optional[Task]:
-    """Atomic ``review -> running`` (None when lost). Parents are re-checked
-    (one may have reopened meanwhile) and a NEW run tracks the reviewer
-    separately from the implementer."""
+    """Recheck parents and atomically claim a review as a separate run."""
     now = int(time.time())
     lock = claimer or _claimer_id()
     expires = now + _resolve_claim_ttl_seconds(ttl_seconds)
@@ -2473,10 +2467,9 @@ def _extend_live_stale_claim(conn: sqlite3.Connection, row: sqlite3.Row, now: in
 
 
 def reclaim_task(
-    conn: sqlite3.Connection, task_id: str, *, reason: Optional[str] = None, signal_fn=None,
+    conn: sqlite3.Connection, task_id: str, *, reason: Optional[str] = None, signal_fn=None, require_stopped: bool = False,
 ) -> bool:
-    """Operator reclaim regardless of TTL: release the claim, restore the source
-    phase, reset the failure counter. False when not running."""
+    """Restore the source phase and clear its failure counter regardless of TTL."""
     row = conn.execute(
         "SELECT status, claim_lock, worker_pid, worker_started_at FROM tasks WHERE id = ?", (task_id,),
     ).fetchone()
@@ -2488,6 +2481,8 @@ def reclaim_task(
     prev_lock = row["claim_lock"]
     termination = _terminate_reclaimed_worker(
         row["worker_pid"], prev_lock, signal_fn=signal_fn, started_at=row["worker_started_at"])
+    if require_stopped and row["worker_pid"] and not termination["terminated"]:
+        return False  # Keep the claim until a campaign pause can confirm its worker is gone.
     with write_txn(conn):
         retry_status = _retry_status_for_run(conn, task_id)
         cur = conn.execute(

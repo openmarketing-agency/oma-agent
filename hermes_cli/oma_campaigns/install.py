@@ -21,7 +21,7 @@ from hermes_cli.config_home import OMA_CAMPAIGN_SKILL
 from hermes_cli.oma_campaigns.defaults import agent_defaults, snapshot
 from hermes_cli.oma_campaigns.schema import validate_record
 from hermes_cli.oma_campaigns.settings import (
-    credential_keys, read_agent_record, record_with_effective, resolve_settings, settings_from,
+    credential_keys, materialize_agent_settings, read_agent_record, resolve_settings, settings_from,
 )
 from hermes_cli.oma_campaigns.source import Agent, Campaign, campaign_fields, checked_id, read_mapping, resolve
 from hermes_cli.profile_provision import ProfileCreateRequest, provision_profile
@@ -80,7 +80,9 @@ def _status(home: Path, campaign_id: str, config: dict) -> dict:
         state = "incomplete"
     else:
         state = "installed" if ready else "draft"
+    lifecycle = config.get("lifecycle_state", "resumed" if state == "installed" else "paused")
     return {**record, "state": state, "present_profiles": present,
+            "lifecycle_state": lifecycle, "integrations": config.get("integrations", []),
             "kanban_board": board if recorded else None,
             "kanban_board_name": metadata["name"] if metadata else None}
 
@@ -331,7 +333,8 @@ def install(home: Path, campaign_id: str) -> dict:
                                   **camofox.get(agent.id, {})} for agent in campaign.agents}
         if (board_dir := kanban_db.board_dir(board)).exists() or board_dir.is_symlink():
             raise ValueError(f"Kanban board {board!r} already exists; refusing to reuse an unrelated board")
-        atomic_config_write(config_path, {**config, "kanban_board": board, "installation_state": "installing"})
+        atomic_config_write(config_path, {**config, "kanban_board": board, "installation_state": "installing",
+                                          "lifecycle_state": "paused"})
         try:
             board_metadata = kanban_db.create_board(board, name=campaign.name, description=campaign.description)
         except sqlite3.Error as exc:
@@ -341,7 +344,7 @@ def install(home: Path, campaign_id: str) -> dict:
         for agent_id, settings in effective.items():
             path, agent_record = read_agent_record(home, campaign_id, agent_id)
             policy = {key: authored[agent_id][key] for key in ("agent", "tools")}
-            updated = record_with_effective({**agent_record, **policy}, settings)
+            updated = materialize_agent_settings({**agent_record, **policy}, settings)
             if agent_id in skipped_camofox:
                 updated = _without_camofox(updated)
             if inherited:

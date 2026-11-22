@@ -1,0 +1,23 @@
+{
+  "discord": {"name": "Discord", "composio": "discord"},
+  "facebook": {"name": "Facebook", "composio": "facebook"},
+  "github": {"name": "GitHub", "composio": "github"},
+  "google-analytics": {"name": "Google Analytics 4", "composio": "google_analytics", "aliases": ["google analytics", "ga4"]},
+  "google-docs": {"name": "Google Docs", "composio": "googledocs"},
+  "google-search-console": {"name": "Google Search Console", "composio": "google_search_console"},
+  "google-sheets": {"name": "Google Sheets", "composio": "googlesheets"},
+  "hubspot": {"name": "HubSpot", "composio": "hubspot"},
+  "instagram": {"name": "Instagram", "composio": "instagram"},
+  "linkedin": {"name": "LinkedIn", "composio": "linkedin"},
+  "mailchimp": {"name": "Mailchimp", "composio": "mailchimp"},
+  "mixpanel": {"name": "Mixpanel", "composio": "mixpanel"},
+  "notion": {"name": "Notion", "composio": "notion"},
+  "posthog": {"name": "PostHog", "composio": "posthog"},
+  "reddit": {"name": "Reddit", "composio": "reddit"},
+  "slack": {"name": "Slack", "composio": "slack"},
+  "stripe": {"name": "Stripe", "composio": "stripe"},
+  "webflow": {"name": "Webflow", "composio": "webflow"},
+  "wordpress": {"name": "WordPress", "composio": null},
+  "x": {"name": "X (Twitter)", "composio": "twitter"},
+  "youtube": {"name": "YouTube", "composio": "youtube"}
+}

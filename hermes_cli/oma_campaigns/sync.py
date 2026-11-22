@@ -1,4 +1,4 @@
-"""Materialize a campaign's model and MCP settings in its installed profiles."""
+"""Materialize campaign model, MCP, and role toolset settings in installed profiles."""
 
 import argparse
 import json
@@ -18,7 +18,7 @@ from hermes_cli.config_credential_values import refuse_redacted_env_value
 from hermes_cli.oma_campaigns.install import _campaign_config_path, _campaigns_dir, _install_lock, _real_path, _status, default_home
 from hermes_cli.oma_campaigns.schema import validate_record
 from hermes_cli.oma_campaigns.settings import (
-    SETTINGS, credential_keys, read_agent_record, record_with_effective, resolve_settings, settings_from,
+    apply_toolset_settings, credential_keys, materialize_agent_settings, read_agent_record, resolve_settings, settings_from,
 )
 from hermes_cli.oma_campaigns.source import read_mapping
 
@@ -53,22 +53,24 @@ def _credential_updates(profile: Path, keys: set[str], stored: dict[str, str]) -
     return updates
 
 
-def _plan_agent(home: Path, campaign_id: str, agent_id: str, defaults: dict) -> _AgentUpdate:
+def _plan_agent(home: Path, campaign_id: str, agent_id: str, defaults: dict, *, orchestrator: bool) -> _AgentUpdate:
     record_path, record = read_agent_record(home, campaign_id, agent_id)
-    effective = resolve_settings(defaults, settings_from(record, agent_id))
     previous = record.get("effective", {})
-    if not isinstance(previous, dict):
-        raise ValueError(f"{agent_id}: effective must be a mapping")
+    resolved = resolve_settings(defaults, settings_from(record, agent_id))
     native_path = home / "profiles" / agent_id / "config.yaml"
     native = require_readable_config_before_write(native_path)
-    removed = (previous.keys() & set(SETTINGS)) - effective.keys()
-    next_native = {**{k: v for k, v in native.items() if k not in removed}, **effective}
+    if "mcp_servers" in previous and "mcp_servers" not in resolved:
+        next_native = {key: value for key, value in native.items() if key != "mcp_servers"}
+    else:
+        next_native = dict(native)
+    next_native.update(resolved)
+    next_native, _ = apply_toolset_settings(next_native, record, agent_id, orchestrator=orchestrator)
     profile = native_path.parent
-    required = credential_keys(effective)
+    required = credential_keys(resolved)
     stored = load_env_file(_real_path(profile / ".env")) if required else {}
     credentials = _credential_updates(profile, required, stored)
     available = {key for key in required if credentials.get(key, stored.get(key, "")).strip()}
-    next_record = record_with_effective(record, effective)
+    next_record = materialize_agent_settings(record, resolved)
     next_record["all-keys"] = sorted(required)
     next_record["available-keys"] = sorted(available)
     return _AgentUpdate(agent_id, record_path, native_path, next_record if next_record != record else None,
@@ -102,7 +104,8 @@ def sync_campaign(home: Path, campaign_id: str) -> dict:
             raise ValueError(f"Campaign {campaign_id!r} is not fully installed; no settings were synced")
         validate_record("campaign", campaign, campaign_path)
         defaults = settings_from(campaign, campaign_id)
-        plans = [_plan_agent(home, campaign_id, agent_id, defaults) for agent_id in status["agents"]]
+        plans = [_plan_agent(home, campaign_id, agent_id, defaults, orchestrator=agent_id == status["orchestrator"])
+                 for agent_id in status["agents"]]
         updates = [plan for plan in plans if plan.native is not None or plan.record is not None or plan.credentials]
         missing = {key for plan in plans for key in plan.required_keys - plan.available_keys}
         required = {key for plan in plans for key in plan.required_keys}

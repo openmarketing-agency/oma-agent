@@ -50,6 +50,94 @@ def bundle(tmp_path, monkeypatch):
     return home, source, cli.main
 
 
+@pytest.mark.parametrize("campaign_connector", [False, True])
+def test_campaign_integrations_use_brand_evidence_and_gate_resume(bundle, capsys, monkeypatch, campaign_connector):
+    from hermes_cli import kanban_db
+    from hermes_cli.config import atomic_config_write
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, main = bundle
+    brand = source / "brand" / "config.yaml"
+    brand.parent.mkdir()
+    atomic_config_write(brand, {
+        "id": "demo", "name": "Demo", "description": "Example brand",
+        "integrations": {"google_analytics": {"status": "observed", "evidence": "research/analytics.md"},
+                         "wordpress": {"status": "observed", "evidence": "research/cms.md"}},
+        "channels": {"social": [{"platform": "twitter", "status": "verified", "url": "https://x.com/demo"},
+                                {"platform": "youtube", "status": "not_checked"}]},
+    })
+    assert main(["integrations"]) == 0
+    assert json.loads(capsys.readouterr().out) == {"candidates": ["google-analytics", "x"], "unmapped": ["wordpress"]}
+    from hermes_cli.oma_campaigns import integrations
+
+    config = source / "campaigns" / "demo" / "config.yaml"
+    connector = {"mcp_servers": {"composio": {"url": "https://backend.composio.dev/mcp"}}} if campaign_connector else {}
+    atomic_config_write(config, {**read_mapping(config), **connector, "integrations": ["x", "google-analytics"]})
+    seen = []
+    connected = {"twitter"}
+
+    def probe(profile, queries):
+        seen.append((profile, set(queries)))
+        return connected.copy()
+
+    monkeypatch.setattr(integrations, "active_composio_toolkits", probe)
+    assert main(["install", "demo"]) == 0
+    assert json.loads(capsys.readouterr().out)["lifecycle_state"] == "paused"
+    assert main(["lifecycle", "demo", "resumed"]) == 3
+    assert json.loads(capsys.readouterr().out) == {
+        "id": "demo", "state": "paused", "missing_integrations": ["google-analytics"],
+    }
+    assert kanban_db.board_exists("campaign-demo")
+    assert read_mapping(config)["lifecycle_state"] == "paused"
+
+    connected.add("google_analytics")
+    assert main(["lifecycle", "demo", "resumed"]) == 0
+    assert json.loads(capsys.readouterr().out) == {"id": "demo", "state": "resumed"}
+    owner = home / "profiles" / "demo__orchestrator" if campaign_connector else home
+    assert seen == [(owner, {"twitter", "google_analytics"})] * 2
+    assert not (home / "profiles" / "demo__orchestrator" / "cron" / "jobs.json").exists()
+
+
+def test_campaign_pause_blocks_gateway_cron_and_kanban_without_editing_job_state(bundle, capsys):
+    from cron.jobs import create_job, get_due_jobs, list_jobs, trigger_job, use_cron_store
+    from hermes_cli import kanban_db, profiles
+    from hermes_cli.kanban_db_connect import connect_closing
+
+    home, _source, main = bundle
+    assert main(["install", "demo"]) == 0
+    assert json.loads(capsys.readouterr().out)["lifecycle_state"] == "paused"
+    role = home / "profiles" / "demo__orchestrator"
+    assert "demo__orchestrator" not in dict(profiles.profiles_to_serve(True))
+    with use_cron_store(role):
+        recurring = create_job(prompt="Review progress", schedule="every 1d")
+        disabled = create_job(prompt="Stay paused", schedule="every 1d", paused=True)
+        assert get_due_jobs() == []
+    with connect_closing(board="campaign-demo") as conn:
+        task_id = kanban_db.create_task(conn, title="Do work", assignee=role.name)
+        assert kanban_db.claim_task(conn, task_id) is None
+    assert main(["lifecycle", "demo", "resumed"]) == 0
+    assert json.loads(capsys.readouterr().out)["state"] == "resumed"
+    assert "demo__orchestrator" in dict(profiles.profiles_to_serve(True))
+    with use_cron_store(role):
+        trigger_job(recurring["id"])
+        assert [j["id"] for j in get_due_jobs()] == [recurring["id"]]
+    with connect_closing(board="campaign-demo") as conn:
+        assert kanban_db.claim_task(conn, task_id) is not None
+    assert main(["lifecycle", "demo", "paused"]) == 0
+    assert json.loads(capsys.readouterr().out)["state"] == "paused"
+    assert "demo__orchestrator" not in dict(profiles.profiles_to_serve(True))
+    assert "default" in dict(profiles.profiles_to_serve(True))
+    with connect_closing(board="campaign-demo") as conn:
+        task = kanban_db.get_task(conn, task_id)
+        assert task is not None and task.status == "ready"
+        assert kanban_db.claim_task(conn, task_id) is None
+    with use_cron_store(role):
+        assert get_due_jobs() == []
+        assert {j["id"]: j["enabled"] for j in list_jobs(include_disabled=True)} == {
+            recurring["id"]: True, disabled["id"]: False,
+        }
+
+
 def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     from agent.runtime_scope import bind_profile_scope
     from hermes_cli.config import read_user_config_raw
@@ -84,7 +172,7 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
         "goals": ["Measure demand"], "plans": ["Review evidence"],
         "agents": ["demo__orchestrator", "demo__worker"],
         "orchestrator": "demo__orchestrator", "kanban_board": "campaign-demo",
-        "kanban_board_name": "Demo", "installation_state": "installed",
+        "kanban_board_name": "Demo", "installation_state": "installed", "lifecycle_state": "paused",
     }
     assert record["agents"] == ["demo__orchestrator", "demo__worker"]
     for agent_id in record["agents"]:
@@ -163,8 +251,9 @@ def test_sync_materializes_defaults_and_agent_overrides(bundle, capsys):
         (worker, {**override, "mcp_servers": {**campaign_defaults["mcp_servers"], **override["mcp_servers"]}}),
     ):
         authored = read_mapping(path)
-        assert authored["effective"] == expected
-        assert {key: authored[key] for key in expected if key in authored} == (override if path == worker else {})
+        assert authored["model"] == expected["model"]
+        assert authored["effective"] == {"mcp_servers": expected["mcp_servers"]}
+        assert authored.get("mcp_servers") == (override["mcp_servers"] if path == worker else None)
         native = read_user_config_raw(home / "profiles" / path.parent.name / "config.yaml")
         assert {key: native[key] for key in expected} == expected
         assert native["agent"]["enabled_toolsets"] == ["file", "kanban"]
@@ -172,6 +261,64 @@ def test_sync_materializes_defaults_and_agent_overrides(bundle, capsys):
 
     assert sync(["demo"]) == 0
     assert json.loads(capsys.readouterr().out)["updated_agents"] == []
+
+
+def test_campaign_sync_applies_each_roles_toolsets_without_replacing_native_sections(bundle, capsys):
+    from hermes_cli.config import atomic_config_replace, read_user_config_raw
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import main as sync
+
+    home, source, main = bundle
+    assert main(["install", "demo"]) == 0
+    capsys.readouterr()
+    worker = source / "agents" / "demo__worker" / "config.yaml"
+    native = home / "profiles" / "demo__worker" / "config.yaml"
+    before = read_user_config_raw(native)
+    before["agent"]["max_turns"] = 11
+    before["tools"]["tool_search"]["listing"] = "off"
+    atomic_config_replace(native, before)
+    authored = read_mapping(worker)
+    authored["agent"].update(enabled_toolsets=["file", "web"], disabled_toolsets=[], max_turns=99)
+    authored["tools"] = {"tool_search": {"eager_toolsets": ["file"], "defer_toolsets": ["web"]}}
+    atomic_config_replace(worker, authored)
+
+    owner = home / "profiles" / "demo__orchestrator" / "config.yaml"
+    assert sync(["demo"]) == 0
+    assert "demo__worker" in json.loads(capsys.readouterr().out)["updated_agents"]
+    assert read_user_config_raw(owner)["agent"]["enabled_toolsets"] == ["file", "kanban"]
+    applied = read_user_config_raw(native)
+    assert applied["agent"]["enabled_toolsets"] == ["file", "web"]
+    assert applied["agent"]["disabled_toolsets"] == []
+    assert applied["agent"]["max_turns"] == 11
+    policy = applied["tools"]["tool_search"]
+    assert (policy["eager_toolsets"], policy["defer_toolsets"], policy["listing"]) == (["file"], ["web"], "off")
+    assert sync(["demo"]) == 0
+    assert json.loads(capsys.readouterr().out)["updated_agents"] == []
+
+
+@pytest.mark.parametrize(("role", "policy", "error_field"), [
+    ("worker", {"enabled_toolsets": "file"}, "agent.enabled_toolsets"),
+    ("orchestrator", {"enabled_toolsets": ["file"]}, "kanban"),
+    ("orchestrator", {"disabled_toolsets": ["kanban"]}, "kanban"),
+])
+def test_campaign_sync_rejects_bad_toolsets_before_applying_other_roles(bundle, capsys, role, policy, error_field):
+    from hermes_cli.config import atomic_config_replace
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import main as sync
+
+    home, source, main = bundle
+    assert main(["install", "demo"]) == 0
+    capsys.readouterr()
+    owner = source / "agents" / "demo__orchestrator" / "config.yaml"
+    worker = source / "agents" / "demo__worker" / "config.yaml"
+    invalid, other = (worker, owner) if role == "worker" else (owner, worker)
+    atomic_config_replace(other, {**read_mapping(other), "model": "unapplied-model"})
+    profiles = tuple(home / "profiles" / name / "config.yaml" for name in ("demo__orchestrator", "demo__worker"))
+    before = [path.read_bytes() for path in profiles]
+    atomic_config_replace(invalid, {**read_mapping(invalid), "agent": policy})
+    assert sync(["demo"]) == 1
+    assert error_field in capsys.readouterr().err
+    assert [path.read_bytes() for path in profiles] == before
 
 
 @pytest.fixture
@@ -375,8 +522,10 @@ def test_install_snapshots_saved_defaults_without_overriding_role_settings(
     assert key not in result.out + result.err
     expected = "explicit-team-model" if explicit_model else {**base_model, "api_key": "${OPENROUTER_API_KEY}"}
     assert read_mapping(campaign)["model"] == expected
-    assert read_mapping(owner)["effective"]["model"] == expected
-    assert read_mapping(worker)["effective"]["model"] == "explicit-worker-model"
+    assert read_mapping(owner)["model"] == expected
+    assert read_mapping(worker)["model"] == "explicit-worker-model"
+    assert "effective" not in read_mapping(owner)
+    assert "effective" not in read_mapping(worker)
     for path in (owner, home / "profiles/demo__orchestrator/config.yaml"):
         data = read_mapping(path)
         assert data["agent"]["reasoning_effort"] == "high"
@@ -399,7 +548,7 @@ def test_install_snapshots_saved_defaults_without_overriding_role_settings(
             assert data["available-keys"] == (["OPENROUTER_API_KEY"] if has_saved_key else [])
 
 
-def test_install_materializes_campaign_defaults_and_sync_can_remove_them(bundle, capsys):
+def test_saved_agent_model_persists_and_can_be_edited_independently_of_campaign(bundle, capsys):
     from hermes_cli.config import atomic_config_replace, atomic_config_write, read_user_config_raw
     from hermes_cli.oma_campaigns.source import read_mapping
     from hermes_cli.oma_campaigns.sync import main as sync
@@ -412,15 +561,43 @@ def test_install_materializes_campaign_defaults_and_sync_can_remove_them(bundle,
     capsys.readouterr()
     native = home / "profiles" / "demo__worker" / "config.yaml"
     agent = source / "agents" / "demo__worker" / "config.yaml"
-    assert read_mapping(agent)["effective"] == defaults
+    assert read_mapping(agent)["model"] == "team-model"
+    assert read_mapping(agent)["effective"] == {"mcp_servers": defaults["mcp_servers"]}
     assert {key: read_user_config_raw(native)[key] for key in defaults} == defaults
 
     current = read_mapping(campaign)
-    atomic_config_replace(campaign, {key: value for key, value in current.items() if key not in defaults})
+    atomic_config_replace(campaign, {**{key: value for key, value in current.items() if key not in defaults},
+                                     "model": "new-campaign-default"})
+    atomic_config_write(agent, {**read_mapping(agent), "model": "edited-worker-model"})
     assert sync(["demo"]) == 0
     assert json.loads(capsys.readouterr().out)["updated_agents"] == ["demo__orchestrator", "demo__worker"]
-    assert not defaults.keys() & read_user_config_raw(native).keys()
+    assert read_user_config_raw(native)["model"] == "edited-worker-model"
+    owner_native = home / "profiles" / "demo__orchestrator" / "config.yaml"
+    assert read_user_config_raw(owner_native)["model"] == "team-model"
+    assert "mcp_servers" not in read_user_config_raw(native)
     assert "effective" not in read_mapping(agent)
+
+
+def test_explicit_sync_refuses_legacy_effective_model_without_changes(bundle, capsys):
+    from hermes_cli.config import atomic_config_replace, atomic_config_write, read_user_config_raw
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import main as sync
+
+    home, source, main = bundle
+    assert main(["install", "demo"]) == 0
+    capsys.readouterr()
+    campaign = source / "campaigns/demo/config.yaml"
+    owner = source / "agents/demo__orchestrator/config.yaml"
+    worker = source / "agents/demo__worker/config.yaml"
+    atomic_config_write(campaign, {**read_mapping(campaign), "model": "new-campaign-default"})
+    atomic_config_replace(owner, {**read_mapping(owner), "effective": {"model": "legacy-owner-model"}})
+    atomic_config_replace(worker, {**read_mapping(worker), "model": "authored-worker-model",
+                                   "effective": {"model": "stale-worker-model"}})
+
+    assert sync(["demo"]) == 1
+    assert "invalid OMA agent effective" in capsys.readouterr().err
+    assert read_mapping(owner)["effective"]["model"] == "legacy-owner-model"
+    assert "model" not in read_user_config_raw(home / "profiles" / owner.parent.name / "config.yaml")
 
 
 def test_bundle_templates_are_ignored_and_profile_conflicts_do_not_publish(bundle, capsys):

@@ -580,6 +580,7 @@ def _profile_lifecycle_verb(runner, *, serve: bool):
 
     async def apply(name):
         from hermes_cli.profiles import profiles_to_serve, profile_is_parked
+        from hermes_cli.oma_campaigns.admission import profile_work_paused
         if not runner._multiplex_on() or not runner._running or runner._served_profile_homes is None:
             return {"error": "host multiplexer is not ready"}
         async with runner._reconcile_lock():
@@ -596,8 +597,8 @@ def _profile_lifecycle_verb(runner, *, serve: bool):
             installed = dict(profiles_to_serve(True, include_parked=True))
             if name not in installed:
                 return {"error": f"unknown profile '{name}'"}
-            if name != "default" and profile_is_parked(installed[name]):
-                return {"error": f"profile '{name}' is parked (gateway.parked)"}
+            if name != "default" and (profile_is_parked(installed[name]) or profile_work_paused(installed[name])):
+                return {"error": f"profile '{name}' is parked or its campaign is paused"}
             if name in known:
                 return {"error": f"profile '{name}' is already served"}
             known[name] = installed[name]

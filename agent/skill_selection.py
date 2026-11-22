@@ -1,11 +1,13 @@
 """Skill allowlist policy, shared by discovery, prompts and explicit activation."""
 
+from functools import lru_cache
+import json
 import logging
 import os
 from pathlib import Path
 from typing import Any
 
-from hermes_constants import get_default_hermes_root, get_hermes_home
+from hermes_constants import get_default_hermes_root, get_hermes_home, PROFILE_ID_RE
 
 logger = logging.getLogger(__name__)
 
@@ -14,14 +16,44 @@ OMA_RETIRED_SKILLS = frozenset({"oma-brands", "oma-playbooks"})
 OMA_DEFAULT_ONLY_SKILLS = OMA_RETIRED_SKILLS | {
     "oma-agents", "oma-brand", "oma-campaigns", "oma-onboarding", "oma-playbook",
 }
+OMA_MAINTENANCE_ONLY_SKILLS = frozenset({"omactl"})
+OMA_SKILL_INVENTORY = ".oma-managed.json"
 
 
-def profile_excluded_skills(home: Path | None = None) -> frozenset[str]:
-    """Reserve the OMA management skills for default and hide retired IDs."""
+@lru_cache(maxsize=16)
+def _pruned_skills(path: Path, _version: tuple) -> frozenset[str]:
+    try:
+        pruned = json.loads(path.read_text(encoding="utf-8-sig")).get("pruned", [])
+        if isinstance(pruned, list):
+            return frozenset(name for name in pruned if isinstance(name, str) and PROFILE_ID_RE.fullmatch(name))
+    except (AttributeError, OSError, ValueError, RecursionError):
+        pass
+    return frozenset()
+
+
+def _profile_pruned_skills(home: Path) -> frozenset[str]:
+    inventory = home / "skills" / OMA_SKILL_INVENTORY
+    try:
+        info = inventory.lstat()
+    except OSError:
+        return frozenset()
+    if inventory.is_symlink() or not inventory.is_file() or info.st_size > 256 * 1024:
+        return frozenset()
+    return _pruned_skills(inventory, (info.st_ino, info.st_mtime_ns, info.st_size))
+
+
+def profile_excluded_skills(home: Path | None = None, *, include_pruned: bool = True) -> frozenset[str]:
+    """Reserve the built-in skills for their owning profiles."""
     home = get_hermes_home() if home is None else home
-    if home.resolve() == get_default_hermes_root(home=home).resolve():
-        return OMA_RETIRED_SKILLS
-    return OMA_DEFAULT_ONLY_SKILLS
+    root = get_default_hermes_root(home=home).resolve()
+    resolved = home.resolve()
+    if resolved == root:
+        excluded = OMA_RETIRED_SKILLS | OMA_MAINTENANCE_ONLY_SKILLS
+    elif resolved == root / "profiles" / "maintenance":
+        excluded = OMA_DEFAULT_ONLY_SKILLS
+    else:
+        return OMA_DEFAULT_ONLY_SKILLS | OMA_MAINTENANCE_ONLY_SKILLS
+    return excluded | _profile_pruned_skills(home) if include_pruned else excluded
 
 
 def _allowlist(value: Any, key: str) -> frozenset[str] | None:

@@ -27,3 +27,8 @@ def validate_record(kind: str, record: dict, context: str | Path) -> None:
             missing = ", ".join(key for key in error.validator_value if key not in error.instance)
             raise ValueError(f"{context}: invalid OMA {kind} {field} (missing: {missing})")
         raise ValueError(f"{context}: invalid OMA {kind} {field} ({error.validator})")
+    if kind == "campaign" and record.get("integrations"):
+        from hermes_cli.oma_campaigns.integrations import integration_catalog
+
+        if set(record["integrations"]) - integration_catalog().keys():
+            raise ValueError(f"{context}: invalid OMA campaign integrations (use canonical catalog IDs)")
