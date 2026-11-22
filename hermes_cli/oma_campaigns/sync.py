@@ -3,26 +3,24 @@
 import argparse
 import json
 import os
-import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from agent.runtime_scope import bind_profile_scope
-from agent.secret_scope import _is_global_env, load_env_file
+from agent.secret_scope import load_env_file
 from hermes_cli.config import (
     atomic_config_replace, atomic_config_write, require_env_writable, require_readable_config_before_write,
-    save_env_value, validate_env_var_name_for_write,
+    save_env_value,
 )
 from hermes_cli.config_backend import require_file_tooling
 from hermes_cli.config_credential_values import refuse_redacted_env_value
 from hermes_cli.oma_campaigns.install import _campaign_config_path, _campaigns_dir, _install_lock, _real_path, _status, default_home
 from hermes_cli.oma_campaigns.schema import validate_record
-from hermes_cli.oma_campaigns.settings import SETTINGS, read_agent_record, record_with_effective, resolve_settings, settings_from
+from hermes_cli.oma_campaigns.settings import (
+    SETTINGS, credential_keys, read_agent_record, record_with_effective, resolve_settings, settings_from,
+)
 from hermes_cli.oma_campaigns.source import read_mapping
-
-_REFERENCE = re.compile(r"\$\{\s*(?:env:\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\}")
-
 
 @dataclass(frozen=True)
 class _AgentUpdate:
@@ -34,37 +32,6 @@ class _AgentUpdate:
     required_keys: set[str]
     available_keys: set[str]
     credentials: dict[str, str] = field(repr=False)
-
-
-def _references(value: object) -> set[str]:
-    pending = [value]
-    seen: set[int] = set()
-    names: set[str] = set()
-    while pending:
-        item = pending.pop()
-        if isinstance(item, str):
-            names.update(_REFERENCE.findall(item))
-        elif isinstance(item, (dict, list)) and id(item) not in seen:
-            seen.add(id(item))
-            pending.extend(item.values() if isinstance(item, dict) else item)
-    return names
-
-
-def _credential_keys(effective: dict) -> set[str]:
-    active_servers = {name: server for name, server in effective.get("mcp_servers", {}).items()
-                      if server.get("enabled") is not False}
-    refs = _references([effective.get("model"), active_servers])
-    keys = set()
-    for name in refs:
-        if _is_global_env(name):
-            continue
-        try:
-            validate_env_var_name_for_write(name)
-        except ValueError:
-            # Native runtime/launch variables may be referenced but must not be persisted.
-            continue
-        keys.add(name)
-    return keys
 
 
 def _credential_updates(profile: Path, keys: set[str], stored: dict[str, str]) -> dict[str, str]:
@@ -97,7 +64,7 @@ def _plan_agent(home: Path, campaign_id: str, agent_id: str, defaults: dict) -> 
     removed = (previous.keys() & set(SETTINGS)) - effective.keys()
     next_native = {**{k: v for k, v in native.items() if k not in removed}, **effective}
     profile = native_path.parent
-    required = _credential_keys(effective)
+    required = credential_keys(effective)
     stored = load_env_file(_real_path(profile / ".env")) if required else {}
     credentials = _credential_updates(profile, required, stored)
     available = {key for key in required if credentials.get(key, stored.get(key, "")).strip()}

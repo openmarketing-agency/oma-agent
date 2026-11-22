@@ -1,12 +1,40 @@
 """Resolve native Hermes settings shared by a campaign and its agents."""
 
+import re
 from pathlib import Path
 
+from agent.secret_scope import _is_global_env
+from hermes_cli.config import validate_env_var_name_for_write
 from hermes_cli.oma_campaigns.schema import validate_record
 from hermes_cli.oma_campaigns.source import _member, read_mapping
 
 
 SETTINGS = ("model", "mcp_servers")
+ENV_REFERENCE = re.compile(r"\$\{\s*(?:env:\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\}")
+
+
+def credential_keys(effective: dict) -> set[str]:
+    servers = [server for server in effective.get("mcp_servers", {}).values() if server.get("enabled") is not False]
+    pending = [effective.get("model"), *servers]
+    seen: set[int] = set()
+    refs: set[str] = set()
+    while pending:
+        item = pending.pop()
+        if isinstance(item, str):
+            refs.update(ENV_REFERENCE.findall(item))
+        elif isinstance(item, (dict, list)) and id(item) not in seen:
+            seen.add(id(item))
+            pending.extend(item.values() if isinstance(item, dict) else item)
+    keys = set()
+    for name in refs:
+        if _is_global_env(name):
+            continue
+        try:
+            validate_env_var_name_for_write(name)
+        except ValueError:
+            continue
+        keys.add(name)
+    return keys
 
 
 def read_agent_record(home: Path, campaign_id: str, agent_id: str) -> tuple[Path, dict]:

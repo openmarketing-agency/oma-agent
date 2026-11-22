@@ -99,6 +99,15 @@ needed and saves them in each owning agent's `jobs` list. Saving a declaration
 does not schedule a job; onboarding registers eligible jobs with native cron
 after verifying the provisioned profiles.
 
+New campaign roles must specify `agent.enabled_toolsets`. Include `kanban`
+for the orchestrator and for any worker that needs it; `[]` selects no tools
+for a worker. Omitted Tool Search settings default to `enabled: "on"` and
+`eager_toolsets: [file, skills, memory]`, without adding those toolsets to a
+role's selection. Explicit overrides are preserved. Agents that select `camofox`
+get the saved URL and key from `default` only when both are present. Where the
+tool is available, use it as the first browser fallback for public-page
+rendering failures, not to retry a bot challenge or explicit access denial.
+
 ### Sync campaign model and MCP settings
 
 Put native Hermes `model` and `mcp_servers` settings in the campaign config as
@@ -110,7 +119,12 @@ server. Omit an override to inherit; an empty agent `mcp_servers: {}` adds no
 overrides. The helper passes through the native settings, including nested
 options, rather than maintaining a separate OMA schema for them.
 
-Provisioning applies these settings to new profiles. After an edit, run
+For new campaigns with no explicit `model`, provisioning snapshots the saved
+`default` profile's model and passes only its matching saved API key to roles
+that inherit it. Missing keys don't block installation. YAML stores references,
+not copied key values. A role without `agent.reasoning_effort` takes the saved
+default effort when present, even if a model was specified explicitly.
+Existing campaigns are not backfilled. After an edit, run
 `sync-campaign` from the default OMA home to update an installed campaign.
 The script is on `PATH` in the Docker image; in a source checkout use
 `scripts/sync-campaign` with that installation's `hermes` on `PATH`.

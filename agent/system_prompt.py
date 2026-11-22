@@ -304,10 +304,32 @@ def _camofox_guidance(agent: Any) -> str:
     if not (direct or deferred):
         return ""
     guidance = (
-        "If the regular browser cannot render an authorized page, Camofox is available as an alternate browser. "
-        "If the site denies access or presents a bot challenge, respect that restriction and use a permitted source instead."
+        "If extraction times out, returns incomplete content, or cannot render an authorized public page, "
+        "use Camofox as the first browser fallback. If the site denies access or presents a bot challenge, "
+        "stop and use a permitted source instead."
     )
     return guidance + (" Find its tools with Tool Search." if deferred else "")
+
+
+def _oma_onboarding_guidance(agent: Any) -> str:
+    if not {"skill_view", "read_file"}.issubset(agent.valid_tool_names):
+        return ""
+    if _active_profile_name(agent, _ambient_plugin_profile_name) != "default":
+        return ""
+    return (
+        "When running OMA brand or onboarding work, check coverage before declaring setup complete. "
+        "Inspect official brand pages, rendered styles, and the authorized source repository for each asset category: "
+        "logos, fonts, icons, illustrations, backgrounds, and images. Save reusable files with source and license evidence, "
+        "verify their brand-relative paths, and record explicit gaps; screenshots are visual references, not reusable assets. "
+        "For key competitors' pricing, cross-check billing cadence, units and plan limits. If a primary source cannot be "
+        "read, check permitted first-party alternatives such as the official help center or docs before marking a gap. "
+        "Label indexed prices as unverified against live checkout and report conflicting evidence. "
+        "During campaign planning, propose a focused Social & Community campaign when verified channels can serve a "
+        "strategy goal; distinguish public links from authenticated access and record a concrete reason if deferred. "
+        "For new campaign agent records write an explicit agent.enabled_toolsets list: start with file, terminal, web, "
+        "browser, skills, memory, session_search, and camofox; honor role limits and opt-outs. Add kanban for the "
+        "orchestrator and workers that need it. The installer handles Camofox eligibility and credential setup."
+    )
 
 
 def _tool_guidance_block(agent: Any) -> Optional[str]:
@@ -334,6 +356,7 @@ def _tool_guidance_block(agent: Any) -> Optional[str]:
         SKILLS_GUIDANCE if "skill_manage" in names else None,
         _kanban_guidance,
         _camofox_guidance(agent),
+        _oma_onboarding_guidance(agent),
     ]
     return " ".join(g for g in tool_guidance if g) or None
 
