@@ -43,9 +43,9 @@ Ordinary new named profiles do not enable either toolset by default. Existing
 
 A fresh file-backed OMA install also creates a `maintenance` profile. It enables
 `file`, `terminal`, `skills`, `memory`, `session_search`, `web`, `browser`, and `camofox`.
-Only `file` and `terminal` are eager; the others are available through Tool
-Search where supported. Use `hermes -p maintenance` to select the profile. The
-installer uses `hermes_cli/data/profiles/maintenance/` for its tool config,
+`file`, `terminal`, `skills`, and `memory` are eager; the others are available
+through Tool Search where supported. Use `hermes -p maintenance` to select the
+profile. The installer uses `hermes_cli/data/profiles/maintenance/` for its tool config,
 `SOUL.md`, and `omactl` skill. The live profile is stored under
 `$HERMES_HOME/profiles/maintenance/` and is not overwritten on upgrade. The
 `omactl` CLI is a separate runtime prerequisite.
