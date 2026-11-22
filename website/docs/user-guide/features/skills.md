@@ -202,7 +202,7 @@ Level 2: skill_view(name, path)  → Specific reference file       (varies)
 
 The agent only loads the full skill content when it actually needs it.
 
-In OMA Agent, `search_skills(query)` also searches the shared OMA bundle by name, description,
+In OMA Agent, `skills_search(query)` also searches the shared OMA bundle by name, description,
 and category. Shared skills are not listed in the system prompt by default: their names and
 descriptions appear on demand in search results. Use `skill_view(name)` to load a result.
 A skill installed into the active profile takes precedence over a shared copy with the same

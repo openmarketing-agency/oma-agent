@@ -14,6 +14,9 @@ design_system:
 website:
   status: verified
   url: https://fieldnote.example.invalid/
+screenshots:
+  - file: screenshots/home-desktop.png
+    source_url: https://fieldnote.example.invalid/
 channels:
   social:
     - platform: linkedin

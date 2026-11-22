@@ -1,12 +1,15 @@
 """Search and load explicit skills without adding bundle skills to every prompt."""
 
 import json
+from pathlib import Path
 
 import pytest
 
 from agent.prompt_builder import build_skills_system_prompt
 from agent.runtime_scope import bind_profile_scope
+from hermes_cli.oma_campaigns.bundle import seed_bundle
 from tools import skills_tool
+from tools.registry import registry
 
 
 def _skill(root, category, name, description):
@@ -30,8 +33,11 @@ def test_search_resolves_profile_and_shared_bundle(tmp_path, monkeypatch):
     _skill(tmp_path / "oma-bundle" / "campaigns" / "seo" / "skills", "research",
            "research-private", "Campaign-private evidence.")
 
-    result = json.loads(skills_tool.search_skills("ReSeArCh"))
-    assert result["success"]
+    assert "search_skills" not in registry.get_tool_names_for_toolset("skills")
+    raw = registry.dispatch("skills_search", {"query": "ReSeArCh"})
+    assert isinstance(raw, str)
+    result = json.loads(raw)
+    assert result["success"], result
     rows = {row["name"]: row for row in result["skills"]}
     assert set(rows) == {"research-tone", "research-market"}
     assert rows["research-tone"]["description"] == "Set the local voice."
@@ -58,7 +64,7 @@ def test_search_preserves_named_profile_selection(tmp_path, monkeypatch):
     _skill(profile / "skills", "research", "research-own", "Profile-owned evidence.")
 
     with bind_profile_scope(profile, hydrate_secrets=False):
-        result = json.loads(skills_tool.search_skills("research"))
+        result = json.loads(skills_tool.skills_search("research"))
         assert [row["name"] for row in result["skills"]] == ["research-own", "research-shared"]
         assert not json.loads(skills_tool.skill_view("research-blocked"))["success"]
         prompt = build_skills_system_prompt()
@@ -77,5 +83,44 @@ def test_bundle_search_and_load_do_not_follow_symlink(tmp_path, monkeypatch):
     except (OSError, NotImplementedError):
         pytest.skip("symlinks unavailable")
 
-    assert json.loads(skills_tool.search_skills("research-external"))["skills"] == []
+    assert json.loads(skills_tool.skills_search("research-external"))["skills"] == []
     assert not json.loads(skills_tool.skill_view("research-external"))["success"]
+
+
+def test_seeded_marketingskills_are_discoverable_and_load_on_demand(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    seed_bundle(Path(__file__).resolve().parents[2] / "oma-bundle", tmp_path)
+    collection = tmp_path / "oma-bundle" / "skills" / "marketingskills"
+
+    results = json.loads(skills_tool.skills_search("marketingskills"))
+    names = {row["name"] for row in results["skills"]}
+    packages = {path.parent.name for path in collection.glob("*/SKILL.md")}
+    assert {"seo-audit", "conversion-tracking", "copywriting"} <= names
+    assert names == packages
+    assert all(row["source"] == "oma-bundle" for row in results["skills"])
+    assert (collection / "LICENSE").is_file()
+
+    for name in sorted(names):
+        skill = json.loads(skills_tool.skill_view(name, preprocess=False))
+        assert skill["success"], skill
+        assert skill["name"] == name
+        assert Path(skill["skill_dir"]) == collection / name
+    asset = json.loads(skills_tool.skill_view(
+        "conversion-tracking", "assets/gtm-recipes/event-map.json", preprocess=False,
+    ))
+    assert asset["success"], asset
+    assert "seo-audit" not in build_skills_system_prompt()
+
+
+def test_brand_can_load_qualified_bundle_skill_with_profile_namesake(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    seed_bundle(Path(__file__).resolve().parents[2] / "oma-bundle", tmp_path)
+    profile_skill = _skill(tmp_path / "skills", "custom", "product-marketing", "Use the profile's marketing notes.")
+    bundle_skill = tmp_path / "oma-bundle" / "skills" / "marketingskills" / "product-marketing"
+
+    bare = json.loads(skills_tool.skill_view("product-marketing", preprocess=False))
+    qualified = json.loads(skills_tool.skill_view("marketingskills/product-marketing", preprocess=False))
+    assert bare["success"], bare
+    assert qualified["success"], qualified
+    assert Path(bare["skill_dir"]) == profile_skill
+    assert Path(qualified["skill_dir"]) == bundle_skill

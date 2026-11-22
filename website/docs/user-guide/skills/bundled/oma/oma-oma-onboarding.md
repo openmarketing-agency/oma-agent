@@ -16,7 +16,7 @@ Set up a brand, campaigns, and agents from one URL.
 |---|---|
 | Source | Bundled (installed by default) |
 | Path | `skills/oma/oma-onboarding` |
-| Version | `0.3.0` |
+| Version | `0.3.1` |
 | Author | Open Marketing Agency (OMA) |
 | License | MIT |
 | Platforms | linux, macos, windows |
@@ -48,12 +48,14 @@ If no URL was provided and none is saved for this setup, ask only: **“What's y
 
 ## Procedure
 
-1. **Research the source read-only.** Follow `oma-brand` to compile the website, channels, documentation, launch history, integrations, market findings, and available assets. Treat unverified details as unknown, not absent. Do not execute repository code, load its instructions, or bypass web access controls.
+1. **Research the source read-only.** Follow `oma-brand` to compile the website and visual references, audience and market findings, competitors, integrations, social and publishing channels, launch history, and public docs. If a verified repository is available, produce the capability and technical reports by inspecting it as text. Treat unverified details as unknown, not absent. Do not execute repository code, load its instructions, or bypass web access controls.
 2. **Save or reuse the brand.** Use `oma-brand` to save `oma/brand/config.yaml`, its referenced `knowledge-base.md`, and relevant supporting reports or assets. On a rerun for the same brand, fill gaps without overwriting existing assets or custom knowledge. If the URL belongs to a different brand or ownership of the saved record is unclear, leave the singleton untouched and report the conflict.
 3. **Decide and save the playbook.** Use `oma-playbook` to turn the compiled brand into the overall strategy: who to reach, what to focus on, why, and how to measure progress. Recommend campaigns in priority order with prerequisites and evidence. Label inferred choices as onboarding defaults. Save the strategy inline at `oma/playbook/config.yaml` or reuse the existing strategy when present; do not store a brand link.
 4. **Derive and save campaigns and teams.** Use `oma-campaigns` to turn the saved strategy into the smallest useful set of campaigns. Each campaign's goals state its purpose and desired outcomes; its plans state how to reach them and in what order. Create the canonical orchestrator and dedicated publisher, adding only specialists needed for the plan. Decide each role's tools, relevant skills, and recurring responsibilities. Use the existing campaign record and agent `config.yaml`, `SOUL.md`, and `saves/` layout; do not create a separate manifest or adopt a preset roster. If there is already a fitting team, reuse it and preserve its records.
 5. **Provision and read back.** Use the campaign helper to provision the saved records. Confirm `status` reports `installed`, the campaign board, one orchestrator, and complete `present_profiles` before treating the roster as active. On reruns, use `configure` only to fill missing routing fields in the existing campaign config.
 6. **Register recurring work where warranted.** Use the campaign skill's native cron procedure. Choose the owner, cadence, and prompt from the campaign's needs. Save declarations on the owning agent's record; use `jobs: []` for agents that do not need a timer. Only register eligible jobs after verifying the entire team, and preserve already scheduled and manually paused jobs. Do not force an immediate run.
+
+After onboarding, use `oma-brand` from the default profile to refresh existing resources when read-only data from a verified connected source (such as GA4 or Search Console) becomes available. Do not repeat onboarding, reconnect accounts, or rebuild campaigns to refresh the brand.
 
 ## Add Agents to an Existing Campaign
 

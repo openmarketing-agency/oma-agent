@@ -22,6 +22,17 @@
       "properties": { "guidelines": { "$ref": "#/$defs/markdown" }, "source_url": { "$ref": "#/$defs/url" } }
     },
     "website": { "$ref": "#/$defs/discovery" },
+    "screenshots": {
+      "type": "array", "uniqueItems": true,
+      "description": "Visual references captured from verified public brand pages.",
+      "items": {
+        "type": "object", "required": ["file", "source_url"], "additionalProperties": false,
+        "properties": {
+          "file": { "type": "string", "$ref": "#/$defs/path", "pattern": "^screenshots/.+\\.(?:png|jpe?g|webp)(?![\\s\\S])" },
+          "source_url": { "$ref": "#/$defs/url" }
+        }
+      }
+    },
     "channels": {
       "type": "object", "additionalProperties": false,
       "properties": {

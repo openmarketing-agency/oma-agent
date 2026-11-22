@@ -58,15 +58,15 @@ def test_prompt_guides_search_for_unlisted_oma_skills(monkeypatch, tmp_path, one
     if has_listed_skill:
         _skill(tmp_path / "skills", "writing/local-writing", "Write locally.")
 
-    prompt = build_skills_system_prompt(available_tools={"skill_view", "search_skills"})
+    prompt = build_skills_system_prompt(available_tools={"skill_view", "skills_search"})
     assert prompt.startswith("## Skills\n")
-    assert "shared OMA skills repository" in prompt and "use search_skills(query)" in prompt
+    assert "shared OMA skills repository" in prompt and "use skills_search(query)" in prompt
     assert "load a relevant match with skill_view(name)" in prompt
     assert "global-research" not in prompt
     assert set(index_entries(prompt)) == ({"local-writing"} if has_listed_skill else set())
 
     without_search = build_skills_system_prompt(available_tools={"skill_view"})
-    assert "search_skills" not in without_search
+    assert "skills_search" not in without_search
     assert bool(without_search) == has_listed_skill
 
 
