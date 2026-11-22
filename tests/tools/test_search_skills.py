@@ -112,6 +112,27 @@ def test_seeded_marketingskills_are_discoverable_and_load_on_demand(tmp_path, mo
     assert "seo-audit" not in build_skills_system_prompt()
 
 
+def test_seeded_social_media_skills_are_discoverable_and_load_on_demand(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    seed_bundle(Path(__file__).resolve().parents[2] / "oma-bundle", tmp_path)
+    collection = tmp_path / "oma-bundle" / "skills" / "social-media-skills"
+    rows = json.loads(skills_tool.skills_search("social-media-skills"))["skills"]
+    names = {row["name"] for row in rows if row["source"] == "oma-bundle"}
+    assert {"engagement-routine", "reply-and-comment-writer", "social-strategy"} <= names
+    assert names == {path.parent.name for path in collection.glob("*/SKILL.md")}
+    assert (collection / "LICENSE").is_file()
+
+    for name in sorted(names):
+        skill = json.loads(skills_tool.skill_view(name, preprocess=False))
+        assert skill["success"], skill
+        assert Path(skill["skill_dir"]) == collection / name
+    reference = json.loads(skills_tool.skill_view(
+        "social-media-skills/reply-and-comment-writer", "references/replying-to-your-comments.md", preprocess=False,
+    ))
+    assert reference["success"], reference
+    assert "reply-and-comment-writer" not in build_skills_system_prompt()
+
+
 def test_brand_can_load_qualified_bundle_skill_with_profile_namesake(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     seed_bundle(Path(__file__).resolve().parents[2] / "oma-bundle", tmp_path)

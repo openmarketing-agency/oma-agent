@@ -15,7 +15,6 @@ mcp_servers:
   docs:
     enabled: false
 effective:
-  model: fixture-research-model
   mcp_servers:
     docs:
       enabled: false

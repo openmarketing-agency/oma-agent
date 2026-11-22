@@ -1083,13 +1083,10 @@ def profiles_to_serve(multiplex: bool, *, include_standalone: bool = False,
 
     ``multiplex=False``: exactly one entry for the *active* profile (byte-for-byte the
     historical single-profile behavior; name is ``"default"`` or the named profile's id).
-    ``multiplex=True``: default plus every live named profile under ``profiles/`` (tombstoned
-    and parked profiles skipped). Pure directory read: never creates a profile dir (#94590).
-
-    Named profiles that authored ``gateway.standalone: true`` are skipped because they opted
-    out of the host multiplexer; a ``gateway.parked`` marker (``hermes -p X gateway stop``) skips
-    a profile the host would otherwise serve. Callers enumerating INSTALLED profiles pass
-    ``include_standalone=True, include_parked=True``; serving/ticking callers pass neither."""
+    ``multiplex=True`` reads the default and named profiles without creating directories.
+    It excludes tombstoned, parked, standalone and paused campaign profiles from service.
+    Inventory callers use ``include_standalone=True, include_parked=True`` to include
+    installed but unserved profiles; serving/ticking callers pass neither."""
     active = get_active_profile_name() or "default"
     default = _get_default_hermes_home()
     if profile_is_parked(default) and default not in _parked_default_warned:
@@ -1097,10 +1094,11 @@ def profiles_to_serve(multiplex: bool, *, include_standalone: bool = False,
         _parked_default_warned.add(default)
     if not multiplex:
         return [(active, get_profile_dir(active))]
+    from hermes_cli.oma_campaigns.admission import profile_work_paused
     serve: list[tuple[str, Path]] = [("default", default)]
     serve.extend((entry.name, entry) for entry in _iter_named_profile_dirs()
                  if (include_standalone or not profile_is_standalone(entry))
-                 and (include_parked or not profile_is_parked(entry)))
+                 and (include_parked or not (profile_is_parked(entry) or profile_work_paused(entry))))
     return serve
 
 

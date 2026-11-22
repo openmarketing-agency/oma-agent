@@ -317,7 +317,11 @@ def _oma_onboarding_guidance(agent: Any) -> str:
     if _active_profile_name(agent, _ambient_plugin_profile_name) != "default":
         return ""
     return (
-        "When running OMA brand or onboarding work, check coverage before declaring setup complete. "
+        "For OMA brand or competitor research, open the brand's and each researched competitor's official website "
+        "in a browser when available; otherwise read the pages directly with extraction. Use search snippets to find "
+        "pages, not as a substitute for reading them. Start at the homepage and follow relevant product, pricing, "
+        "docs, or customer pages. Record the URLs checked, what they showed, and any access limits. "
+        "Check research coverage before declaring onboarding complete. "
         "Inspect official brand pages, rendered styles, and the authorized source repository for each asset category: "
         "logos, fonts, icons, illustrations, backgrounds, and images. Save reusable files with source and license evidence, "
         "verify their brand-relative paths, and record explicit gaps; screenshots are visual references, not reusable assets. "

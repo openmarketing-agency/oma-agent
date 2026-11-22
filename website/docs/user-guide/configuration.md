@@ -83,6 +83,21 @@ Docker seeds a missing bundle at `/opt/data/oma-bundle`; on a native checkout
 the bundle can be copied to the default Hermes home. Existing bundles are
 preserved and old templates are ignored.
 
+Docker also creates `oma/agents/default/` and `oma/agents/maintenance/` on the
+data volume. These are standalone records (`campaign_id: null`), not campaign
+members. Startup fills missing files from existing native profiles and preserves
+saved edits. The default record references `oma-agents`, `oma-brand`,
+`oma-campaigns`, `oma-onboarding`, and `oma-playbook`; maintenance references
+`omactl`. Docker places those packages under `oma-bundle/skills/oma/`.
+
+After editing a standalone agent's `config.yaml`, run
+`python -m hermes_cli.oma_campaigns.standalone sync <id>` in the agent's
+environment. It applies the saved `model`, `mcp_servers`, toolset settings, and
+the packages listed under `oma_skills`. An explicit `oma_skills: []` removes all previously
+synced packages from that profile. Omitting the field leaves skills alone.
+Unrelated skills, shared source packages, credentials and native `SOUL.md`
+are not changed by sync. Start a new session to see changes to session setup.
+
 Editable campaign records live at `$HERMES_HOME/oma/campaigns/<id>/config.yaml`.
 They contain `id`, `name`, `description`, and inline `goals` and `plans`. Campaign
 and agent records do not need a `version` field. The installer writes
@@ -116,9 +131,10 @@ rendering failures, not to retry a bot challenge or explicit access denial.
 ### Sync campaign model and MCP settings
 
 Put native Hermes `model` and `mcp_servers` settings in the campaign config as
-defaults. Put exceptions in the same top-level keys in an agent's own config.
-An agent's `model` replaces the entire campaign model (a model name or a
-mapping). `mcp_servers` combines entries by name: an agent can add a server,
+defaults. Installation seeds an omitted agent `model` as a top-level field.
+Edit that field to change the agent's model; later campaign edits do not
+replace it. `effective.model` is not accepted.
+`mcp_servers` combines entries by name: an agent can add a server,
 replace a named server's entire definition, or set `enabled: false` for that
 server. Omit an override to inherit; an empty agent `mcp_servers: {}` adds no
 overrides. The helper passes through the native settings, including nested
@@ -137,6 +153,19 @@ The script is on `PATH` in the Docker image; in a source checkout use
 ```sh
 sync-campaign my-campaign
 ```
+
+Both campaign sync and standalone agent sync read toolset settings from each
+agent's own `oma/agents/<id>/config.yaml`, not from a campaign-wide default:
+
+- `agent.enabled_toolsets` and `agent.disabled_toolsets` select toolsets.
+- `tools.tool_search.enabled`, `listing`, `eager_toolsets`, and `defer_toolsets`
+  control which selected tools are shown upfront or found on demand.
+
+An explicit list replaces the native list; `[]` is not the same as omitting the
+setting. Omitted settings and unrelated native config, including
+`platform_toolsets`, are left alone. Campaign orchestrators must keep `kanban`
+enabled. Sync neither grants access to missing integrations nor changes the
+tool catalog of an existing conversation; open a new session to see the changes.
 
 For a Next.js integration, save the authored YAML atomically and invoke this
 command server-side with the campaign ID as its only argument and no shell.
@@ -163,10 +192,10 @@ The difference between the lists is what's missing. Keys introduced by an
 agent override appear in the campaign lists too. The lists contain names only,
 don't verify provider authentication, and refresh on each `sync-campaign` run.
 
-The helper updates `effective` in each roster member's OMA agent config and
-the two native settings in `profiles/<agent-id>/config.yaml`. Don't edit
-`effective`: it's generated and records which settings to remove when a
-previously synced setting is deleted from both sources. Other profile settings
+The helper updates generated `effective.mcp_servers` and the two native
+settings in `profiles/<agent-id>/config.yaml`. Don't edit `effective`: it
+records which previously synced MCP servers to remove when deleted from both
+sources. Other profile settings
 and toolset allowlists are preserved. On profiles with an explicit
 `agent.enabled_toolsets` list, list `mcp-<server-name>` there separately to
 make its tools available. Sync does not restart the gateway or force an open
@@ -174,6 +203,27 @@ conversation to reload. Serialize save-and-sync requests and rerun sync if a
 filesystem error interrupts publication; replacement is atomic per file,
 not across the whole roster. The CLI returns JSON on stdout (`id`, `agents`,
 `updated_agents`) and progress or errors on stderr.
+
+### Campaign pause and resume
+
+New campaigns install paused. Existing installations without a lifecycle field
+keep their prior running behavior. Use `python -m hermes_cli.oma_campaigns
+lifecycle <id> paused` or `lifecycle <id> resumed` in the Hermes environment.
+Pausing blocks new work on the campaign board, cron fires, and shared-gateway
+profile work without stopping the default gateway. It requests cancellation
+of active work and preserves queued tasks and individually paused jobs. Check
+whether an interrupted publisher already posted before retrying its task.
+
+`hermes_cli/oma_campaigns/schemas/integrations.json` is the canonical OMA ID
+catalog. Run `python -m hermes_cli.oma_campaigns integrations` to derive
+candidates from observed `integrations` and verified `channels.social` in
+`$HERMES_HOME/oma/brand/config.yaml`. Save only the required subset as
+`integrations` in `oma/campaigns/<id>/config.yaml`. Use `google-analytics` and
+`x` in OMA records; `google_analytics` and `twitter` are Composio toolkit slugs.
+Resuming checks the orchestrator's Composio session for a campaign with its own
+`composio` MCP configuration, otherwise the workspace default profile's session.
+A missing or unverified requirement leaves
+the campaign paused. WordPress has an OMA ID but no verified Composio mapping.
 
 ### Shared brand and playbook
 
@@ -234,7 +284,7 @@ For initial setup, `oma-onboarding` only asks for a website or GitHub repository
 URL. It builds the brand and playbook from that source, then designs and
 provisions campaigns and agents that fit. It chooses which recurring work
 needs a schedule and registers eligible jobs in their owning profiles. Jobs
-run on their declared schedule when a healthy Hermes gateway serves the profile.
+run on schedule after resume, when a healthy Hermes gateway serves the profile.
 
 OMA starter configs skip interactive approval prompts, auto-approve flagged
 commands in cron, single-query, and unattended sessions, and skip the MCP reload

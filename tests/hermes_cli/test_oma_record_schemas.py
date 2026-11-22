@@ -39,10 +39,14 @@ def test_oma_record_fixture(kind):
     ("campaign", {"agents": ["demo__worker"]}),
     ("campaign", {"agents": ["demo__orchestrator", "other__orchestrator"]}),
     ("campaign", {"goals": "not a list"}),
+    ("campaign", {"integrations": ["google_analytics"]}),
+    ("campaign", {"integrations": ["x", "x"]}),
+    ("campaign", {"lifecycle_state": "running"}),
     ("campaign", {"model": 1}),
     ("agent", {"jobs": [{"id": "review", "schedule": "1d"}]}),
     ("agent", {"mcp_servers": {"docs": "not a mapping"}}),
     ("agent", {"available-keys": ["not a variable name"]}),
+    ("agent", {"effective": {"model": "legacy-model"}}),
 ])
 def test_schema_rejects_invalid_fields(kind, fields):
     record: dict[str, object] = {"id": "demo", "name": "Demo", "description": "Example"}
@@ -62,4 +66,5 @@ def test_legacy_fields_still_validate():
     validator("campaign").validate({**identity, "version": "0.1.0", "playbook": "old-playbook",
                                     "orchestrator": "demo__orchestrator", "agents": ["demo__orchestrator"]})
     validator("agent").validate({**identity, "campaign_id": None, "version": "0.1.0",
+                                 "effective": {"mcp_servers": {}},
                                  "future_hermes_section": {"new_option": True}})

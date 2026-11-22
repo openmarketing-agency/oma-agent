@@ -70,9 +70,11 @@ def test_oma_onboarding_guidance_is_scoped_to_the_setup_agent(monkeypatch, profi
     agent = _make_agent(valid_tool_names={"skill_view", "read_file"}, skip_context_files=True)
     stable = build_system_prompt_parts(agent)["stable"]
     assert ("Social & Community" in stable) == (profile == "default")
+    assert ("open the brand's and each researched competitor's official website" in stable) == (profile == "default")
     if profile == "default":
         assert "help center" in stable and "license" in stable
         assert "agent.enabled_toolsets" in stable and "camofox" in stable
+        assert "search snippets" in stable and "pricing" in stable and "URLs checked" in stable
 
 
 def _captured_context_cwd(agent):

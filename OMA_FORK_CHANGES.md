@@ -181,12 +181,18 @@ The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) designs t
 | `install <id>` | Provision a team from saved campaign and agent records. Does not start agent turns or replace an existing installation. |
 | `list` / `status <id>` | Inspect campaign records and verify the board and profiles locally. |
 | `configure <id>` | Fill missing routing fields in the existing campaign config without reinstalling. |
+| `integrations` | List canonical integration candidates from saved brand evidence. |
+| `lifecycle <id> paused` / `lifecycle <id> resumed` | Control campaign work. New campaigns start paused; resume verifies required connections. |
 
-The separate `sync-campaign <id>` script applies campaign model and MCP defaults plus per-agent overrides to the verified roster and updates the generated OMA agent view. Supplied environment values that match config references are saved to the owning profile `.env` files; absent values don't block sync. The same command records `all-keys` and `available-keys` in the OMA campaign and agent configs, listing variable names only. Toolset allowlists are unchanged.
+The separate `sync-campaign <id>` script applies each role's editable top-level `model`, merged MCP settings, and explicitly authored toolset selection and Tool Search settings. The agent schema rejects `effective.model`. Supplied environment values that match config references are saved to the owning profile `.env` files; absent values don't block sync. The same command records `all-keys` and `available-keys` in the OMA campaign and agent configs, listing variable names only. Omitted toolset settings and unrelated native settings are preserved.
+
+The [OMA integration catalog](hermes_cli/oma_campaigns/schemas/integrations.json) maps stable IDs such as `google-analytics` to provider slugs. Campaigns declare their required subset, not every service observed in brand research. An unverified requirement blocks resume.
 
 **New campaign defaults:** When the campaign omits `model`, installation snapshots the model saved on `default`, not the current chat’s model. Only profiles inheriting that model receive its matching usable saved API key, if any; no other provider keys or OAuth tokens are copied. Agents with explicit models keep them. An omitted `agent.reasoning_effort` takes the saved `default` value when present, independently of the model selection. Tool Search defaults to `enabled: "on"` and `eager_toolsets: [file, skills, memory]` for new campaign profiles. Each role must supply `agent.enabled_toolsets`; the orchestrator must include `kanban`, while a worker can omit it or explicitly select `[]`. Installed campaigns are not migrated.
 
 **Shared skills only:** The [repository bundle](oma-bundle/README.md) ships reusable skills, not campaign or agent templates. Docker seeds it at `$HERMES_HOME/oma-bundle` only if absent. Existing volumes are preserved and any old templates are ignored.[3][5]
+
+**Standalone agents:** Docker seeds missing `oma/agents/default` and `oma/agents/maintenance` records without applying them or replacing saved edits. Their `oma_skills` lists reference the default management packages and maintenance-only `omactl` in the local bundle. Explicit standalone sync applies model, MCP, and the same explicit toolset settings as campaign sync, and reconciles managed skill copies, including removals. It never applies the saved persona or changes unrelated skills.
 
 **Editable campaign config:** The agent writes the identity, roster, goals and plans before provisioning. Campaign and agent records are unversioned; older `version` fields are ignored and preserved in existing files. Campaigns use the single stored playbook without a `playbook` field.
 

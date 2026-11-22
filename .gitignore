@@ -23,6 +23,7 @@ act/
 .env.development
 .env.test
 .hermes-docker/
+/.oma-agent/
 .notebooklm-home/
 .notebooklm-cli-venv/
 .notebooklm-playwright/

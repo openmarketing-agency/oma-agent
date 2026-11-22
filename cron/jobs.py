@@ -2703,7 +2703,11 @@ def claim_job_for_fire(
     ``claim_ttl_seconds`` exists (the TTL lets another fire reclaim after a crash; mark_job_run
     clears the claim). Otherwise stamp ``fire_claim`` and, for recurring jobs, advance
     ``next_run_at`` so a stale re-delivery cannot re-fire."""
+    from hermes_cli.oma_campaigns.admission import profile_work_paused
+
     def apply(jobs, _i, job):
+        if profile_work_paused(_current_cron_store().jobs_file.parent.parent):
+            return False
         if is_terminal_job(job) and not _is_recoverable_error_job(job):
             return False
         # Both enabled and pause markers must clear — a half-paused record must not claim. ``force``
@@ -2844,6 +2848,10 @@ def get_due_jobs() -> list[dict[str, Any]]:
     This prevents the perpetual-defer loop (#33315) where a job whose runtime exceeds ``interval + grace``
     would be skipped forever.
     """
+    from hermes_cli.oma_campaigns.admission import profile_work_paused
+
+    if profile_work_paused(_current_cron_store().jobs_file.parent.parent):
+        return []
     with _jobs_lock():
         return _get_due_jobs_locked()
 

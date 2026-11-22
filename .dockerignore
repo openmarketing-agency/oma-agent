@@ -45,6 +45,7 @@ ui-tui/packages/hermes-ink/dist/
 /docker-container-buildkitd.toml
 
 # Environment files
+.oma-agent
 .env
 .env.*
 # ...but keep the template: docker/stage2-hook.sh seeds $HERMES_HOME/.env from
@@ -72,6 +73,8 @@ htmlcov/
 
 # Runtime data (bind-mounted at /opt/data; must not leak into build context)
 data/
+!hermes_cli/data/
+!hermes_cli/data/profiles/maintenance/**
 .hermes-docker/
 .notebooklm-home/
 

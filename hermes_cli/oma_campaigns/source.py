@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import hermes_yaml as yaml
-from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS
+from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS, OMA_MAINTENANCE_ONLY_SKILLS
 from hermes_constants import PROFILE_ID_RE
 from hermes_cli.oma_campaigns.bundle import bundle_dir
 from hermes_cli.oma_campaigns.schema import validate_record
@@ -99,11 +99,12 @@ def _skill_index(*roots: Path) -> dict[str, list[Path]]:
     return index
 
 
-def _resolve_skills(data: dict, context: str, index: dict[str, list[Path]]) -> dict[str, Path]:
+def resolve_skills(names: object, context: str, index: dict[str, list[Path]],
+                   *, excluded: frozenset[str]) -> dict[str, Path]:
     selected = {}
-    for name in _names(data.pop("oma_skills", []), f"{context}.oma_skills"):
+    for name in _names(names, f"{context}.oma_skills"):
         paths = index.get(name, [])
-        if len(paths) != 1 or not PROFILE_ID_RE.fullmatch(name) or name in OMA_DEFAULT_ONLY_SKILLS:
+        if len(paths) != 1 or not PROFILE_ID_RE.fullmatch(name) or name in excluded:
             raise ValueError(f"{context}: skill {name!r} must resolve to one eligible OMA package (found {len(paths)})")
         if any(path.is_symlink() or not (path.is_file() or path.is_dir()) for path in paths[0].rglob("*")):
             raise ValueError(f"{context}: skill {name!r} contains unsupported files or symlinks")
@@ -136,7 +137,8 @@ def _read_agent(root: Path, campaign_id: str, agent_id: str, index: dict[str, li
     soul = _member(path, "SOUL.md").read_text(encoding="utf-8-sig")
     if not soul.strip():
         raise ValueError(f"{agent_id}: SOUL.md is empty")
-    skills = _resolve_skills(data, agent_id, index)
+    skills = resolve_skills(data.pop("oma_skills", []), agent_id, index,
+                            excluded=OMA_DEFAULT_ONLY_SKILLS | OMA_MAINTENANCE_ONLY_SKILLS)
     _job_ids(data.pop("jobs", []), agent_id)
     return Agent(agent_id, description, data, soul, skills)
 
