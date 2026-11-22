@@ -38,7 +38,7 @@ def bundle(tmp_path, monkeypatch):
         jobs = "[{id: sample, schedule: '1d', prompt: Review evidence.}]" if role == "orchestrator" else "[]"
         (candidate / "config.yaml").write_text(
             f"id: demo__{role}\nname: {role.title()}\ndescription: Test role.\ncampaign_id: demo\noma_skills: {dependencies}\n"
-            f"agent: {{enabled_toolsets: [file]}}\njobs: {jobs}\n", encoding="utf-8",
+            f"agent: {{enabled_toolsets: [file, kanban]}}\njobs: {jobs}\n", encoding="utf-8",
         )
         (candidate / "SOUL.md").write_text(f"I am the {role}.\n", encoding="utf-8")
     for name in ("shared", "unused"):
@@ -340,6 +340,65 @@ def test_sync_records_available_keys_in_campaign_and_agent_configs(bundle, capsy
     assert read_mapping(worker_record)["available-keys"] == ["PRIVATE_MODEL_STATUS_TOKEN"]
 
 
+@pytest.mark.parametrize(("explicit_model", "has_saved_key"), [(False, True), (True, True), (False, False)])
+def test_install_snapshots_saved_defaults_without_overriding_role_settings(
+    bundle, capsys, monkeypatch, explicit_model, has_saved_key,
+):
+    from agent.secret_scope import load_env_file
+    from hermes_cli.config import atomic_config_write
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, main = bundle
+    campaign = source / "campaigns/demo/config.yaml"
+    owner = source / "agents/demo__orchestrator/config.yaml"
+    worker = source / "agents/demo__worker/config.yaml"
+    base_model = {"default": "root-fixture", "provider": "openrouter"}
+    atomic_config_write(home / "config.yaml", {"model": base_model, "agent": {"reasoning_effort": "high"}})
+    key = "sk-or-v1-fixture-model-key"
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-other-process-key")
+    (home / ".env").write_text(
+        f"OPENROUTER_API_KEY={key if has_saved_key else ''}\nUNRELATED_API_KEY=unrelated-fixture\n"
+        "CAMOFOX_URL=https://browser.invalid\nCAMOFOX_API_KEY=fixture-browser-key\n",
+        encoding="utf-8",
+    )
+    if explicit_model:
+        atomic_config_write(campaign, {**read_mapping(campaign), "model": "explicit-team-model"})
+    atomic_config_write(owner, {**read_mapping(owner),
+                                "agent": {"enabled_toolsets": ["file", "skills", "memory", "kanban", "camofox"]}})
+    worker_config = read_mapping(worker)
+    atomic_config_write(worker, {**worker_config, "model": "explicit-worker-model",
+                                 "agent": {**worker_config["agent"], "reasoning_effort": "low"},
+                                 "tools": {"tool_search": {"eager_toolsets": []}}})
+
+    assert main(["install", "demo"]) == 0
+    result = capsys.readouterr()
+    assert key not in result.out + result.err
+    expected = "explicit-team-model" if explicit_model else {**base_model, "api_key": "${OPENROUTER_API_KEY}"}
+    assert read_mapping(campaign)["model"] == expected
+    assert read_mapping(owner)["effective"]["model"] == expected
+    assert read_mapping(worker)["effective"]["model"] == "explicit-worker-model"
+    for path in (owner, home / "profiles/demo__orchestrator/config.yaml"):
+        data = read_mapping(path)
+        assert data["agent"]["reasoning_effort"] == "high"
+        assert data["tools"]["tool_search"] == {"enabled": "on", "eager_toolsets": ["file", "skills", "memory"]}
+        assert key not in path.read_text(encoding="utf-8")
+    for path in (worker, home / "profiles/demo__worker/config.yaml"):
+        data = read_mapping(path)
+        assert data["agent"]["reasoning_effort"] == "low"
+        assert data["tools"]["tool_search"]["eager_toolsets"] == []
+    assert read_mapping(home / "profiles/demo__orchestrator/config.yaml")["model"] == expected
+    env = load_env_file(home / "profiles/demo__orchestrator/.env")
+    assert env["CAMOFOX_API_KEY"] == "fixture-browser-key"
+    assert env.get("OPENROUTER_API_KEY") == (key if has_saved_key and not explicit_model else None)
+    assert "UNRELATED_API_KEY" not in env
+    assert load_env_file(home / "profiles/demo__worker/.env") == {}
+    if not explicit_model:
+        for path in (campaign, owner):
+            data = read_mapping(path)
+            assert data["all-keys"] == ["OPENROUTER_API_KEY"]
+            assert data["available-keys"] == (["OPENROUTER_API_KEY"] if has_saved_key else [])
+
+
 def test_install_materializes_campaign_defaults_and_sync_can_remove_them(bundle, capsys):
     from hermes_cli.config import atomic_config_replace, atomic_config_write, read_user_config_raw
     from hermes_cli.oma_campaigns.source import read_mapping
@@ -391,6 +450,8 @@ def test_bundle_templates_are_ignored_and_profile_conflicts_do_not_publish(bundl
     ("campaigns/demo/config.yaml", "demo__orchestrator, demo__worker", "demo__orchestrator, demo__orchestrator", "duplicate names"),
     ("agents/demo__worker/config.yaml", "campaign_id: demo", "campaign_id: other", "campaign_id"),
     ("agents/demo__worker/config.yaml", "jobs: []", "jobs: [{id: review, schedule: '1d'}]", "invalid OMA agent jobs.0"),
+    ("agents/demo__worker/config.yaml", "enabled_toolsets: [file, kanban]", "enabled_toolsets: null", "explicit list"),
+    ("agents/demo__orchestrator/config.yaml", "enabled_toolsets: [file, kanban]", "enabled_toolsets: [file]", "include kanban"),
 ])
 def test_invalid_roster_does_not_publish(bundle, capsys, file, before, after, error):
     home, source, main = bundle
@@ -429,7 +490,7 @@ def test_new_campaign_camofox_requires_complete_saved_pair(bundle, capsys, monke
 
     home, source, main = bundle
     record = source / "agents/demo__orchestrator/config.yaml"
-    atomic_config_replace(record, {**read_mapping(record), "agent": {"enabled_toolsets": ["file", "camofox"]}})
+    atomic_config_replace(record, {**read_mapping(record), "agent": {"enabled_toolsets": ["file", "kanban", "camofox"]}})
     pair = {"CAMOFOX_URL": "https://browser.example.invalid", "CAMOFOX_API_KEY": "fixture-browser-token"}
     if saved:
         lines = [f"{key}='{pair[key] if key in saved else '   '}'" for key in pair]
@@ -455,7 +516,7 @@ def test_new_campaign_camofox_requires_complete_saved_pair(bundle, capsys, monke
     assert load_env_file(orchestrator / ".env") == (pair if configured else {})
 
 
-def test_new_campaign_camofox_respects_opt_out_and_legacy_selection(bundle):
+def test_new_campaign_camofox_respects_opt_out_and_rejects_legacy_selection(bundle, capsys):
     from agent.secret_scope import load_env_file
     from hermes_cli.config import atomic_config_replace
     from hermes_cli.oma_campaigns.source import read_mapping
@@ -466,9 +527,13 @@ def test_new_campaign_camofox_respects_opt_out_and_legacy_selection(bundle):
     spec = read_mapping(orchestrator)
     del spec["agent"]
     atomic_config_replace(orchestrator, {**spec, "platform_toolsets": {"cli": ["file", "camofox"]}})
+    assert main(["install", "demo"]) == 1
+    assert "explicit list" in capsys.readouterr().err
+    assert not (home / "profiles/demo__orchestrator").exists()
+    atomic_config_replace(orchestrator, {**spec, "agent": {"enabled_toolsets": ["file", "kanban", "camofox"]}})
     worker = records / "demo__worker/config.yaml"
     atomic_config_replace(worker, {**read_mapping(worker), "agent": {
-        "enabled_toolsets": ["file", "camofox"], "disabled_toolsets": ["camofox"],
+        "enabled_toolsets": [], "disabled_toolsets": ["camofox"],
     }})
     pair = {"CAMOFOX_URL": "https://browser.example.invalid", "CAMOFOX_API_KEY": "fixture-browser-token"}
     (home / ".env").write_text("".join(f"{key}={value}\n" for key, value in pair.items()), encoding="utf-8")
@@ -477,9 +542,11 @@ def test_new_campaign_camofox_respects_opt_out_and_legacy_selection(bundle):
     profiles = home / "profiles"
     assert load_env_file(profiles / "demo__orchestrator/.env") == pair
     native = read_mapping(profiles / "demo__orchestrator/config.yaml")
-    assert native["platform_toolsets"]["cli"] == ["file", "camofox", "kanban"]
+    assert native["agent"]["enabled_toolsets"] == ["file", "kanban", "camofox"]
     assert load_env_file(profiles / "demo__worker/.env") == {}
-    assert read_mapping(profiles / "demo__worker/config.yaml")["agent"]["disabled_toolsets"] == ["camofox"]
+    assert read_mapping(profiles / "demo__worker/config.yaml")["agent"] == {
+        "enabled_toolsets": [], "disabled_toolsets": ["camofox"],
+    }
 
 
 def test_generated_cron_belongs_to_the_verified_owner(bundle, capsys):

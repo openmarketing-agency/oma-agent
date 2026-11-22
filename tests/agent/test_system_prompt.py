@@ -56,8 +56,23 @@ def test_camofox_hint_requires_enabled_and_available_plugin(monkeypatch, toolset
     agent = _make_agent(enabled_toolsets=enabled, disabled_toolsets=disabled, valid_tool_names=direct, skip_context_files=True)
     parts = build_system_prompt_parts(agent)
     assert ("Camofox" in parts["stable"]) == expected
+    if expected:
+        assert "first browser fallback" in parts["stable"]
+        assert "extraction times out" in parts["stable"]
+        assert "bot challenge" in parts["stable"] and "stop" in parts["stable"]
     if expected and deferred:
         assert "Find its tools with Tool Search" in parts["stable"]
+
+
+@pytest.mark.parametrize("profile", ["default", "maintenance"])
+def test_oma_onboarding_guidance_is_scoped_to_the_setup_agent(monkeypatch, profile):
+    monkeypatch.setattr("agent.system_prompt._active_profile_name", lambda *_: profile)
+    agent = _make_agent(valid_tool_names={"skill_view", "read_file"}, skip_context_files=True)
+    stable = build_system_prompt_parts(agent)["stable"]
+    assert ("Social & Community" in stable) == (profile == "default")
+    if profile == "default":
+        assert "help center" in stable and "license" in stable
+        assert "agent.enabled_toolsets" in stable and "camofox" in stable
 
 
 def _captured_context_cwd(agent):
