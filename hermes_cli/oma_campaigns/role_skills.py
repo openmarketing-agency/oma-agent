@@ -1,4 +1,4 @@
-"""Materialize and prune only the standalone profile skills managed by OMA."""
+"""Materialize and prune standalone profiles' optional OMA skill packages."""
 
 from contextlib import contextmanager
 import json
@@ -7,7 +7,7 @@ import shutil
 from tempfile import TemporaryDirectory
 
 from agent.skill_selection import (
-    OMA_DEFAULT_ONLY_SKILLS, OMA_MAINTENANCE_ONLY_SKILLS, OMA_RETIRED_SKILLS,
+    OMA_DEFAULT_STARTER_SKILLS, OMA_MAINTENANCE_ONLY_SKILLS,
     OMA_SKILL_INVENTORY, profile_excluded_skills,
 )
 from hermes_cli.oma_campaigns.bundle import bundle_dir
@@ -58,25 +58,11 @@ def _same_package(source: Path, target: Path) -> bool:
     return True
 
 
-def _starter_copies(root: Path, profile: Path, home: Path, local: dict, bundled: dict) -> dict[str, str]:
-    """Recognize shipped copies on first sync, never claim an edited starter implicitly."""
-    names = OMA_DEFAULT_ONLY_SKILLS - OMA_RETIRED_SKILLS if profile == home else OMA_MAINTENANCE_ONLY_SKILLS
-    owned = {}
-    for name in names:
-        copies, packages = local.get(name, []), bundled.get(name, [])
-        if len(copies) == len(packages) == 1 and _same_package(packages[0], copies[0]):
-            owned[name] = copies[0].relative_to(root).as_posix()
-    return owned
-
-
-def _plan(home: Path, profile: Path, root: Path, names: list[str], owned: dict[str, str] | None) -> tuple[dict, dict, dict]:
-    shared = _member(bundle_dir(home), "skills")
-    bundled = _skill_index(shared) if names or owned is None else {}
+def _plan(home: Path, profile: Path, root: Path, names: list[str], owned: dict[str, str]) -> tuple[dict, dict]:
+    bundled = _skill_index(_member(bundle_dir(home), "skills")) if names else {}
     selected = resolve_skills(names, profile.name, bundled,
                               excluded=profile_excluded_skills(profile, include_pruned=False))
-    local = _skill_index(root) if selected or owned or owned is None else {}
-    if owned is None:
-        owned = _starter_copies(root, profile, home, local, bundled)
+    local = _skill_index(root) if selected or owned else {}
     installs = {}
     next_owned = {}
     for name, package in selected.items():
@@ -103,7 +89,7 @@ def _plan(home: Path, profile: Path, root: Path, names: list[str], owned: dict[s
     for target in (*removals, *installs):
         if any(target in path.parents for copies in local.values() for path in copies):
             raise ValueError("OMA skill package overlaps another local skill")
-    return owned, next_owned, {**removals, **installs}
+    return next_owned, {**removals, **installs}
 
 
 @contextmanager
@@ -114,10 +100,14 @@ def apply_role_skills(home: Path, profile: Path, names: list[str] | None):
         return
     root = _member(profile, "skills")
     inventory = _member(root, OMA_SKILL_INVENTORY)
-    had_inventory = inventory.exists()
     owned, pruned = _read_inventory(inventory)
-    owned, next_owned, changes = _plan(home, profile, root, names, owned if had_inventory else None)
-    if not changes and owned == next_owned and (had_inventory or not next_owned):
+    starters = OMA_DEFAULT_STARTER_SKILLS if profile == home else OMA_MAINTENANCE_ONLY_SKILLS
+    # Accept legacy record lists and release old claims without touching starter copies.
+    names = [name for name in names if name not in starters]
+    extras_owned = {name: path for name, path in owned.items() if name not in starters}
+    next_owned, changes = _plan(home, profile, root, names, extras_owned)
+    next_pruned = (pruned | extras_owned.keys()) - next_owned.keys() - starters
+    if not changes and owned == next_owned and pruned == next_pruned:
         yield False
         return
     root.mkdir(mode=0o700, exist_ok=True)
@@ -129,8 +119,7 @@ def apply_role_skills(home: Path, profile: Path, names: list[str] | None):
             if package is not None:
                 shutil.copytree(package, prepared[target][1])
         prepared[inventory] = (stage / "old-inventory", stage / "new-inventory")
-        pruned = (pruned | owned.keys()) - next_owned.keys()
-        data = {"owned": next_owned, "pruned": sorted(pruned)}
+        data = {"owned": next_owned, "pruned": sorted(next_pruned)}
         prepared[inventory][1].write_text(json.dumps(data, sort_keys=True), encoding="utf-8")
         touched = []
         try:

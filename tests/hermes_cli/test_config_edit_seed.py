@@ -151,7 +151,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
         assert _get_platform_tools(maintenance_config, "cli") == {
             "file", "terminal", "skills", "memory", "session_search", "web", "browser", "camofox",
         }
-        assert maintenance_config["tools"]["tool_search"]["eager_toolsets"] == ["file", "terminal"]
+        assert maintenance_config["tools"]["tool_search"]["eager_toolsets"] == ["file", "terminal", "skills", "memory"]
         assert maintenance_config["tools"]["tool_search"]["listing"] == "off"
         assert maintenance_config["approvals"]["cron_mode"] == "approve"
         assert not (maintenance / "skills" / "oma").exists()
@@ -167,6 +167,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
             assert disclosed.activated
             assert {tool["function"]["name"] for tool in disclosed.tool_defs} == {
                 "read_file", "write_file", "search_files", "patch", "terminal", "process_manage",
+                "skills_list", "skills_search", "skill_view", "skill_manage", "memory",
             } | BRIDGE_TOOL_NAMES
     else:
         home = create_profile("fresh", no_alias=True, seed_model=False)

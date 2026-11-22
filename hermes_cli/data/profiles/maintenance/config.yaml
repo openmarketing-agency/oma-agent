@@ -4,5 +4,5 @@ agent:
 tools:
   tool_search:
     enabled: "on"
-    eager_toolsets: [file, terminal]
+    eager_toolsets: [file, terminal, skills, memory]
     listing: "off"

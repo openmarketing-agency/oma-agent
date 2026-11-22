@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 
 # Old bundled copies can remain on disk after sync; never offer the retired workflow.
 OMA_RETIRED_SKILLS = frozenset({"oma-brands", "oma-playbooks"})
-OMA_DEFAULT_ONLY_SKILLS = OMA_RETIRED_SKILLS | {
+OMA_DEFAULT_STARTER_SKILLS = frozenset({
     "oma-agents", "oma-brand", "oma-campaigns", "oma-onboarding", "oma-playbook",
-}
+})
+OMA_DEFAULT_ONLY_SKILLS = OMA_RETIRED_SKILLS | OMA_DEFAULT_STARTER_SKILLS
 OMA_MAINTENANCE_ONLY_SKILLS = frozenset({"omactl"})
 OMA_SKILL_INVENTORY = ".oma-managed.json"
 
@@ -49,11 +50,14 @@ def profile_excluded_skills(home: Path | None = None, *, include_pruned: bool = 
     resolved = home.resolve()
     if resolved == root:
         excluded = OMA_RETIRED_SKILLS | OMA_MAINTENANCE_ONLY_SKILLS
+        starters = OMA_DEFAULT_STARTER_SKILLS
     elif resolved == root / "profiles" / "maintenance":
         excluded = OMA_DEFAULT_ONLY_SKILLS
+        starters = OMA_MAINTENANCE_ONLY_SKILLS
     else:
         return OMA_DEFAULT_ONLY_SKILLS | OMA_MAINTENANCE_ONLY_SKILLS
-    return excluded | _profile_pruned_skills(home) if include_pruned else excluded
+    # Old sync inventories could hide starters that are now independent of extras.
+    return excluded | (_profile_pruned_skills(home) - starters) if include_pruned else excluded
 
 
 def _allowlist(value: Any, key: str) -> frozenset[str] | None:

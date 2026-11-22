@@ -43,9 +43,9 @@ Ordinary new named profiles do not enable either toolset by default. Existing
 
 A fresh file-backed OMA install also creates a `maintenance` profile. It enables
 `file`, `terminal`, `skills`, `memory`, `session_search`, `web`, `browser`, and `camofox`.
-Only `file` and `terminal` are eager; the others are available through Tool
-Search where supported. Use `hermes -p maintenance` to select the profile. The
-installer uses `hermes_cli/data/profiles/maintenance/` for its tool config,
+`file`, `terminal`, `skills`, and `memory` are eager; the others are available
+through Tool Search where supported. Use `hermes -p maintenance` to select the
+profile. The installer uses `hermes_cli/data/profiles/maintenance/` for its tool config,
 `SOUL.md`, and `omactl` skill. The live profile is stored under
 `$HERMES_HOME/profiles/maintenance/` and is not overwritten on upgrade. The
 `omactl` CLI is a separate runtime prerequisite.
@@ -86,15 +86,17 @@ preserved and old templates are ignored.
 Docker also creates `oma/agents/default/` and `oma/agents/maintenance/` on the
 data volume. These are standalone records (`campaign_id: null`), not campaign
 members. Startup fills missing files from existing native profiles and preserves
-saved edits. The default record references `oma-agents`, `oma-brand`,
-`oma-campaigns`, `oma-onboarding`, and `oma-playbook`; maintenance references
-`omactl`. Docker places those packages under `oma-bundle/skills/oma/`.
+saved edits. The `default` profile gets `oma-agents`, `oma-brand`,
+`oma-campaigns`, `oma-onboarding`, and `oma-playbook`; `maintenance` gets `omactl`.
+These starter skills don't need `oma_skills` entries. Docker places their
+source packages under `oma-bundle/skills/oma/`.
 
 After editing a standalone agent's `config.yaml`, run
 `python -m hermes_cli.oma_campaigns.standalone sync <id>` in the agent's
 environment. It applies the saved `model`, `mcp_servers`, toolset settings, and
-the packages listed under `oma_skills`. An explicit `oma_skills: []` removes all previously
-synced packages from that profile. Omitting the field leaves skills alone.
+extra packages listed under `oma_skills`. An explicit `oma_skills: []` removes
+only the previously synced extras. Omitting the field leaves skills alone, and
+legacy entries naming the profile's starter skills are ignored.
 Unrelated skills, shared source packages, credentials and native `SOUL.md`
 are not changed by sync. Start a new session to see changes to session setup.
 

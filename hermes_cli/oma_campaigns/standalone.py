@@ -11,7 +11,6 @@ import sys
 from tempfile import TemporaryDirectory
 
 from agent.runtime_scope import bind_profile_scope
-from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS, OMA_MAINTENANCE_ONLY_SKILLS, OMA_RETIRED_SKILLS
 from hermes_cli.active_sessions import _FileLock
 from hermes_cli.config import atomic_config_replace, require_readable_config_before_write
 from hermes_cli.config_backend import config_version, require_file_tooling, supports_file_tooling
@@ -25,8 +24,8 @@ from hermes_constants import named_profile_is_live
 from hermes_yaml import YAMLError, safe_load
 
 _AGENTS = {
-    "default": ("Default", "Set up the brand, strategy, and campaigns.", OMA_DEFAULT_ONLY_SKILLS - OMA_RETIRED_SKILLS),
-    "maintenance": ("Maintenance", "Diagnose and maintain this OMA workspace.", OMA_MAINTENANCE_ONLY_SKILLS),
+    "default": ("Default", "Set up the brand, strategy, and campaigns."),
+    "maintenance": ("Maintenance", "Diagnose and maintain this OMA workspace."),
 }
 _IDENTIFIER = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_./:@+\-]{0,199}")
 _MAX_RECORD_BYTES = 256 * 1024
@@ -74,12 +73,12 @@ def _seed_record(home: Path, agent_id: str) -> bool:
     if target.exists() and persona.exists():  # config-reader: ok — authored OMA record, not native config
         return False
     profile = _profile(home, agent_id)
-    name, description, skills = _AGENTS[agent_id]
+    name, description = _AGENTS[agent_id]
     native = _member(profile, "config.yaml")
     with bind_profile_scope(profile, hydrate_secrets=False):
         config_version(native)  # Do not adopt an absent profile configuration.
         model = _existing_model(require_readable_config_before_write(native).get("model"))
-    record = {"id": agent_id, "name": name, "description": description, "campaign_id": None, "oma_skills": sorted(skills)}
+    record = {"id": agent_id, "name": name, "description": description, "campaign_id": None}
     if model is not None:
         record["model"] = model
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
