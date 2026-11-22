@@ -59,6 +59,18 @@ def test_no_credentials_copies_nothing_from_the_launch_profile(launch):
     assert result.mirrored == {"env": False, "auth": "shared", "model_inherited": False, "voice": False}
 
 
+def test_staged_profile_queues_default_plugins_without_copying_camofox_settings(launch, monkeypatch):
+    from agent.secret_scope import load_env_file
+    from hermes_cli import default_plugins
+
+    (launch / ".env").write_text("CAMOFOX_URL=https://browser.example.invalid\nCAMOFOX_API_KEY=dummy\n", encoding="utf-8")
+    queued = []
+    monkeypatch.setattr(default_plugins, "spawn_install", queued.append)
+    result = provision_profile(ProfileCreateRequest(name="work", mirror_credentials=False), initialize=lambda _: None)
+    assert queued == [result.path]
+    assert load_env_file(result.path / ".env") == {}
+
+
 def test_clone_all_brings_its_own_auth_so_it_is_not_reported_shared(launch):
     result = provision_profile(ProfileCreateRequest(name="work", clone_all=True))
     assert (result.path / "auth.json").exists()

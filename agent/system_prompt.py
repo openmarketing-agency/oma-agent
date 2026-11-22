@@ -290,6 +290,10 @@ def _profile_name_for_home(home: Path) -> str:
 
 def _camofox_guidance(agent: Any) -> str:
     """Guide only sessions that actually have the optional browser backend in scope."""
+    selected = getattr(agent, "enabled_toolsets", None)
+    disabled = getattr(agent, "disabled_toolsets", None) or ()
+    if (selected is not None and "camofox" not in selected) or "camofox" in disabled:
+        return ""
     names = agent.valid_tool_names or set()
     if registry.get_toolset_for_tool("browser_navigate") != "camofox":
         return ""

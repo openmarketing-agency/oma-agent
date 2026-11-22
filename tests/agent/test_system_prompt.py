@@ -40,18 +40,21 @@ def _make_agent(**overrides):
     return SimpleNamespace(**base)
 
 
-@pytest.mark.parametrize(("toolset", "direct", "deferred", "expected"), [
-    ("camofox", {"browser_navigate"}, set(), True),
-    ("camofox", {"tool_search", "tool_call"}, {"browser_navigate"}, True),
-    ("camofox", {"tool_search", "tool_call"}, set(), False),
-    ("browser", {"browser_navigate"}, set(), False),
+@pytest.mark.parametrize(("toolset", "enabled", "disabled", "direct", "deferred", "expected"), [
+    ("camofox", ["camofox"], [], {"browser_navigate"}, set(), True),
+    ("camofox", ["camofox"], [], {"tool_search", "tool_call"}, {"browser_navigate"}, True),
+    ("camofox", ["camofox"], [], {"tool_search", "tool_call"}, set(), False),
+    ("browser", ["camofox"], [], {"browser_navigate"}, set(), False),
+    ("camofox", ["browser"], [], {"browser_navigate"}, set(), False),
+    ("camofox", ["camofox"], ["camofox"], {"browser_navigate"}, set(), False),
 ])
-def test_camofox_hint_requires_available_plugin_tools(monkeypatch, toolset, direct, deferred, expected):
+def test_camofox_hint_requires_enabled_and_available_plugin(monkeypatch, toolset, enabled, disabled, direct, deferred, expected):
     from tools.registry import registry
 
     monkeypatch.setattr(registry, "get_toolset_for_tool", lambda name: toolset if name == "browser_navigate" else None)
     monkeypatch.setattr("agent.system_prompt._tool_search_scoped_names", lambda _agent: frozenset(deferred))
-    parts = build_system_prompt_parts(_make_agent(valid_tool_names=direct, skip_context_files=True))
+    agent = _make_agent(enabled_toolsets=enabled, disabled_toolsets=disabled, valid_tool_names=direct, skip_context_files=True)
+    parts = build_system_prompt_parts(agent)
     assert ("Camofox" in parts["stable"]) == expected
     if expected and deferred:
         assert "Find its tools with Tool Search" in parts["stable"]
