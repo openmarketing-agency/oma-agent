@@ -43,7 +43,7 @@ def main(argv=None) -> int:
             return 0
         result = handlers[args.command](default_home(), args)
         print(json.dumps(result, indent=2))
-        return 3 if args.command == "lifecycle" and "missing_integrations" in result else 0
+        return 3 if args.command == "lifecycle" and result.get("missing_model") is True else 0
     except (ValueError, OSError) as exc:
         print(f"OMA campaigns: {exc}", file=sys.stderr)
         return 1

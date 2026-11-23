@@ -47,12 +47,63 @@ def test_startup_adopts_existing_profiles_and_bundles_default_only_skills(tmp_pa
         assert not json.loads(skills_tool.skill_view("oma/oma-campaigns", preprocess=False))["success"]
         assert json.loads(skills_tool.skill_view("oma/omactl", preprocess=False))["success"]
 
-    atomic_config_replace(default / "config.yaml", {**saved, "model": "operator-edit"})
+    atomic_config_replace(default / "config.yaml", {**saved, "model": "operator-edit", "agent": {"enabled_toolsets": []}})
     (default / "SOUL.md").write_text("Operator edit", encoding="utf-8")
+    edited = (default / "config.yaml").read_bytes()
     seed_standalone_agents(tmp_path, install_dir=source)
-    assert read_mapping(default / "config.yaml")["model"] == "operator-edit"
+    assert (default / "config.yaml").read_bytes() == edited
     assert (default / "SOUL.md").read_bytes() == b"Operator edit"
     assert read_user_config_raw(tmp_path / "config.yaml")["model"] == "openrouter/test-model"
+
+
+def test_startup_seeds_each_standalone_record_from_its_native_starter(tmp_path, monkeypatch):
+    from hermes_cli.config_home import seed_install_config
+    from hermes_cli.oma_campaigns.standalone import main, sync_standalone_agent
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("HERMES_DISABLE_LAZY_INSTALLS", "1")
+    seed_install_config()
+    paths = {
+        "default": tmp_path / "config.yaml",
+        "maintenance": tmp_path / "profiles" / "maintenance" / "config.yaml",
+    }
+    before = {role: path.read_bytes() for role, path in paths.items()}
+
+    assert main(["seed", "--ensure-maintenance"]) == 0
+
+    for role, path in paths.items():
+        native = read_user_config_raw(path)
+        saved = read_mapping(tmp_path / "oma" / "agents" / role / "config.yaml")
+        keys = ["agent", "tools", "skills", "approvals", "_config_version"]
+        if role == "default":
+            keys.append("kanban")
+        else:
+            assert "kanban" not in saved
+        assert {key: saved[key] for key in keys} == {key: native[key] for key in keys}
+        assert "_default_plugins_installed" not in saved
+        assert sync_standalone_agent(tmp_path, role)["updated"] == []
+        assert path.read_bytes() == before[role]
+
+
+def test_startup_adopts_saved_plugin_state_without_copying_other_native_settings(tmp_path, monkeypatch):
+    from hermes_cli.oma_campaigns.standalone import seed_standalone_agents
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    plugins = {"enabled": ["camofox"], "disabled": []}
+    atomic_config_replace(tmp_path / "config.yaml", {
+        "agent": {"enabled_toolsets": [], "max_turns": 99},
+        "tools": {"tool_search": {"enabled": "off", "eager_toolsets": None, "listing": "off"}},
+        "skills": {"disabled": [], "extra_dirs": ["/private/local-skills"]},
+        "plugins": {**plugins, "settings": {"example": {"api_key": "fixture-private-value"}}},
+        "_default_plugins_installed": ["camofox"],
+    })
+    assert seed_standalone_agents(tmp_path)["seeded"] == ["default"]
+    saved = read_mapping(tmp_path / "oma" / "agents" / "default" / "config.yaml")
+    assert saved["plugins"] == plugins
+    assert saved["_default_plugins_installed"] == ["camofox"]
+    assert saved["agent"] == {"enabled_toolsets": []}
+    assert saved["skills"] == {"disabled": []}
+    assert saved["tools"]["tool_search"]["eager_toolsets"] is None
 
 
 @pytest.mark.parametrize("role", ["default", "maintenance"])
@@ -89,6 +140,25 @@ def test_sync_applies_only_saved_settings_to_the_owning_profile(tmp_path, monkey
     assert (native / "SOUL.md").read_bytes() != b"Do not apply me"
     assert (untouched / "config.yaml").read_bytes() == untouched_bytes
     assert sync_standalone_agent(tmp_path, role)["updated"] == []
+
+
+def test_standalone_sync_saves_explicit_env_and_tracks_names(tmp_path, monkeypatch):
+    from agent.secret_scope import load_env_file
+    from hermes_cli.oma_campaigns.standalone import seed_standalone_agents, sync_standalone_agent
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    _profile(tmp_path, "root-model", "Default persona")
+    ops = _profile(tmp_path / "profiles" / "maintenance", "ops-model", "Maintenance persona")
+    seed_standalone_agents(tmp_path)
+    target = tmp_path / "oma" / "agents" / "maintenance" / "config.yaml"
+    values = {"EXTRA_TOOL_TOKEN": "fixture-explicit-value"}
+    assert sync_standalone_agent(tmp_path, "maintenance", env=values)["updated"] == ["env"]
+    assert sync_standalone_agent(tmp_path, "maintenance", env={})["updated"] == []
+    assert load_env_file(ops / ".env") == values
+    assert not (tmp_path / ".env").exists()
+    saved = read_mapping(target)
+    assert saved["all-keys"] == saved["available-keys"] == ["EXTRA_TOOL_TOKEN"]
+    assert values["EXTRA_TOOL_TOKEN"] not in target.read_text()
 
 
 def test_sync_updates_and_prunes_managed_packages_without_touching_unrelated_skills(tmp_path, monkeypatch):

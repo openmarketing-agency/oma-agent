@@ -50,13 +50,10 @@ def bundle(tmp_path, monkeypatch):
     return home, source, cli.main
 
 
-@pytest.mark.parametrize("campaign_connector", [False, True])
-def test_campaign_integrations_use_brand_evidence_and_gate_resume(bundle, capsys, monkeypatch, campaign_connector):
-    from hermes_cli import kanban_db
+def test_campaign_integration_candidates_use_brand_evidence(bundle, capsys):
     from hermes_cli.config import atomic_config_write
-    from hermes_cli.oma_campaigns.source import read_mapping
 
-    home, source, main = bundle
+    _, source, main = bundle
     brand = source / "brand" / "config.yaml"
     brand.parent.mkdir()
     atomic_config_write(brand, {
@@ -68,42 +65,43 @@ def test_campaign_integrations_use_brand_evidence_and_gate_resume(bundle, capsys
     })
     assert main(["integrations"]) == 0
     assert json.loads(capsys.readouterr().out) == {"candidates": ["google-analytics", "x"], "unmapped": ["wordpress"]}
-    from hermes_cli.oma_campaigns import integrations
 
+
+@pytest.mark.parametrize("model", ["provider/test-model", {"default": "test-model", "provider": "openrouter"}])
+def test_campaign_resume_requires_saved_model_but_not_connected_integrations(bundle, capsys, model):
+    from hermes_cli import kanban_db
+    from hermes_cli.config import atomic_config_replace, atomic_config_write
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, main = bundle
     config = source / "campaigns" / "demo" / "config.yaml"
-    connector = {"mcp_servers": {"composio": {"url": "https://backend.composio.dev/mcp"}}} if campaign_connector else {}
-    atomic_config_write(config, {**read_mapping(config), **connector, "integrations": ["x", "google-analytics"]})
-    seen = []
-    connected = {"twitter"}
-
-    def probe(profile, queries):
-        seen.append((profile, set(queries)))
-        return connected.copy()
-
-    monkeypatch.setattr(integrations, "active_composio_toolkits", probe)
+    atomic_config_write(config, {**read_mapping(config), "integrations": ["google-analytics"]})
     assert main(["install", "demo"]) == 0
     assert json.loads(capsys.readouterr().out)["lifecycle_state"] == "paused"
-    assert main(["lifecycle", "demo", "resumed"]) == 3
-    assert json.loads(capsys.readouterr().out) == {
-        "id": "demo", "state": "paused", "missing_integrations": ["google-analytics"],
-    }
     assert kanban_db.board_exists("campaign-demo")
-    assert read_mapping(config)["lifecycle_state"] == "paused"
+    for missing in ({}, {"model": " "}, {"model": {"provider": "openrouter"}}):
+        atomic_config_write(config, {**read_mapping(config), **missing})
+        assert main(["lifecycle", "demo", "resumed"]) == 3
+        assert json.loads(capsys.readouterr().out) == {"id": "demo", "state": "paused", "missing_model": True}
+        assert read_mapping(config)["lifecycle_state"] == "paused"
 
-    connected.add("google_analytics")
+    atomic_config_replace(config, {**read_mapping(config), "model": model})
     assert main(["lifecycle", "demo", "resumed"]) == 0
     assert json.loads(capsys.readouterr().out) == {"id": "demo", "state": "resumed"}
-    owner = home / "profiles" / "demo__orchestrator" if campaign_connector else home
-    assert seen == [(owner, {"twitter", "google_analytics"})] * 2
+    assert read_mapping(config)["integrations"] == ["google-analytics"]
     assert not (home / "profiles" / "demo__orchestrator" / "cron" / "jobs.json").exists()
 
 
 def test_campaign_pause_blocks_gateway_cron_and_kanban_without_editing_job_state(bundle, capsys):
     from cron.jobs import create_job, get_due_jobs, list_jobs, trigger_job, use_cron_store
     from hermes_cli import kanban_db, profiles
+    from hermes_cli.config import atomic_config_write
     from hermes_cli.kanban_db_connect import connect_closing
+    from hermes_cli.oma_campaigns.source import read_mapping
 
-    home, _source, main = bundle
+    home, source, main = bundle
+    config = source / "campaigns" / "demo" / "config.yaml"
+    atomic_config_write(config, {**read_mapping(config), "model": "provider/test-model"})
     assert main(["install", "demo"]) == 0
     assert json.loads(capsys.readouterr().out)["lifecycle_state"] == "paused"
     role = home / "profiles" / "demo__orchestrator"
@@ -415,6 +413,28 @@ def test_sync_campaign_script_imports_matching_env_and_skips_missing_values(bund
     assert run("demo", "--secret", "TEAM_SYNC_TOKEN").returncode == 2
 
 
+def test_sync_campaign_saves_explicit_env_without_model_or_mcp_reference(bundle, capsys, monkeypatch):
+    from agent.secret_scope import load_env_file
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import sync_campaign
+
+    home, source, main = bundle
+    assert main(["install", "demo"]) == 0
+    monkeypatch.setenv("OMA_AMBIENT_TOKEN", "never-copy")
+    expected = {"EXTRA_TOOL_TOKEN": "fixture-explicit-value"}
+    roles = ("demo__orchestrator", "demo__worker")
+    assert sync_campaign(home, "demo", env=expected)["updated_agents"] == list(roles)
+    assert sync_campaign(home, "demo", env={})["updated_agents"] == []
+    for role in roles:
+        assert load_env_file(home / "profiles" / role / ".env") == expected
+    assert not (home / ".env").exists()
+    for directory in [source / "campaigns" / "demo", *(source / "agents" / role for role in roles)]:
+        path = directory / "config.yaml"
+        saved = read_mapping(path)
+        assert saved["all-keys"] == saved["available-keys"] == ["EXTRA_TOOL_TOKEN"]
+        assert expected["EXTRA_TOOL_TOKEN"] not in path.read_text()
+
+
 def test_sync_records_available_keys_in_campaign_and_agent_configs(bundle, capsys, run_campaign_script):
     from agent.runtime_scope import bind_profile_scope
     from hermes_cli.config import atomic_config_replace, atomic_config_write, remove_env_value, save_env_value
@@ -442,34 +462,35 @@ def test_sync_records_available_keys_in_campaign_and_agent_configs(bundle, capsy
         for name in ("WORKER_STATUS_TOKEN", "DISABLED_STATUS_TOKEN"):
             save_env_value(name, "test-stored-value")
 
-    def check(campaign_keys, owner_keys, worker_keys, *, worker_uses_mcp=True, **env):
+    owner_names = {"TEAM_STATUS_TOKEN", "UNRELATED_STATUS_TOKEN"}
+    worker_names = {"TEAM_STATUS_TOKEN", "WORKER_STATUS_TOKEN", "DISABLED_STATUS_TOKEN"}
+    extras = (owner_names | worker_names) - {"TEAM_STATUS_TOKEN"}
+
+    def check(campaign_keys, owner_keys, worker_keys, **env):
         result = run_campaign_script("sync-campaign", "demo", **env)
         assert result.returncode == 0, result.stderr
         assert "test-stored-value" not in result.stdout + result.stderr
-        worker_refs = ["TEAM_STATUS_TOKEN", "WORKER_STATUS_TOKEN"] if worker_uses_mcp else ["TEAM_STATUS_TOKEN"]
-        assert read_mapping(campaign)["all-keys"] == worker_refs
-
-        assert read_mapping(owner_record)["all-keys"] == ["TEAM_STATUS_TOKEN"]
-        assert read_mapping(worker_record)["all-keys"] == worker_refs
+        assert read_mapping(campaign)["all-keys"] == sorted(owner_names | worker_names)
+        assert read_mapping(owner_record)["all-keys"] == sorted(owner_names)
+        assert read_mapping(worker_record)["all-keys"] == sorted(worker_names)
         for path, keys in zip((campaign, owner_record, worker_record), (campaign_keys, owner_keys, worker_keys)):
             record = read_mapping(path)
-            assert record["available-keys"] == keys
+            assert record["available-keys"] == sorted(keys)
             assert "configured-keys" not in record
             assert "test-stored-value" not in path.read_text(encoding="utf-8-sig")
         for directory in (profile, worker):
             assert not {"all-keys", "available-keys"} & read_mapping(directory / "config.yaml").keys()
 
-    check(["WORKER_STATUS_TOKEN"], ["TEAM_STATUS_TOKEN"], ["WORKER_STATUS_TOKEN"])
-    check(["TEAM_STATUS_TOKEN", "WORKER_STATUS_TOKEN"], ["TEAM_STATUS_TOKEN"],
-          ["TEAM_STATUS_TOKEN", "WORKER_STATUS_TOKEN"], TEAM_STATUS_TOKEN="test-stored-value")
+    check(extras, owner_names, worker_names - {"TEAM_STATUS_TOKEN"})
+    check(owner_names | worker_names, owner_names, worker_names, TEAM_STATUS_TOKEN="test-stored-value")
 
-    # Losing a saved key and removing a reference both invalidate the stored status.
+    # An omitted reference still counts while its value is saved in the profile.
     with bind_profile_scope(profile, hydrate_secrets=False):
         remove_env_value("TEAM_STATUS_TOKEN")
     config = read_mapping(worker_record)
     config.pop("mcp_servers")
     atomic_config_replace(worker_record, config)
-    check([], [], ["TEAM_STATUS_TOKEN"], worker_uses_mcp=False)
+    check(extras, owner_names - {"TEAM_STATUS_TOKEN"}, worker_names)
 
     # A model override introduces a campaign-visible key even before the value is supplied.
     config = read_mapping(worker_record)
@@ -478,13 +499,14 @@ def test_sync_records_available_keys_in_campaign_and_agent_configs(bundle, capsy
     }})
     result = run_campaign_script("sync-campaign", "demo")
     assert result.returncode == 0, result.stderr
-    assert read_mapping(campaign)["all-keys"] == ["PRIVATE_MODEL_STATUS_TOKEN", "TEAM_STATUS_TOKEN"]
-    assert read_mapping(campaign)["available-keys"] == []
+    new_name = {"PRIVATE_MODEL_STATUS_TOKEN"}
+    assert read_mapping(campaign)["all-keys"] == sorted(owner_names | worker_names | new_name)
+    assert read_mapping(campaign)["available-keys"] == sorted(extras)
     result = run_campaign_script("sync-campaign", "demo", PRIVATE_MODEL_STATUS_TOKEN="test-stored-value")
     assert result.returncode == 0, result.stderr
-    assert read_mapping(campaign)["available-keys"] == ["PRIVATE_MODEL_STATUS_TOKEN"]
-    assert read_mapping(worker_record)["all-keys"] == ["PRIVATE_MODEL_STATUS_TOKEN"]
-    assert read_mapping(worker_record)["available-keys"] == ["PRIVATE_MODEL_STATUS_TOKEN"]
+    assert read_mapping(campaign)["available-keys"] == sorted(extras | new_name)
+    assert read_mapping(worker_record)["all-keys"] == sorted(worker_names | new_name)
+    assert read_mapping(worker_record)["available-keys"] == sorted(worker_names | new_name)
 
 
 @pytest.mark.parametrize(("explicit_model", "has_saved_key"), [(False, True), (True, True), (False, False)])
