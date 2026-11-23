@@ -7,7 +7,7 @@ from pathlib import Path
 
 from hermes_cli.oma_campaigns.install import configure, default_home, install, installed
 from hermes_cli.oma_campaigns.integrations import brand_candidates
-from hermes_cli.oma_campaigns.lifecycle import set_lifecycle
+from hermes_cli.oma_campaigns.lifecycle import set_lifecycle, set_mode
 from hermes_cli.oma_campaigns.schema import KINDS, validate_record
 from hermes_cli.oma_campaigns.source import read_mapping
 
@@ -23,6 +23,9 @@ def main(argv=None) -> int:
     lifecycle = commands.add_parser("lifecycle", help="Pause or resume an installed campaign")
     lifecycle.add_argument("id")
     lifecycle.add_argument("state", choices=("paused", "resumed"))
+    mode = commands.add_parser("mode", help="Change the automation policy of a stopped campaign")
+    mode.add_argument("id")
+    mode.add_argument("mode", choices=("yolo", "approve", "control"))
     validate = commands.add_parser("validate", help="Check an OMA YAML record without applying it")
     validate.add_argument("kind", choices=KINDS)
     validate.add_argument("path", type=Path)
@@ -34,6 +37,7 @@ def main(argv=None) -> int:
         "install": lambda home, args: install(home, args.id),
         "integrations": lambda home, args: brand_candidates(home),
         "lifecycle": lambda home, args: set_lifecycle(home, args.id, args.state),
+        "mode": lambda home, args: set_mode(home, args.id, args.mode),
     }
     args = parser.parse_args(argv)
     try:

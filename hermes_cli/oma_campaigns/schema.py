@@ -7,7 +7,7 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 
-KINDS = ("brand", "playbook", "campaign", "agent")
+KINDS = ("brand", "playbook", "campaign", "agent", "publication")
 
 
 @lru_cache(maxsize=len(KINDS))

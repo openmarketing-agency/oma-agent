@@ -136,6 +136,101 @@ def test_campaign_pause_blocks_gateway_cron_and_kanban_without_editing_job_state
         }
 
 
+@pytest.mark.parametrize("mode", ["yolo", "approve", "control"])
+def test_campaign_publications_handoff(bundle, capsys, mode):
+    from hermes_cli import kanban_db
+    from hermes_cli.config import atomic_config_write
+    from hermes_cli.kanban_db_connect import connect_closing
+    from hermes_cli.oma_campaigns.publications import (
+        PublicationError, approve_publication, claim_publication, finish_publication, list_publications, save_publication,
+    )
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, main = bundle
+    config_path = source / "campaigns" / "demo" / "config.yaml"
+    config = read_mapping(config_path)
+    atomic_config_write(config_path, {**config, "mode": mode, "model": "provider/test-model",
+                                     "agents": [*config["agents"], "demo__publisher"]})
+    role = source / "agents" / "demo__publisher"
+    role.mkdir()
+    worker = source / "agents" / "demo__worker"
+    atomic_config_write(role / "config.yaml", {**read_mapping(worker / "config.yaml"), "id": role.name})
+    (role / "SOUL.md").write_text("I publish approved publications.\n", encoding="utf-8")
+    assert main(["install", "demo"]) == 0
+    assert json.loads(capsys.readouterr().out)["mode"] == mode
+    assert main(["lifecycle", "demo", "resumed"]) == 0
+    assert list_publications(home, "demo")["publications"] == []
+    assert not (config_path.parent / "publications.sqlite3").exists()
+
+    draft = {"platform": "x", "kind": "reply", "account": {"id": "connected-42", "handle": "demo"},
+             "content": {"text": "Thanks!\nHere is the detail."}, "target": {"id": "987", "text": "Question?"}}
+    saved = save_publication(home, "demo", "demo__worker", draft)
+    item = saved["id"]
+    if mode == "yolo":
+        assert saved["status"] == "approved" and saved["task_id"]
+        assert saved["approval"]["source"] == "automatic" and saved["approval"]["by"] is None
+    else:
+        assert saved["status"] == "pending_approval" and saved["task_id"] is None
+        with pytest.raises(PublicationError, match="not available"):
+            claim_publication(home, "demo", role.name, item, 1)
+        draft["content"]["text"] += " Updated."
+        saved = save_publication(home, "demo", "demo__worker", draft, publication_id=item, revision=1)
+        with pytest.raises(PublicationError, match="changed"):
+            approve_publication(home, "demo", item, 1, "owner")
+        saved = approve_publication(home, "demo", item, 2, "owner")
+        assert saved["approval"]["source"] == "human" and saved["approval"]["by"] == "owner"
+        assert approve_publication(home, "demo", item, 2, "owner")["task_id"] == saved["task_id"]
+    with connect_closing(board="campaign-demo") as conn:
+        assert len(kanban_db.list_tasks(conn)) == 1
+        ordinary = kanban_db.create_task(conn, title="Ordinary work", assignee="demo__worker")
+        assert (kanban_db.claim_task(conn, ordinary) is None) == (mode == "control")
+        task = kanban_db.claim_task(conn, saved["task_id"])
+        assert task is not None and task.assignee == role.name and item in task.body
+        assert draft["content"]["text"] not in task.body
+    with pytest.raises(PublicationError, match="Only the campaign publisher"):
+        claim_publication(home, "demo", "demo__worker", item, saved["revision"])
+    claim = claim_publication(home, "demo", role.name, item, saved["revision"])
+    assert claim["content"] == draft["content"] and claim["target"] == draft["target"]
+    with pytest.raises(PublicationError, match="not available"):
+        claim_publication(home, "demo", role.name, item, saved["revision"])
+    result = finish_publication(home, "demo", role.name, item, saved["revision"], claim["claim_token"],
+                                {"provider_id": "external-1", "url": "https://x.com/demo/status/1"})
+    assert result["status"] == "published"
+    listed = list_publications(home, "demo")["publications"]
+    assert listed == [result] and "claim_token" not in listed[0]
+
+
+def test_campaign_control_removes_registered_cron_and_restores_operator_pause(bundle):
+    from cron.jobs import create_job, list_jobs, use_cron_store
+    from hermes_cli.config import atomic_config_write
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import sync_campaign
+
+    home, source, main = bundle
+    path = source / "campaigns" / "demo" / "config.yaml"
+    atomic_config_write(path, {**read_mapping(path), "model": "provider/test-model"})
+    assert main(["install", "demo"]) == 0
+    profile = home / "profiles" / "demo__orchestrator"
+    with use_cron_store(profile):
+        operator = create_job(prompt="Stay paused", schedule="1d", paused=True)
+    assert main(["mode", "demo", "control"]) == 0
+    sync_campaign(home, "demo")
+    assert main(["lifecycle", "demo", "resumed"]) == 0
+    with use_cron_store(profile):
+        assert list_jobs(include_disabled=True) == []
+        with pytest.raises(ValueError, match="control mode"):
+            create_job(prompt="Must not run", schedule="1d")
+    assert main(["mode", "demo", "approve"]) == 1
+    assert main(["lifecycle", "demo", "paused"]) == 0
+    assert main(["mode", "demo", "approve"]) == 0
+    sync_campaign(home, "demo")
+    assert main(["lifecycle", "demo", "resumed"]) == 0
+    with use_cron_store(profile):
+        jobs = {job["id"]: job for job in list_jobs(include_disabled=True)}
+        assert not jobs[operator["id"]]["enabled"]
+        assert any(job.get("oma_job_id") == "sample" and job["enabled"] for job in jobs.values())
+
+
 def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     from agent.runtime_scope import bind_profile_scope
     from hermes_cli.config import read_user_config_raw

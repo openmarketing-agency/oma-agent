@@ -84,7 +84,7 @@ def _status(home: Path, campaign_id: str, config: dict) -> dict:
         state = "installed" if ready else "draft"
     lifecycle = config.get("lifecycle_state", "resumed" if state == "installed" else "paused")
     return {**record, "state": state, "present_profiles": present,
-            "lifecycle_state": lifecycle, "integrations": config.get("integrations", []),
+            "lifecycle_state": lifecycle, "mode": config.get("mode", "yolo"), "integrations": config.get("integrations", []),
             "kanban_board": board if recorded else None,
             "kanban_board_name": metadata["name"] if metadata else None}
 
@@ -285,6 +285,13 @@ def campaign_soul(soul: str, agent_id: str, orchestrator: str, agents: tuple[str
     return (
         f"{soul.rstrip()}\n\n{campaign_context}\n## Campaign Kanban board\n\n"
         f"Use only `{board}` for this campaign's Kanban work. {board_role}\n\n"
+        "## Campaign publications\n\n"
+        "Save each intended post or reply as a publication, in every campaign mode. Submit the exact platform, "
+        "account, kind, content and reply target as JSON on stdin to "
+        "`python -m hermes_cli.oma_campaigns.publications save`. Do not send it directly. The runtime handles "
+        "automatic or human approval according to the campaign mode and queues the campaign publisher. "
+        "Only the publisher posts, after claiming the saved revision, then records the provider receipt. "
+        "If the required tool or approved claim is unavailable, report the blocker without posting.\n\n"
         "## Campaign scratch directory\n\n"
         f"Use `{scratch}` for this profile's temporary campaign files.\n\n"
         "## Saved context\n\n"
