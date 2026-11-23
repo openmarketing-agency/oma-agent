@@ -5,8 +5,10 @@ from pathlib import Path
 
 from agent.secret_scope import _is_global_env
 from hermes_cli.config import cfg_get, validate_env_var_name_for_write
+from hermes_cli.config_home import OMA_CAMPAIGN_SKILL
 from hermes_cli.oma_campaigns.schema import validate_record
 from hermes_cli.oma_campaigns.source import _member, read_mapping
+from hermes_constants import VALID_REASONING_EFFORTS
 
 
 SETTINGS = ("model", "mcp_servers")
@@ -111,6 +113,37 @@ def apply_toolset_settings(native: dict, record: dict, context: str, *, orchestr
     return native, updated
 
 
+def reasoning_effort(record: dict, context: str):
+    value = cfg_get(record, "agent", "reasoning_effort", default=_OMITTED)
+    if value is not _OMITTED and value is not None and value is not False and value not in (*VALID_REASONING_EFFORTS, "none"):
+        raise ValueError(f"{context}: invalid agent.reasoning_effort")
+    return value
+
+
+def apply_profile_settings(native: dict, record: dict, defaults: dict, context: str, *,
+                           orchestrator: bool = False, campaign: bool = False) -> tuple[dict, list[str]]:
+    changed = []
+    for path in (("agent", "reasoning_effort"), ("skills", "enabled"), ("skills", "disabled"), ("skills", "auto_load")):
+        if path[0] == "agent":
+            value = reasoning_effort(record, context)
+            if value is _OMITTED:
+                value = reasoning_effort(defaults, context)
+        else:
+            value = cfg_get(record, *path, default=_OMITTED)
+            if value is _OMITTED:
+                continue
+            if not (_is_toolset_list(value) or (path[-1] == "enabled" and value is None)):
+                raise ValueError(f"{context}: {'.'.join(path)} must be a list of skill names")
+            if campaign and path[-1] == "disabled":
+                # The campaign management skill stays unavailable to campaign profiles.
+                value = sorted(set(value or ()) | {OMA_CAMPAIGN_SKILL})
+        if value is not _OMITTED and value != cfg_get(native, *path, default=_OMITTED):
+            native = _write_toolset_leaf(native, path, value, context)
+            changed.append(".".join(path))
+    native, toolsets = apply_toolset_settings(native, record, context, orchestrator=orchestrator)
+    return native, changed + toolsets
+
+
 def resolve_settings(defaults: dict, overrides: dict) -> dict:
     effective = {**defaults, **overrides}
     if "mcp_servers" in effective:
@@ -119,10 +152,8 @@ def resolve_settings(defaults: dict, overrides: dict) -> dict:
 
 
 def materialize_agent_settings(record: dict, resolved: dict) -> dict:
-    """Save the selected model as editable data; only merged MCP remains generated."""
+    """Keep model overrides authored; never turn an inherited model into an override."""
     new = {key: value for key, value in record.items() if key != "effective"}
-    if "model" in resolved:
-        new["model"] = resolved["model"]
     if "mcp_servers" in resolved:
         new["effective"] = {"mcp_servers": resolved["mcp_servers"]}
     return new

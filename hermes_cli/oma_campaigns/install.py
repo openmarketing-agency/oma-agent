@@ -20,7 +20,9 @@ from hermes_cli.config_defaults import DEFAULT_CONFIG
 from hermes_cli.config_home import OMA_CAMPAIGN_SKILL
 from hermes_cli.oma_campaigns.defaults import agent_defaults, snapshot
 from hermes_cli.oma_campaigns.schema import validate_record
+from hermes_cli.oma_campaigns.role_skills import write_skill_inventory
 from hermes_cli.oma_campaigns.settings import (
+    apply_profile_settings,
     credential_keys, materialize_agent_settings, read_agent_record, resolve_settings, settings_from,
 )
 from hermes_cli.oma_campaigns.source import Agent, Campaign, campaign_fields, checked_id, read_mapping, resolve
@@ -243,6 +245,8 @@ def _initialize(agent: Agent, config: dict, credentials: dict[str, str], staging
         raise ValueError(f"{agent.id}: a bundled preload could not be installed")
     for name, source in agent.skills.items():
         shutil.copytree(source, staging / "skills" / name)
+    if agent.skills:
+        write_skill_inventory(staging / "skills", {name: name for name in agent.skills})
 
 
 def _agent_data_dir(home: Path, agent_id: str, name: str) -> Path:
@@ -270,27 +274,35 @@ def _campaign_context_soul(config_path: Path) -> str:
     )
 
 
+def campaign_soul(soul: str, agent_id: str, orchestrator: str, agents: tuple[str, ...], board: str,
+                  campaign_config: Path, saves: Path, scratch: Path) -> str:
+    campaign_context = _campaign_context_soul(campaign_config)
+    if agent_id == orchestrator:
+        roster = ", ".join(f"`{name}`" for name in agents)
+        board_role = f"Coordinate the team's work here. Assign tasks only within your campaign roster: {roster}."
+    else:
+        board_role = f"Your orchestrator is `{orchestrator}`. Return handoffs on your assigned task."
+    return (
+        f"{soul.rstrip()}\n\n{campaign_context}\n## Campaign Kanban board\n\n"
+        f"Use only `{board}` for this campaign's Kanban work. {board_role}\n\n"
+        "## Campaign scratch directory\n\n"
+        f"Use `{scratch}` for this profile's temporary campaign files.\n\n"
+        "## Saved context\n\n"
+        f"Use `{saves}` to remember context for future sessions. Save useful decisions, "
+        "preferences, findings, blockers, and next steps as concise Markdown (`.md`) "
+        "notes only. When resuming work, read the relevant notes if needed and update "
+        "them when the context changes. Do not store credentials or raw transcripts.\n"
+    )
+
+
 def _publish_profiles(campaign: Campaign, configs: dict[str, dict], paths: dict[str, tuple[Path, Path]],
                       board: str, campaign_config: Path, credentials: dict[str, dict[str, str]]) -> None:
-    campaign_context = _campaign_context_soul(campaign_config)
-    roster = ", ".join(f"`{agent.id}`" for agent in campaign.agents)
+    roster = tuple(agent.id for agent in campaign.agents)
     for agent in campaign.agents:
         saves, scratch = paths[agent.id]
         scratch.mkdir(mode=0o700, parents=True, exist_ok=True)
         saves.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if agent.id == campaign.orchestrator:
-            board_role = f"Coordinate the team's work here. Assign tasks only within your campaign roster: {roster}."
-        else:
-            board_role = f"Your orchestrator is `{campaign.orchestrator}`. Return handoffs on your assigned task."
-        soul = (f"{agent.soul.rstrip()}\n\n{campaign_context}\n## Campaign Kanban board\n\n"
-                f"Use only `{board}` for this campaign's Kanban work. {board_role}\n\n"
-                "## Campaign scratch directory\n\n"
-                f"Use `{scratch}` for this profile's temporary campaign files.\n\n"
-                "## Saved context\n\n"
-                f"Use `{saves}` to remember context for future sessions. Save useful decisions, "
-                "preferences, findings, blockers, and next steps as concise Markdown (`.md`) "
-                "notes only. When resuming work, read the relevant notes if needed and update "
-                "them when the context changes. Do not store credentials or raw transcripts.\n")
+        soul = campaign_soul(agent.soul, agent.id, campaign.orchestrator, roster, board, campaign_config, saves, scratch)
         request = ProfileCreateRequest(name=agent.id, alias=False, mirror_credentials=False,
                                        description=agent.description, soul=soul)
         provision_profile(request, initialize=partial(_initialize, agent, configs[agent.id], credentials[agent.id]))
@@ -312,7 +324,7 @@ def install(home: Path, campaign_id: str) -> dict:
         paths = {agent.id: (_agent_data_dir(home, agent.id, "saves"), _agent_data_dir(home, agent.id, "tmp"))
                  for agent in campaign.agents}
         inherited = "model" not in config
-        config, effort, model_credential = snapshot(home, config)
+        config, model_credential = snapshot(home, config)
         inherited = inherited and "model" in config
         for name in model_credential:
             require_env_writable(name, "set")
@@ -320,7 +332,7 @@ def install(home: Path, campaign_id: str) -> dict:
         effective = {agent.id: resolve_settings(defaults, settings_from(agent.config, agent.id))
                      for agent in campaign.agents}
         board = f"campaign-{campaign.id}"
-        authored = {agent.id: agent_defaults(agent.config, effort, agent.id, orchestrator=agent.id == campaign.orchestrator)
+        authored = {agent.id: agent_defaults(agent.config, agent.id, orchestrator=agent.id == campaign.orchestrator)
                     for agent in campaign.agents}
         configs = {
             agent.id: _with_kanban({**authored[agent.id], **effective[agent.id], "skills": policies[agent.id],
@@ -328,6 +340,9 @@ def install(home: Path, campaign_id: str) -> dict:
                                   board, campaign.orchestrator, agent.id)
             for agent in campaign.agents
         }
+        for agent in campaign.agents:
+            configs[agent.id], _ = apply_profile_settings(configs[agent.id], authored[agent.id], config, agent.id,
+                                                          orchestrator=agent.id == campaign.orchestrator, campaign=True)
         camofox, skipped_camofox = _configure_camofox(home, configs)
         credentials = {agent.id: {**(model_credential if "model" not in agent.config else {}),
                                   **camofox.get(agent.id, {})} for agent in campaign.agents}

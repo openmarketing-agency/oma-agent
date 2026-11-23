@@ -13,6 +13,7 @@ from agent.skill_selection import (
 from hermes_cli.oma_campaigns.bundle import bundle_dir
 from hermes_cli.oma_campaigns.source import _member, _skill_index, resolve_skills
 from hermes_constants import PROFILE_ID_RE
+from utils import atomic_write_text
 
 
 def _read_inventory(path: Path) -> tuple[dict[str, str], set[str]]:
@@ -92,24 +93,35 @@ def _plan(home: Path, profile: Path, root: Path, names: list[str], owned: dict[s
     return next_owned, {**removals, **installs}
 
 
-@contextmanager
-def apply_role_skills(home: Path, profile: Path, names: list[str] | None):
-    """Stage all copies before mutating the profile; roll back on a failed config write."""
+def write_skill_inventory(root: Path, owned: dict[str, str]) -> None:
+    atomic_write_text(root / OMA_SKILL_INVENTORY, json.dumps({"owned": owned, "pruned": []}, sort_keys=True), mode=0o600)
+
+
+def plan_role_skills(home: Path, profile: Path, names: list[str] | None):
     if names is None:
-        yield False
-        return
+        return None
     root = _member(profile, "skills")
     inventory = _member(root, OMA_SKILL_INVENTORY)
     owned, pruned = _read_inventory(inventory)
-    starters = OMA_DEFAULT_STARTER_SKILLS if profile == home else OMA_MAINTENANCE_ONLY_SKILLS
+    starters = (OMA_DEFAULT_STARTER_SKILLS if profile == home else
+                OMA_MAINTENANCE_ONLY_SKILLS if profile.name == "maintenance" else frozenset())
     # Accept legacy record lists and release old claims without touching starter copies.
     names = [name for name in names if name not in starters]
     extras_owned = {name: path for name, path in owned.items() if name not in starters}
     next_owned, changes = _plan(home, profile, root, names, extras_owned)
     next_pruned = (pruned | extras_owned.keys()) - next_owned.keys() - starters
     if not changes and owned == next_owned and pruned == next_pruned:
+        return None
+    return root, inventory, changes, {"owned": next_owned, "pruned": sorted(next_pruned)}
+
+
+@contextmanager
+def apply_role_skills(plan):
+    """Stage all copies before mutating the profile; roll back on a failed profile write."""
+    if plan is None:
         yield False
         return
+    root, inventory, changes, data = plan
     root.mkdir(mode=0o700, exist_ok=True)
     with TemporaryDirectory(prefix=".oma-sync-", dir=root) as staging:
         stage = Path(staging)
@@ -119,7 +131,6 @@ def apply_role_skills(home: Path, profile: Path, names: list[str] | None):
             if package is not None:
                 shutil.copytree(package, prepared[target][1])
         prepared[inventory] = (stage / "old-inventory", stage / "new-inventory")
-        data = {"owned": next_owned, "pruned": sorted(next_pruned)}
         prepared[inventory][1].write_text(json.dumps(data, sort_keys=True), encoding="utf-8")
         touched = []
         try:

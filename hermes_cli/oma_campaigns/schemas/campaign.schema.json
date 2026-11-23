@@ -23,6 +23,10 @@
     "kanban_board_name": { "$ref": "#/$defs/text" },
     "installation_state": { "enum": [null, "installing", "installed"], "readOnly": true },
     "model": { "type": ["string", "object"], "description": "Native Hermes model shorthand or mapping." },
+    "agent": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "reasoning_effort": { "enum": [null, false, "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"] } }
+    },
     "mcp_servers": { "type": "object", "propertyNames": { "minLength": 1 }, "additionalProperties": { "type": "object" } },
     "all-keys": { "$ref": "#/$defs/key_names", "readOnly": true },
     "available-keys": { "$ref": "#/$defs/key_names", "readOnly": true },
