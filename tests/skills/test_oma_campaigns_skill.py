@@ -50,13 +50,10 @@ def bundle(tmp_path, monkeypatch):
     return home, source, cli.main
 
 
-@pytest.mark.parametrize("campaign_connector", [False, True])
-def test_campaign_integrations_use_brand_evidence_and_gate_resume(bundle, capsys, monkeypatch, campaign_connector):
-    from hermes_cli import kanban_db
+def test_campaign_integration_candidates_use_brand_evidence(bundle, capsys):
     from hermes_cli.config import atomic_config_write
-    from hermes_cli.oma_campaigns.source import read_mapping
 
-    home, source, main = bundle
+    _, source, main = bundle
     brand = source / "brand" / "config.yaml"
     brand.parent.mkdir()
     atomic_config_write(brand, {
@@ -68,42 +65,43 @@ def test_campaign_integrations_use_brand_evidence_and_gate_resume(bundle, capsys
     })
     assert main(["integrations"]) == 0
     assert json.loads(capsys.readouterr().out) == {"candidates": ["google-analytics", "x"], "unmapped": ["wordpress"]}
-    from hermes_cli.oma_campaigns import integrations
 
+
+@pytest.mark.parametrize("model", ["provider/test-model", {"default": "test-model", "provider": "openrouter"}])
+def test_campaign_resume_requires_saved_model_but_not_connected_integrations(bundle, capsys, model):
+    from hermes_cli import kanban_db
+    from hermes_cli.config import atomic_config_replace, atomic_config_write
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, main = bundle
     config = source / "campaigns" / "demo" / "config.yaml"
-    connector = {"mcp_servers": {"composio": {"url": "https://backend.composio.dev/mcp"}}} if campaign_connector else {}
-    atomic_config_write(config, {**read_mapping(config), **connector, "integrations": ["x", "google-analytics"]})
-    seen = []
-    connected = {"twitter"}
-
-    def probe(profile, queries):
-        seen.append((profile, set(queries)))
-        return connected.copy()
-
-    monkeypatch.setattr(integrations, "active_composio_toolkits", probe)
+    atomic_config_write(config, {**read_mapping(config), "integrations": ["google-analytics"]})
     assert main(["install", "demo"]) == 0
     assert json.loads(capsys.readouterr().out)["lifecycle_state"] == "paused"
-    assert main(["lifecycle", "demo", "resumed"]) == 3
-    assert json.loads(capsys.readouterr().out) == {
-        "id": "demo", "state": "paused", "missing_integrations": ["google-analytics"],
-    }
     assert kanban_db.board_exists("campaign-demo")
-    assert read_mapping(config)["lifecycle_state"] == "paused"
+    for missing in ({}, {"model": " "}, {"model": {"provider": "openrouter"}}):
+        atomic_config_write(config, {**read_mapping(config), **missing})
+        assert main(["lifecycle", "demo", "resumed"]) == 3
+        assert json.loads(capsys.readouterr().out) == {"id": "demo", "state": "paused", "missing_model": True}
+        assert read_mapping(config)["lifecycle_state"] == "paused"
 
-    connected.add("google_analytics")
+    atomic_config_replace(config, {**read_mapping(config), "model": model})
     assert main(["lifecycle", "demo", "resumed"]) == 0
     assert json.loads(capsys.readouterr().out) == {"id": "demo", "state": "resumed"}
-    owner = home / "profiles" / "demo__orchestrator" if campaign_connector else home
-    assert seen == [(owner, {"twitter", "google_analytics"})] * 2
+    assert read_mapping(config)["integrations"] == ["google-analytics"]
     assert not (home / "profiles" / "demo__orchestrator" / "cron" / "jobs.json").exists()
 
 
 def test_campaign_pause_blocks_gateway_cron_and_kanban_without_editing_job_state(bundle, capsys):
     from cron.jobs import create_job, get_due_jobs, list_jobs, trigger_job, use_cron_store
     from hermes_cli import kanban_db, profiles
+    from hermes_cli.config import atomic_config_write
     from hermes_cli.kanban_db_connect import connect_closing
+    from hermes_cli.oma_campaigns.source import read_mapping
 
-    home, _source, main = bundle
+    home, source, main = bundle
+    config = source / "campaigns" / "demo" / "config.yaml"
+    atomic_config_write(config, {**read_mapping(config), "model": "provider/test-model"})
     assert main(["install", "demo"]) == 0
     assert json.loads(capsys.readouterr().out)["lifecycle_state"] == "paused"
     role = home / "profiles" / "demo__orchestrator"

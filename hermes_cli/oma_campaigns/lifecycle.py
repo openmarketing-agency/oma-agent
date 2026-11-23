@@ -12,7 +12,6 @@ from hermes_cli.config import atomic_config_write
 from hermes_cli.config_backend import require_file_tooling
 from hermes_cli.kanban_db_connect import _dispatch_tick_lock, connect_closing
 from hermes_cli.oma_campaigns.install import _campaign_config_path, _campaigns_dir, _install_lock, _status
-from hermes_cli.oma_campaigns.integrations import missing_integrations
 from hermes_cli.oma_campaigns.schema import validate_record
 from hermes_cli.oma_campaigns.source import read_mapping
 
@@ -80,13 +79,10 @@ def set_lifecycle(home: Path, campaign_id: str, target: str) -> dict:
             atomic_config_write(path, config)
             if target == "paused":
                 return {**result, "state": "paused"}
-        # Console sync puts the campaign's Composio session and key into its roster,
-        # not the workspace's default profile. Probe the campaign's own session when set.
-        connection_home = (home / "profiles" / status["orchestrator"]
-                           if config.get("mcp_servers", {}).get("composio") else home)
-        missing = missing_integrations(home, config.get("integrations", []), connection_home=connection_home)
-        if missing:
-            return {**result, "state": "paused", "missing_integrations": missing}
+        model = config.get("model")
+        model_id = model.get("default") if isinstance(model, dict) else model
+        if not isinstance(model_id, str) or not model_id.strip():
+            return {**result, "state": "paused", "missing_model": True}
         _skip_missed_recurring_jobs(profiles)
         atomic_config_write(path, {**config, "lifecycle_state": "resumed"})
     rescan_gateway_profiles(home)
