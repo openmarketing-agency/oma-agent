@@ -140,11 +140,12 @@ python -m hermes_cli.oma_campaigns.standalone sync my-campaign__orchestrator
 
 Both apply these settings from the saved OMA records:
 
-- **Model and reasoning:** A campaign supplies `model` and `agent.reasoning_effort`
-  defaults. Omit either field on an agent to inherit it on every sync; an explicit
-  agent value wins. Old records may contain values copied at installation; these
-  still count as overrides. Remove the copied agent field to opt into inheritance.
-  If neither record declares the field, the native setting is left alone.
+- **Model and reasoning:** Campaign members resolve an explicit agent setting
+  before the campaign setting, then the saved `default` profile. Inherited
+  settings are not written back as overrides. Values copied onto older records
+  still count as overrides; remove the copied field to restore inheritance.
+  If none of these sources supplies a campaign member's model, sync removes the
+  stale native model. Standalone sync still leaves omitted settings alone.
   `effective.model` is not supported.
 - **MCP:** Campaign and agent `mcp_servers` combine by name. Replace an entire
   named server or set `enabled: false` on that agent; `{}` adds no campaign
@@ -157,6 +158,7 @@ Both apply these settings from the saved OMA records:
   omission leaves it alone. Campaign orchestrators must keep Kanban enabled.
 - **Persona and skills:** The authored `SOUL.md` becomes the native persona,
   including generated campaign context and board routing for campaign members.
+  Older campaign records without an authored `SOUL.md` keep the installed persona.
   `oma_skills` reconciles packages from the shared bundle. Omit it to leave packages
   alone, or use `[]` to remove OMA-managed extras. Starter and unrelated skills
   stay intact. Old campaign copies without ownership metadata are not pruned
@@ -171,14 +173,15 @@ Both apply these settings from the saved OMA records:
   Omit `jobs` to leave the store alone; `jobs: []` removes tracked OMA jobs only.
   Activate a desired job separately with native Hermes cron.
 
-New campaigns can snapshot omitted model and reasoning defaults from the saved
-`default` profile at installation. Only profiles inheriting that root model
-receive its matching saved API key, if any. Sync never rereads root defaults.
+Install and sync read missing campaign defaults from the saved `default` profile,
+not from the current chat. Only profiles inheriting that model can receive its
+matching saved API key. Sync uses the inherited key to fill a missing profile key;
+an explicitly supplied key takes precedence.
 
 Both commands accept an explicit JSON key map on `--env-stdin`. Campaign Sync
 saves each supplied value to every roster member's `.env`; Agent Sync saves it
 only to the selected profile. Use Agent Sync for a credential meant for one
-agent. Omitted values stay unchanged and neither command imports ambient process
+agent. Other saved values stay unchanged and neither command imports ambient process
 variables. Keep `${KEY_NAME}` references in YAML and pass values only through a
 trusted server-side caller, never through command-line arguments. Restrict MCP
 edits to trusted administrators: native stdio MCP entries can launch programs.

@@ -11,6 +11,7 @@ from hermes_cli.oma_campaigns.bundle import bundle_dir
 from hermes_cli.oma_campaigns.schema import validate_record
 from tools.skill_usage import read_skill_name
 
+DEFAULT_CAMPAIGN_MODE = "approve"
 _SOURCE_SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 

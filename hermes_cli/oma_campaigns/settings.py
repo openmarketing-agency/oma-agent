@@ -115,7 +115,7 @@ def apply_toolset_settings(native: dict, record: dict, context: str, *, orchestr
 
 def reasoning_effort(record: dict, context: str):
     value = cfg_get(record, "agent", "reasoning_effort", default=_OMITTED)
-    if value is not _OMITTED and value is not None and value is not False and value not in (*VALID_REASONING_EFFORTS, "none"):
+    if value is not _OMITTED and value is not None and value is not False and value not in ("", *VALID_REASONING_EFFORTS, "none"):
         raise ValueError(f"{context}: invalid agent.reasoning_effort")
     return value
 

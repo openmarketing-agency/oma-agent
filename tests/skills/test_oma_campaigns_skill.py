@@ -72,10 +72,12 @@ def test_campaign_resume_requires_saved_model_but_not_connected_integrations(bun
     from hermes_cli import kanban_db
     from hermes_cli.config import atomic_config_replace, atomic_config_write
     from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import sync_campaign
 
     home, source, main = bundle
     config = source / "campaigns" / "demo" / "config.yaml"
-    atomic_config_write(config, {**read_mapping(config), "integrations": ["google-analytics"]})
+    declared = ["google-analytics", "workspace-managed-tool"]
+    atomic_config_write(config, {**read_mapping(config), "integrations": declared})
     assert main(["install", "demo"]) == 0
     assert json.loads(capsys.readouterr().out)["lifecycle_state"] == "paused"
     assert kanban_db.board_exists("campaign-demo")
@@ -88,8 +90,10 @@ def test_campaign_resume_requires_saved_model_but_not_connected_integrations(bun
     atomic_config_replace(config, {**read_mapping(config), "model": model})
     assert main(["lifecycle", "demo", "resumed"]) == 0
     assert json.loads(capsys.readouterr().out) == {"id": "demo", "state": "resumed"}
-    assert read_mapping(config)["integrations"] == ["google-analytics"]
     assert not (home / "profiles" / "demo__orchestrator" / "cron" / "jobs.json").exists()
+    assert main(["lifecycle", "demo", "paused"]) == 0
+    assert sync_campaign(home, "demo")["id"] == "demo"
+    assert read_mapping(config)["integrations"] == declared
 
 
 def test_campaign_pause_blocks_gateway_cron_and_kanban_without_editing_job_state(bundle, capsys):
@@ -136,7 +140,7 @@ def test_campaign_pause_blocks_gateway_cron_and_kanban_without_editing_job_state
         }
 
 
-@pytest.mark.parametrize("mode", ["yolo", "approve", "control"])
+@pytest.mark.parametrize("mode", [None, "yolo", "approve", "control"])
 def test_campaign_publications_handoff(bundle, capsys, mode):
     from hermes_cli import kanban_db
     from hermes_cli.config import atomic_config_write
@@ -149,7 +153,9 @@ def test_campaign_publications_handoff(bundle, capsys, mode):
     home, source, main = bundle
     config_path = source / "campaigns" / "demo" / "config.yaml"
     config = read_mapping(config_path)
-    atomic_config_write(config_path, {**config, "mode": mode, "model": "provider/test-model",
+    if mode is not None:
+        config["mode"] = mode
+    atomic_config_write(config_path, {**config, "model": "provider/test-model",
                                      "agents": [*config["agents"], "demo__publisher"]})
     role = source / "agents" / "demo__publisher"
     role.mkdir()
@@ -157,8 +163,9 @@ def test_campaign_publications_handoff(bundle, capsys, mode):
     atomic_config_write(role / "config.yaml", {**read_mapping(worker / "config.yaml"), "id": role.name})
     (role / "SOUL.md").write_text("I publish approved publications.\n", encoding="utf-8")
     assert main(["install", "demo"]) == 0
-    assert json.loads(capsys.readouterr().out)["mode"] == mode
+    assert json.loads(capsys.readouterr().out)["mode"] == (mode or "approve")
     assert main(["lifecycle", "demo", "resumed"]) == 0
+    assert list_publications(home, "demo")["mode"] == (mode or "approve")
     assert list_publications(home, "demo")["publications"] == []
     assert not (config_path.parent / "publications.sqlite3").exists()
 
@@ -263,6 +270,7 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     assert read_mapping(config_path) == {
         "id": "demo", "name": "Demo", "description": "Test team.",
         "goals": ["Measure demand"], "plans": ["Review evidence"],
+        "integrations": [],
         "agents": ["demo__orchestrator", "demo__worker"],
         "orchestrator": "demo__orchestrator", "kanban_board": "campaign-demo",
         "kanban_board_name": "Demo", "installation_state": "installed", "lifecycle_state": "paused",
@@ -400,6 +408,55 @@ def test_agent_and_campaign_sync_share_inheritance_and_keep_campaign_persona_con
     capsys.readouterr()
     assert sync(["demo"]) == 0
     assert json.loads(capsys.readouterr().out)["updated_agents"] == []
+
+
+def test_campaign_sync_and_resume_resolve_saved_default_without_pinning_it(bundle, capsys):
+    from agent.secret_scope import load_env_file
+    from hermes_cli.config import atomic_config_replace, read_user_config_raw
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import sync_campaign
+
+    home, source, main = bundle
+    campaign = source / "campaigns/demo/config.yaml"
+    worker_record = source / "agents/demo__worker/config.yaml"
+    owner_record = source / "agents/demo__orchestrator/config.yaml"
+    owner = home / "profiles/demo__orchestrator"
+    worker = home / "profiles/demo__worker"
+    default_config = home / "config.yaml"
+    initial = {"provider": "openrouter", "default": "first-model", "api_key": "${OPENROUTER_API_KEY}"}
+    atomic_config_replace(default_config, {"model": initial, "agent": {"reasoning_effort": "low"}})
+    (home / ".env").write_text("OPENROUTER_API_KEY=sk-or-v1-fixture-default\n", encoding="utf-8")
+    atomic_config_replace(worker_record, {**read_mapping(worker_record), "model": "worker-override"})
+    assert main(["install", "demo"]) == 0
+    capsys.readouterr()
+    assert read_user_config_raw(owner / "config.yaml")["model"] == initial
+    assert "model" not in read_mapping(campaign)
+    assert read_mapping(campaign)["integrations"] == []
+
+    updated = {**initial, "default": "next-model"}
+    atomic_config_replace(default_config, {"model": updated, "agent": {"reasoning_effort": ""}})
+    (owner_record.parent / "SOUL.md").unlink()
+    native_soul = (owner / "SOUL.md").read_bytes()
+    explicit_key = "sk-or-v1-fixture-explicit"
+    sync_campaign(home, "demo", env={"OPENROUTER_API_KEY": explicit_key})
+    assert read_user_config_raw(owner / "config.yaml")["model"] == updated
+    assert read_user_config_raw(owner / "config.yaml")["agent"]["reasoning_effort"] == ""
+    assert (owner / "SOUL.md").read_bytes() == native_soul
+    assert load_env_file(owner / ".env")["OPENROUTER_API_KEY"] == explicit_key
+    assert read_user_config_raw(worker / "config.yaml")["model"] == "worker-override"
+    assert "model" not in read_mapping(campaign)
+    assert "model" not in read_mapping(owner_record)
+    assert main(["lifecycle", "demo", "resumed"]) == 0
+    assert json.loads(capsys.readouterr().out)["state"] == "resumed"
+    assert main(["lifecycle", "demo", "paused"]) == 0
+    capsys.readouterr()
+
+    atomic_config_replace(default_config, {})
+    sync_campaign(home, "demo")
+    assert "model" not in read_user_config_raw(owner / "config.yaml")
+    assert read_user_config_raw(worker / "config.yaml")["model"] == "worker-override"
+    assert main(["lifecycle", "demo", "resumed"]) == 3
+    assert json.loads(capsys.readouterr().out)["missing_model"] is True
 
 
 def test_campaign_sync_reconciles_only_oma_jobs_and_skills(bundle, capsys):
@@ -878,8 +935,12 @@ def test_install_snapshots_saved_defaults_without_overriding_role_settings(
     result = capsys.readouterr()
     assert key not in result.out + result.err
     expected = "explicit-team-model" if explicit_model else {**base_model, "api_key": "${OPENROUTER_API_KEY}"}
-    assert read_mapping(campaign)["model"] == expected
-    assert read_mapping(campaign)["agent"]["reasoning_effort"] == "high"
+    saved_campaign = read_mapping(campaign)
+    if explicit_model:
+        assert saved_campaign["model"] == expected
+    else:
+        assert "model" not in saved_campaign
+    assert "reasoning_effort" not in saved_campaign.get("agent", {})
     assert "model" not in read_mapping(owner)
     assert read_mapping(worker)["model"] == "explicit-worker-model"
     assert "effective" not in read_mapping(owner)

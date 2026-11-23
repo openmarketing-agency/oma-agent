@@ -5,7 +5,7 @@ import re
 import sqlite3
 
 from hermes_constants import get_default_hermes_root
-from hermes_cli.oma_campaigns.source import _member, read_mapping
+from hermes_cli.oma_campaigns.source import DEFAULT_CAMPAIGN_MODE, _member, read_mapping
 
 _ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
@@ -30,7 +30,7 @@ def _blocked(home: Path, campaign: str, *, profile: str | None = None,
         return True
     if profile is not None and profile not in roster:
         return False
-    mode = run.get("mode", "yolo")
+    mode = run.get("mode", DEFAULT_CAMPAIGN_MODE)
     if mode not in ("yolo", "approve", "control") or (cron and mode == "control"):
         return True
     installed = run.get("installation_state") == "installed"

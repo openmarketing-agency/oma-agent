@@ -10,12 +10,12 @@ from cron.jobs import (_jobs_lock, cancel_job_run, compute_next_run, is_job_runn
 from gateway.control_socket import rescan_gateway_profiles
 from gateway.status import resolve_gateway_liveness
 from hermes_cli import kanban_db
-from hermes_cli.config import atomic_config_write
+from hermes_cli.config import atomic_config_write, read_user_config_raw
 from hermes_cli.config_backend import require_file_tooling
 from hermes_cli.kanban_db_connect import _dispatch_tick_lock, connect_closing
 from hermes_cli.oma_campaigns.install import _campaign_config_path, _campaigns_dir, _install_lock, _status
 from hermes_cli.oma_campaigns.schema import validate_record
-from hermes_cli.oma_campaigns.source import _member, read_mapping
+from hermes_cli.oma_campaigns.source import DEFAULT_CAMPAIGN_MODE, _member, read_mapping
 from utils.files import atomic_json_write
 
 
@@ -136,15 +136,17 @@ def set_lifecycle(home: Path, campaign_id: str, target: str) -> dict:
             atomic_config_write(path, config)
             if target == "paused":
                 return {**result, "state": "paused"}
-        model = config.get("model")
+        # Resume checks the model selection, not credentials or integration reachability.
+        model = config["model"] if "model" in config else read_user_config_raw(home / "config.yaml").get("model")
         model_id = model.get("default") if isinstance(model, dict) else model
         if not isinstance(model_id, str) or not model_id.strip():
             return {**result, "state": "paused", "missing_model": True}
-        if config.get("mode") == "control":
+        mode = config.get("mode", DEFAULT_CAMPAIGN_MODE)
+        if mode == "control":
             _control_cron(profiles, park=True)
         else:
             _control_cron(profiles, park=False)
-            if config.get("mode") in ("yolo", "approve"):
+            if mode in ("yolo", "approve"):
                 _activate_new_jobs(profiles)
             _skip_missed_recurring_jobs(profiles)
         atomic_config_write(path, {**config, "lifecycle_state": "resumed"})

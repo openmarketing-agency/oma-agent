@@ -25,7 +25,9 @@ from hermes_cli.oma_campaigns.settings import (
     apply_profile_settings,
     credential_keys, materialize_agent_settings, read_agent_record, resolve_settings, settings_from,
 )
-from hermes_cli.oma_campaigns.source import Agent, Campaign, campaign_fields, checked_id, read_mapping, resolve
+from hermes_cli.oma_campaigns.source import (
+    DEFAULT_CAMPAIGN_MODE, Agent, Campaign, campaign_fields, checked_id, read_mapping, resolve,
+)
 from hermes_cli.profile_provision import ProfileCreateRequest, provision_profile
 from hermes_cli.profiles import get_profile_dir, profile_exists
 from hermes_constants import get_hermes_home
@@ -84,7 +86,8 @@ def _status(home: Path, campaign_id: str, config: dict) -> dict:
         state = "installed" if ready else "draft"
     lifecycle = config.get("lifecycle_state", "resumed" if state == "installed" else "paused")
     return {**record, "state": state, "present_profiles": present,
-            "lifecycle_state": lifecycle, "mode": config.get("mode", "yolo"), "integrations": config.get("integrations", []),
+            "lifecycle_state": lifecycle, "mode": config.get("mode", DEFAULT_CAMPAIGN_MODE),
+            "integrations": config.get("integrations", []),
             "kanban_board": board if recorded else None,
             "kanban_board_name": metadata["name"] if metadata else None}
 
@@ -331,11 +334,11 @@ def install(home: Path, campaign_id: str) -> dict:
         paths = {agent.id: (_agent_data_dir(home, agent.id, "saves"), _agent_data_dir(home, agent.id, "tmp"))
                  for agent in campaign.agents}
         inherited = "model" not in config
-        config, model_credential = snapshot(home, config)
-        inherited = inherited and "model" in config
+        resolved_campaign, model_credential = snapshot(home, config)
+        inherited = inherited and "model" in resolved_campaign
         for name in model_credential:
             require_env_writable(name, "set")
-        defaults = settings_from(config, campaign_id)
+        defaults = settings_from(resolved_campaign, campaign_id)
         effective = {agent.id: resolve_settings(defaults, settings_from(agent.config, agent.id))
                      for agent in campaign.agents}
         board = f"campaign-{campaign.id}"
@@ -348,13 +351,16 @@ def install(home: Path, campaign_id: str) -> dict:
             for agent in campaign.agents
         }
         for agent in campaign.agents:
-            configs[agent.id], _ = apply_profile_settings(configs[agent.id], authored[agent.id], config, agent.id,
-                                                          orchestrator=agent.id == campaign.orchestrator, campaign=True)
+            configs[agent.id], _ = apply_profile_settings(
+                configs[agent.id], authored[agent.id], resolved_campaign, agent.id,
+                orchestrator=agent.id == campaign.orchestrator, campaign=True,
+            )
         camofox, skipped_camofox = _configure_camofox(home, configs)
         credentials = {agent.id: {**(model_credential if "model" not in agent.config else {}),
                                   **camofox.get(agent.id, {})} for agent in campaign.agents}
         if (board_dir := kanban_db.board_dir(board)).exists() or board_dir.is_symlink():
             raise ValueError(f"Kanban board {board!r} already exists; refusing to reuse an unrelated board")
+        config.setdefault("integrations", [])
         atomic_config_write(config_path, {**config, "kanban_board": board, "installation_state": "installing",
                                           "lifecycle_state": "paused"})
         try:
