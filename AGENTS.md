@@ -113,6 +113,7 @@ per variant and a name → variant table (`tools/environments/`, its table still
 
 ## Rules that apply everywhere
 
+- **Edit scope:** Edit only `oma-agent`. Do not edit `openmarketing.agency` or other repos unless explicitly asked.
 - **No defensive clutter:** no wrappers or `try/except: pass` around code that cannot fail, no flags
   nobody sets, no dead code wired in without E2E proof. Comments keep the WHY, cut the WHAT.
 - **Never infer process identity from argv substrings;** use
