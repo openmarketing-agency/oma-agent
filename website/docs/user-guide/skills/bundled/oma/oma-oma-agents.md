@@ -62,6 +62,8 @@ When drafting a record, load the matching reference with `skill_view` (`name: om
 
 The campaign agent examples request `camofox` in `agent.enabled_toolsets` and leave it deferred. Honor explicit role restrictions and opt-outs. For new campaign profiles, the installer copies Camofox settings only when both required values are saved in the default profile; otherwise it provisions normally without Camofox. An allowlist entry does not grant browser or destination access.
 
+**Only the campaign orchestrator gets standing Kanban access.** Include `kanban` in the orchestrator's `agent.enabled_toolsets` only. Omit it from other campaign roles without explicitly disabling it: Hermes supplies task tools when it dispatches an assigned task.
+
 ## Record Format
 
 ```text

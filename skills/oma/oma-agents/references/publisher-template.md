@@ -10,7 +10,7 @@ name: SEO Publisher
 description: Applies authorized content changes and verifies the live result.
 campaign_id: seo
 agent:
-  enabled_toolsets: [file, terminal, web, browser, skills, memory, session_search, camofox, kanban]
+  enabled_toolsets: [file, terminal, web, browser, skills, memory, session_search, camofox]
 tools:
   tool_search:
     enabled: "on"
@@ -20,6 +20,8 @@ skills:
 oma_skills: [copy-editing, seo-audit]
 jobs: []
 ```
+
+Only the campaign orchestrator gets standing Kanban access. Omit `kanban` from the publisher's saved toolsets without explicitly disabling it. Hermes supplies the task tools when it dispatches an assigned publication.
 
 Use `copy-editing` to flag issues before publishing and `seo-audit` to verify relevant live details, such as the title, canonical URL, or internal links. If a check calls for a content change, return it for revision rather than editing the approved copy during publication.
 
