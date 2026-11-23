@@ -17,6 +17,7 @@ from hermes_cli.config_backend import config_version, require_file_tooling
 from hermes_cli.oma_campaigns.credentials import (
     apply_credential_updates, key_status, plan_credential_updates, read_sync_env, validate_sync_env,
 )
+from hermes_cli.oma_campaigns.defaults import snapshot
 from hermes_cli.oma_campaigns.install import (
     _agent_data_dir, _campaign_config_path, _campaigns_dir, _install_lock, _status, campaign_soul, default_home,
 )
@@ -44,6 +45,8 @@ class _Campaign:
     path: Path
     saved: dict = field(repr=False)
     status: dict
+    resolved: dict = field(repr=False)
+    inherited_credential: dict[str, str] = field(repr=False)
 
     def render_soul(self, home: Path, agent_id: str, soul: str) -> str:
         return campaign_soul(
@@ -114,7 +117,7 @@ def _plan_agent(home: Path, agent_id: str, env: dict[str, str], *, campaign: _Ca
     campaign_id = campaign.status["id"] if campaign else None
     record, digest = _read_saved(record_path, agent_id, campaign_id, revision)
     source_soul = _read_soul(_member(directory, "SOUL.md"))
-    if (source_soul is not None or campaign is not None) and not (source_soul or "").strip():
+    if source_soul is not None and not source_soul.strip():
         raise ValueError(f"{agent_id}: SOUL.md is missing or empty")
     rendered = campaign.render_soul(home, agent_id, source_soul) if campaign and source_soul is not None else source_soul
     profile = profile_dir(home, agent_id)
@@ -122,10 +125,17 @@ def _plan_agent(home: Path, agent_id: str, env: dict[str, str], *, campaign: _Ca
     before = config_version(native_path)
     native = require_readable_config_before_write(native_path)
     native_soul = _read_soul(_member(profile, "SOUL.md"))
-    defaults = campaign.saved if campaign else {}
+    if campaign and source_soul is None and not (native_soul or "").strip():
+        raise ValueError(f"{agent_id}: SOUL.md is missing or empty")
+    defaults = campaign.resolved if campaign else {}
     resolved = resolve_settings(settings_from(defaults, campaign_id or agent_id), settings_from(record, agent_id))
     next_native = {**native, **resolved}
     updated = [key for key, value in resolved.items() if native.get(key) != value]
+    # The campaign and agent records own the native model. Clear a stale model
+    # when neither record nor the saved default supplies one, without adding effective.model.
+    if campaign and "model" not in resolved and "model" in next_native:
+        del next_native["model"]
+        updated.append("model")
     if (campaign and "mcp_servers" in record.get("effective", {}) and "mcp_servers" not in resolved
             and "mcp_servers" in next_native):
         del next_native["mcp_servers"]
@@ -135,6 +145,9 @@ def _plan_agent(home: Path, agent_id: str, env: dict[str, str], *, campaign: _Ca
         orchestrator=bool(campaign and agent_id == campaign.status["orchestrator"]),
     )
     stored = load_env_file(_member(profile, ".env"))
+    if campaign and "model" not in record:
+        inherited = {name: value for name, value in campaign.inherited_credential.items() if not stored.get(name)}
+        env = {**inherited, **env}
     credentials = plan_credential_updates(profile, set(env), stored, env)
     required = credential_keys(settings_from(next_native, agent_id))
     names, available = key_status(required, {**stored, **credentials})
@@ -195,7 +208,8 @@ def _load_installed(home: Path, path: Path, campaign_id: str) -> _Campaign:
     if status["state"] != "installed":
         raise ValueError(f"Campaign {campaign_id!r} is not fully installed; no settings were synced")
     validate_record("campaign", saved, path)
-    return _Campaign(path, saved, status)
+    resolved, inherited_credential = snapshot(home, saved)
+    return _Campaign(path, saved, status, resolved, inherited_credential)
 
 
 def _verify_campaign(campaign: _Campaign) -> None:

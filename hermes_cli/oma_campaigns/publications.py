@@ -20,7 +20,7 @@ from hermes_cli import kanban_db
 from hermes_cli.kanban_db_connect import connect_closing
 from hermes_cli.oma_campaigns.install import _campaign_config_path, _campaigns_dir, _status
 from hermes_cli.oma_campaigns.schema import validate_record
-from hermes_cli.oma_campaigns.source import _member, read_mapping
+from hermes_cli.oma_campaigns.source import DEFAULT_CAMPAIGN_MODE, _member, read_mapping
 
 _ID = re.compile(r"[a-f0-9]{32}")
 _MAX_DRAFT_BYTES = 96 * 1024
@@ -152,7 +152,7 @@ def list_publications(home: Path, campaign_id: str, *, before: int | None = None
         rows = conn.execute(
             _SELECT + " WHERE (? IS NULL OR p.seq < ?) ORDER BY p.seq DESC LIMIT ?", (before, before, limit + 1),
         ).fetchall() if conn else []
-    return {"campaign_id": campaign_id, "mode": config.get("mode", "yolo"),
+    return {"campaign_id": campaign_id, "mode": config.get("mode", DEFAULT_CAMPAIGN_MODE),
             "publications": [_view(row) for row in rows[:limit]],
             "next_cursor": rows[limit - 1]["seq"] if len(rows) > limit else None}
 
@@ -178,7 +178,7 @@ def save_publication(home: Path, campaign_id: str, agent_id: str, draft: dict, *
     if agent_id not in config["agents"]:
         raise PublicationError(403, "The agent does not belong to this campaign.")
     payload = _draft_json(draft)
-    automatic = publication_id is None and config.get("mode", "yolo") == "yolo"
+    automatic = publication_id is None and config.get("mode", DEFAULT_CAMPAIGN_MODE) == "yolo"
     at = _now()
     with _db(directory, write=True) as conn:
         if publication_id is None:
@@ -204,7 +204,7 @@ def save_publication(home: Path, campaign_id: str, agent_id: str, draft: dict, *
 
 def approve_publication(home: Path, campaign_id: str, publication_id: str, revision: int, approver: str) -> dict:
     directory, config = _campaign(home, campaign_id)
-    if config.get("mode") not in ("approve", "control"):
+    if config.get("mode", DEFAULT_CAMPAIGN_MODE) not in ("approve", "control"):
         raise PublicationError(409, "This campaign does not use manual publication approval.")
     if not isinstance(approver, str) or not 0 < len(approver) <= 128 or not approver.isprintable() or not approver.strip():
         raise PublicationError(422, "A valid approver is required.")
@@ -253,7 +253,7 @@ def claim_publication(home: Path, campaign_id: str, agent_id: str, publication_i
     with _db(directory, write=True) as conn:
         row = _row(conn, publication_id)
         _check_revision(row, revision)
-        mode = config.get("mode", "yolo")
+        mode = config.get("mode", DEFAULT_CAMPAIGN_MODE)
         if (config.get("lifecycle_state", "resumed") != "resumed"
                 or row["status"] != "approved" or not row["task_id"]
                 or (mode in ("approve", "control") and not row["approved_by"])):

@@ -10,7 +10,7 @@ name: SEO Writer
 description: Drafts evidence-backed pages and articles for the campaign's audience.
 campaign_id: seo
 agent:
-  enabled_toolsets: [file, terminal, web, browser, skills, memory, session_search, camofox, kanban]
+  enabled_toolsets: [file, terminal, web, browser, skills, memory, session_search, camofox]
 tools:
   tool_search:
     enabled: "on"
