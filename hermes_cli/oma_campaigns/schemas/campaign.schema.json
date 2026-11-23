@@ -18,6 +18,7 @@
     "goals": { "$ref": "#/$defs/text_list" },
     "plans": { "$ref": "#/$defs/text_list" },
     "integrations": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/properties/id" }, "description": "Canonical OMA integration IDs required to resume." },
+    "mode": { "enum": ["yolo", "approve", "control"], "default": "yolo", "description": "Campaign automation and publishing policy; separate from lifecycle." },
     "lifecycle_state": { "enum": ["paused", "pausing", "resumed"], "readOnly": true },
     "kanban_board": { "type": "string", "pattern": "^campaign-[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])" },
     "kanban_board_name": { "$ref": "#/$defs/text" },

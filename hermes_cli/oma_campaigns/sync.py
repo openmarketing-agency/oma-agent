@@ -144,7 +144,7 @@ def _plan_agent(home: Path, agent_id: str, env: dict[str, str], *, campaign: _Ca
     return _AgentUpdate(agent_id, record_path, digest, native_path, before, next_record if next_record != record else None,
                         next_native, source_soul, native_soul, rendered, tuple(updated + profile_changes),
                         names, available, credentials, plan_role_skills(home, profile, record.get("oma_skills")),
-                        plan_role_jobs(profile, record.get("jobs")))
+                        plan_role_jobs(profile, record.get("jobs")) if defaults.get("mode") != "control" else None)
 
 
 def _verify_record(update: _AgentUpdate) -> None:

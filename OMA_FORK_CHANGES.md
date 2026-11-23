@@ -183,6 +183,7 @@ The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) designs t
 | `configure <id>` | Fill missing routing fields in the existing campaign config without reinstalling. |
 | `integrations` | List canonical integration candidates from saved brand evidence. |
 | `lifecycle <id> paused` / `lifecycle <id> resumed` | Control campaign work. New campaigns start paused; resume requires a saved campaign model. |
+| `mode <id> yolo\|approve\|control` | Change the saved automation policy of a stopped campaign. |
 
 `sync-campaign <id>` reconciles the installed roster; `python -m hermes_cli.oma_campaigns.standalone sync <agent-id>` uses the same logic for one standalone or campaign agent. Both apply saved model, reasoning, MCP, tool and skill settings, persona, managed skill packages, and declared cron jobs. New jobs are paused, existing operator pauses are preserved, and unrelated jobs are not touched. Both save only explicitly supplied `--env-stdin` values: every roster member for campaign sync, or just the target for agent sync. The generated `all-keys` and `available-keys` lists contain names only. See [sync settings](website/docs/user-guide/configuration.md#sync-saved-oma-settings).
 
@@ -213,6 +214,10 @@ The `default` starter uses this routing to queue one task for the installed orch
 When the built-in decomposer runs under `default`, `kanban.orchestrator_profile: default` assigns the parent task back to `default` after decomposition. This does not change who runs child tasks, or redirect ordinary tasks assigned directly to campaign orchestrators.
 
 **Campaign installation does not register jobs.** Sync parses and reconciles declarations separately. It does not run jobs or change campaign lifecycle. See [job reconciliation](hermes_cli/oma_campaigns/role_jobs.py).
+
+**Campaign modes:** `mode` is independent of Start/Stop. In explicit `yolo` and `approve` modes, Start activates synced jobs awaiting their first activation, but retains operator pauses. `control` stores existing registrations outside the live cron store, rejects new registrations, and blocks automatic ordinary Kanban work. Leaving `control` restores saved jobs; it does not start the campaign. Records that omit `mode` retain their previous scheduling behavior.
+
+**Publications:** All modes use the same [draft schema](hermes_cli/oma_campaigns/schemas/publication.schema.json) and a campaign-local `publications.sqlite3` for draft revisions, approvals, and publish results. New drafts are auto-approved in `yolo`; `approve` and `control` require human approval of the exact revision. The publisher agent claims the approved record and sends it through a configured integration. This workflow does not control separately configured tools with direct write access. Existing agent profile instructions pick up the new guidance on campaign sync.
 
 **URL-only onboarding:** The [`oma-onboarding` skill](skills/oma/oma-onboarding/SKILL.md) uses one website or GitHub repository URL as brand and strategy evidence. The agent decides which campaigns and roles fit and which roles need recurring jobs, choosing each cadence and prompt. It registers eligible jobs through native Hermes cron in the owning profiles after verifying the team. This preserves operator pauses, does not force an immediate run, and skips jobs requiring unverified external permissions. Due jobs need a healthy gateway scheduler.
 

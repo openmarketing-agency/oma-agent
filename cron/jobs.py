@@ -1910,7 +1910,10 @@ def create_job(
         if value is not None:
             job[key] = value
 
+    from hermes_cli.oma_campaigns.admission import profile_cron_disabled
     with _jobs_lock():
+        if profile_cron_disabled(_current_cron_store().jobs_file.parent.parent):
+            raise ValueError("Cron jobs are disabled for campaigns in control mode.")
         save_jobs(load_jobs() + [job])
     return job
 
@@ -2706,7 +2709,7 @@ def claim_job_for_fire(
     from hermes_cli.oma_campaigns.admission import profile_work_paused
 
     def apply(jobs, _i, job):
-        if profile_work_paused(_current_cron_store().jobs_file.parent.parent):
+        if profile_work_paused(_current_cron_store().jobs_file.parent.parent, cron=True):
             return False
         if is_terminal_job(job) and not _is_recoverable_error_job(job):
             return False
@@ -2850,7 +2853,7 @@ def get_due_jobs() -> list[dict[str, Any]]:
     """
     from hermes_cli.oma_campaigns.admission import profile_work_paused
 
-    if profile_work_paused(_current_cron_store().jobs_file.parent.parent):
+    if profile_work_paused(_current_cron_store().jobs_file.parent.parent, cron=True):
         return []
     with _jobs_lock():
         return _get_due_jobs_locked()

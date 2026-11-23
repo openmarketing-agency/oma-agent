@@ -2127,7 +2127,7 @@ def _claim_and_open_run(
 ) -> Optional[int]:
     """Open a run using a status/assignee CAS. Caller holds the write transaction."""
     from hermes_cli.oma_campaigns.admission import board_work_paused
-    if board_work_paused(conn):
+    if board_work_paused(conn, task_id=task_id):
         return None
     cur = conn.execute(
         f"""

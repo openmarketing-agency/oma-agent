@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OMA Publication Draft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["platform", "account", "kind", "content"],
+  "properties": {
+    "platform": {"type": "string", "pattern": "^[a-z0-9]+(?:[-_][a-z0-9]+)*(?![\\s\\S])", "maxLength": 64},
+    "kind": {"enum": ["post", "reply"]},
+    "account": {
+      "type": "object", "additionalProperties": false, "required": ["id"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"}, "name": {"$ref": "#/$defs/label"},
+        "handle": {"$ref": "#/$defs/label"}, "avatar_url": {"$ref": "#/$defs/url"}
+      }
+    },
+    "content": {
+      "type": "object", "additionalProperties": false, "required": ["text"],
+      "properties": {
+        "text": {"type": "string", "maxLength": 16000},
+        "media": {
+          "type": "array", "maxItems": 20,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["asset_id", "kind"],
+            "properties": {
+              "asset_id": {"$ref": "#/$defs/id"}, "kind": {"enum": ["image", "video", "document"]},
+              "url": {"$ref": "#/$defs/url"}, "alt_text": {"type": "string", "maxLength": 2000}
+            }
+          }
+        }
+      },
+      "anyOf": [
+        {"properties": {"text": {"pattern": "\\S"}}},
+        {"required": ["media"], "properties": {"media": {"minItems": 1}}}
+      ]
+    },
+    "target": {
+      "type": "object", "additionalProperties": false, "required": ["id"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"}, "url": {"$ref": "#/$defs/url"},
+        "author_name": {"$ref": "#/$defs/label"}, "author_handle": {"$ref": "#/$defs/label"},
+        "author_avatar_url": {"$ref": "#/$defs/url"}, "text": {"type": "string", "maxLength": 8000}
+      }
+    }
+  },
+  "if": {"properties": {"kind": {"const": "reply"}}},
+  "then": {"required": ["target"]},
+  "else": {"not": {"required": ["target"]}},
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^\\S+(?![\\s\\S])"},
+    "label": {"type": "string", "maxLength": 256},
+    "url": {"type": "string", "maxLength": 2048, "pattern": "^https?://[^/\\s?#]+[^\\s]*(?![\\s\\S])"}
+  }
+}

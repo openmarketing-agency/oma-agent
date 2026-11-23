@@ -13,6 +13,7 @@ from hermes_time import now
 
 _OWNER = "oma_job_id"
 _LEGACY_PREFIX = "oma:"
+AWAITING_ACTIVATION = "Created by OMA sync; awaiting operator activation."
 
 
 def _verify_paths(profile: Path) -> None:
@@ -87,7 +88,7 @@ def _reconcile(current: list, definitions: dict) -> tuple[list, set[str]]:
         created_at = now().isoformat()
         seed = {"id": job_id, _OWNER: source_id, "state": "paused", "enabled": False,
                 "created_at": created_at, "paused_at": created_at, "next_run_at": None,
-                "paused_reason": "Created by OMA sync; awaiting operator activation."}
+                "paused_reason": AWAITING_ACTIVATION}
         updated.append(merge_job_definition(seed, declaration))
     return updated, removed
 
