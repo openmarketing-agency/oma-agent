@@ -31,6 +31,18 @@ Resolve the default profile's home with `hermes -p default config path`. Use `<h
 2. Confirm that the sources describe the same product using links from the site, repository metadata, or another official source. Do not merge unrelated brands or replace the singleton without explicit confirmation. Reruns fill gaps and refresh stale, evidence-backed findings without overwriting unrelated fields, approved knowledge, or custom assets.
 3. Work through all relevant checks below. Record the coverage and sources in the corresponding Markdown reports. A blocked or unchecked source is not a negative finding.
 
+## Brand Templates
+
+When drafting the brand record, use `skill_view` with `name: oma-brand` and the closest reference as `file_path`:
+
+| Template | Useful starting point for |
+| --- | --- |
+| [B2B SaaS](references/b2b-saas-template.md) | A product site, trial or demo path, and public instrumentation evidence. |
+| [Open source](references/open-source-template.md) | A repository-led product with official docs and license considerations. |
+| [Ecommerce](references/ecommerce-template.md) | A storefront, checkout path, and product imagery or visual identity. |
+
+Each illustrates `config.yaml` and its companion `knowledge-base.md`. Adapt the structure to the research; never copy example URLs, statuses, or findings into the saved brand. Add only references to files actually saved under `oma/brand/`. If none fits, follow the research and output procedure below. These examples do not create or replace the workspace's single brand.
+
 ## Use the Bundled Marketing Skills
 
 Use the shared skill packages under `<home>/oma-bundle/skills/` as the source for marketing research procedures. Load the relevant package with its qualified `skill_view` name and verify its returned `skill_dir` is in that bundle, not in the profile or project skills directory. For other relevant packages, use `skills_search` and select results with `source: oma-bundle`, then verify the loaded path. Do not substitute a same-named skill from another source.
