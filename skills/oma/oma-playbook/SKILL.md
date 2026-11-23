@@ -29,18 +29,31 @@ Use the default profile's Hermes home as the base for `oma/playbook/`. On the lo
 
 Save the one playbook at `oma/playbook/config.yaml`. Keep its stable lowercase, hyphen-separated `id` independent of the display `name`; campaigns use the fixed path, not an ID link. Do not add a `brand_id` field: this playbook applies to the single brand in the same Hermes home.
 
-```yaml
-id: marketing-strategy
-name: Marketing Strategy
-description: Shared marketing priorities for the brand.
-strategy: |-
-  Focus on reaching teams already looking for a solution in this category.
-  Prioritize a clear product site and measurable sign-up path before a public
-  launch. Use verified social channels to test positioning; defer channels
-  without an audience or a clear role. Measure qualified sign-ups.
-```
-
 `strategy` is the strategy text itself. Use a YAML block scalar for multiline content, not a filename or link to a separate strategy document. If the user has not supplied or asked you to draft a strategy, use `strategy: ""` and report it as unset.
+
+## Playbook Templates
+
+Use the [Presenton worked example](references/presenton-example.md) as the model for a complete playbook. Load it with `skill_view` (`name: oma-playbook`, `file_path: references/presenton-example.md`). For a different business model, load the relevant reference as well:
+
+| Template | Use for |
+| --- | --- |
+| [B2B SaaS](references/b2b-saas-template.md) | Qualified trials or demos and product adoption. |
+| [Open source](references/open-source-template.md) | Developer adoption through docs, releases, and existing communities. |
+| [Ecommerce](references/ecommerce-template.md) | Product discovery, completed purchases, or repeat orders. |
+
+Keep the following sections inside the inline `strategy` value, not as new YAML keys. Adapt them to the saved brand evidence and user constraints:
+
+1. **What the product is:** Explain what it does and what users get in plain language.
+2. **Positioning:** Name the main reason to choose it over alternatives and the evidence behind that difference.
+3. **Who we market to:** Explain what each material audience needs and how it contributes to adoption, reach, or revenue. Keep one brand story; tailor the angle by audience.
+4. **What success looks like:** Describe the progression from discovery to meaningful use and, where relevant, revenue or another business outcome.
+5. **Channels and their roles:** Give each priority channel a distinct job. Separate ongoing work, release or proof amplifiers, and deferred channels. Name what would justify revisiting a deferred channel.
+6. **What we talk about:** List durable themes and the demonstrations, workflows, or customer evidence that support them.
+7. **Voice:** State how to write and what to avoid, including any differences by audience or channel.
+8. **Measuring progress:** Connect each channel to downstream outcomes. Separate reach, adoption, and commercial measures where relevant; record attribution and data gaps without guessing.
+9. **Claims:** Limit claims to what current, approved evidence supports. State what must not be claimed and how to handle comparisons.
+
+Close with the material changes that should trigger a strategy review. Keep editorial calendars, individual deliverables, weekly decisions, agent rosters, and schedules in campaigns. The examples do not create additional records or authorize campaign execution.
 
 ## Build Strategy from the Compiled Brand
 
@@ -54,11 +67,11 @@ Recommend the smallest set of campaigns that would advance the priorities, with 
 
 | Brand finding | Campaign to consider |
 | --- | --- |
-| No verified website after checking, and the audience needs a destination | A website or landing-page campaign before sending traffic there. |
+| Research confirms the official website is absent and the audience needs a destination | A website-build campaign before sending traffic there. |
 | No Product Hunt or other relevant launch found, and the audience and product are ready | A product-launch campaign on the platform that fits the audience; validate readiness and the conversion path first. |
-| No blog or newsletter covering an audience need, with a viable publishing path | A blog or newsletter campaign; start with whichever serves the objective. |
+| Research confirms the blog is absent and owned articles would serve the audience | A blog-build campaign; reuse the existing site or make hosting a prerequisite. |
 | Verified social channels where the intended audience is active | A social campaign on those channels, building on existing accounts rather than automatically opening new ones. |
-| Public docs are missing or weak and users need them to adopt the product | A documentation campaign, or a docs milestone within a broader website or launch campaign. |
+| Users need public docs to adopt the product | If absent after checking, recommend a public-docs build; if present but weak, recommend improving them. |
 | The priority outcome cannot be measured with current access | Make measurement setup or verification a prerequisite; use a separate campaign only if the work warrants one. |
 
 These are examples, not required campaigns. Include recommended priorities and their rationale in the inline strategy, then hand off campaign selection and execution design to `oma-campaigns`. Do not create rosters, campaign records, or jobs when only drafting the playbook.

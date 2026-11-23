@@ -161,9 +161,13 @@ Both apply these settings from the saved OMA records:
   alone, or use `[]` to remove OMA-managed extras. Starter and unrelated skills
   stay intact. Old campaign copies without ownership metadata are not pruned
   until sync has tracked them as declared packages.
-- **Schedules:** `jobs` adds or edits OMA-owned jobs in the owning profile.
-  Newly registered jobs are paused; existing jobs retain their pause and completion
-  state. Legacy local jobs named `oma:<id>` are reused when they match a declaration.
+- **Schedules:** `jobs` reconciles OMA-owned jobs in the owning profile.
+  Unchanged jobs keep their native ID and state. If the name, prompt, schedule,
+  timezone, or repeat limit changes, sync replaces the job with a new native ID
+  and a fresh repeat count. Active jobs stay scheduled; operator pauses are
+  preserved. New jobs and replacements for completed jobs start paused.
+  This also applies to legacy local `oma:<id>` jobs, even with a chat or API
+  origin. Jobs with external delivery or attached automation are not taken over.
   Omit `jobs` to leave the store alone; `jobs: []` removes tracked OMA jobs only.
   Activate a desired job separately with native Hermes cron.
 

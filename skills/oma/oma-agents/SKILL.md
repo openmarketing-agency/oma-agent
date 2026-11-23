@@ -24,6 +24,26 @@ Create, list, inspect, and update local agent records. Save concise notes that h
 
 Use the default Hermes profile's home as the base for `oma/agents/`. On the local CLI, `hermes config path` identifies that home. Do not use the working directory or search other profiles' stores. Use `search_files`, `read_file`, `write_file`, and `patch` for records and text. Use `terminal` only if needed to create an empty `saves/` directory.
 
+## Agent Templates
+
+When drafting a record, load the matching reference with `skill_view` (`name: oma-agents`, `file_path` set to the reference path). Each example has a `config.yaml` and `SOUL.md` to adapt, not a profile to install verbatim. The examples use `oma_skills` from the shared bundle's `marketingskills` and `social-media-skills` categories.
+
+| Example | Responsibility |
+| --- | --- |
+| [Base agent (researcher)](references/base-agent-template.md) | Investigate a campaign question and hand back evidence. |
+| [Orchestrator](references/orchestrator-template.md) | Plan work, assign tasks, and run a bounded recurring review. |
+| [Social media orchestrator](references/social-media-orchestrator-template.md) | Check new social activity every 30 minutes and queue follow-up. |
+| [Product Hunt orchestrator](references/product-hunt-orchestrator-template.md) | Review new products and substantial features for launch every 10 days. |
+| [Publisher](references/publisher-template.md) | Apply authorized revisions and verify the live result. |
+| [Writer](references/writer-template.md) | Draft and revise copy without publishing it. |
+| [Blog writer](references/blog-writer-template.md) | Draft articles and prepare supporting media. |
+| [Social media content writer](references/social-media-content-writer-template.md) | Draft channel-native copy and prepare supporting images or video. |
+| [Owned-channel orchestrator](references/owned-channel-orchestrator-template.md) | Coordinate a website, blog, or public docs build. |
+| [Owned-channel publisher](references/owned-channel-publisher-template.md) | Apply and verify authorized site, blog, or docs changes. |
+| [Maintenance handoff](references/maintenance-handoff.md) | Route hosting work to the existing standalone `maintenance` profile using `omactl`. |
+
+The campaign agent examples request `camofox` in `agent.enabled_toolsets` and leave it deferred. Honor explicit role restrictions and opt-outs. For new campaign profiles, the installer copies Camofox settings only when both required values are saved in the default profile; otherwise it provisions normally without Camofox. An allowlist entry does not grant browser or destination access.
+
 ## Record Format
 
 ```text
@@ -35,28 +55,13 @@ oma/agents/<agent_dir>/
 
 For a campaign agent, use `<campaign_id>__<agent_id>`, where `<agent_id>` is the agent's short lowercase, hyphen-separated ID. For example, `seo` and `researcher` give `seo__researcher`. Use the full ID as `id`, the record directory name, and the native profile name when provisioned. Prefix a short ID once; preserve an already-qualified ID if its prefix matches the selected campaign, and reject a mismatched or doubled prefix rather than guessing. Standalone agents use a stable lowercase ID without a campaign prefix. The display `name` is separate and can change without renaming the record.
 
-```yaml
-id: seo__researcher
-name: SEO Researcher
-description: Research and summarize changes in organic search.
-campaign_id: seo
-agent:
-  enabled_toolsets: [file, web, skills]
-skills:
-  disabled: []
-  auto_load: []
-cron:
-  max_parallel_jobs: 1
-jobs: []
-```
-
 `campaign_id` is the ID of the owning campaign. Verify that it matches the `id` in `oma/campaigns/<campaign_id>/config.yaml` in the same Hermes home. Use `campaign_id: null` for a standalone agent. Do not store playbook or brand links in the agent record; agents use the single playbook and brand at their fixed locations when needed.
 
-The owning campaign's `config.yaml` keeps its roster under `agents`, a YAML list of full canonical IDs. For example, `agents: [seo__orchestrator, seo__researcher]`. Keep this roster separate from the agent's own config.
+The owning campaign's `config.yaml` keeps its roster under `agents`, a YAML list of full canonical IDs. For example, `agents: [seo__orchestrator, seo__researcher, seo__publisher]`. Keep this roster separate from the agent's own config.
 
 `SOUL.md` defines the agent's role, voice, and operating boundaries. Keep tools, skills, and schedules in `config.yaml`. Use `saves/` for the working context the agent needs to remember, not for settings or persona instructions.
 
-Keep toolset selection under `agent.enabled_toolsets`, tool behavior under `tools`, skill policy under `skills`, and scheduler settings under `cron`. During campaign design, choose only needed toolsets and exact shared package IDs under `oma_skills`. Declare genuinely recurring work in `jobs` with a unique `id`, native `schedule`, and bounded `prompt` per job. Use `jobs: []` when no work is scheduled. For an existing record preserve unrelated settings and selection policies. Do not store credentials here.
+Keep toolset selection under `agent.enabled_toolsets`, tool behavior under `tools`, skill policy under `skills`, and scheduler settings under `cron`. Use `skills_search` to find relevant `oma-bundle` packages; under `oma_skills`, save their exact `SKILL.md` names, not category-qualified paths. Declare genuinely recurring work in `jobs` with a unique `id`, native `schedule`, and bounded `prompt` per job. Use `jobs: []` when no work is scheduled. For an existing record preserve unrelated settings and selection policies. Do not store credentials here.
 
 ## Procedure
 

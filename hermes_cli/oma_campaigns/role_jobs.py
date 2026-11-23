@@ -1,11 +1,11 @@
 """Reconcile only OMA-owned schedules in the owning profile's native cron store."""
 
-from hashlib import sha256
 from pathlib import Path
+from uuid import uuid4
 
 from agent.runtime_scope import bind_profile_scope
-from cron.job_definition import merge_job_definition
-from cron.jobs import _jobs_lock, compute_next_run, load_jobs, parse_schedule, save_jobs, use_cron_store
+from cron.job_definition import JOB_DEFINITION_FIELDS, merge_job_definition
+from cron.jobs import _jobs_lock, compute_next_run, is_job_runnable, load_jobs, parse_schedule, save_jobs, use_cron_store
 from cron.jobs_time import normalize_timezone
 from cron.lifecycle_guard import check_gateway_lifecycle
 from hermes_cli.oma_campaigns.source import _job_ids, _member
@@ -46,50 +46,77 @@ def _legacy_source(job: dict) -> str | None:
     return None
 
 
+def _can_manage_legacy_job(job: dict) -> bool:
+    # A creator origin does not change local delivery. Never take over a job
+    # that can send externally or runs extra automation outside the declaration.
+    return (
+        job.get("deliver") == "local"
+        and job.get("failure_deliver") in (None, "local")
+        and not any(job.get(key) for key in (
+            "script", "no_agent", "monitor_script", "monitor_url", "skills", "skill", "attach_to_session", "context_from",
+        ))
+    )
+
+
+def _matches_declaration(job: dict, declaration: dict) -> bool:
+    old_schedule = job.get("schedule") or {}
+    display = declaration["schedule_display"]
+    # Parsing "in 2h" again computes a new instant, not a new declaration.
+    same_relative_delay = display.startswith("once in ") and old_schedule.get("display") == display
+    return (
+        (same_relative_delay or old_schedule == declaration["schedule"])
+        and all(job.get(key) == declaration[key] for key in ("name", "prompt", "timezone"))
+        and (job.get("repeat") or {}).get("times") == declaration["repeat"]["times"]
+    )
+
+
+def _new_job(source_id: str, declaration: dict, previous: dict | None = None) -> dict:
+    previous = previous or {}
+    # Preserve native options that OMA does not declare, not old scheduler state.
+    options = {k: v for k, v in previous.items() if k in JOB_DEFINITION_FIELDS}
+    definition = {**options, **declaration, "deliver": previous.get("deliver", "local")}
+    schedule = declaration["schedule"]
+    runnable = bool(previous) and previous.get("state") != "completed" and is_job_runnable(previous)
+    one_time = schedule["kind"] == "once"
+    next_run = compute_next_run(schedule, timezone=declaration["timezone"]) if runnable or one_time else None
+    if one_time and next_run is None:
+        raise ValueError(f"OMA job {source_id!r} has a one-time schedule in the past")
+    created_at = now().isoformat()
+    seed = {"id": "oma-" + uuid4().hex[:24], _OWNER: source_id, "created_at": created_at, "enabled": False}
+    if "interpreter" in previous:
+        seed["interpreter"] = previous["interpreter"]
+    replacement = merge_job_definition(seed, definition)
+    replacement.update(
+        enabled=runnable, state="scheduled" if runnable else "paused", next_run_at=next_run if runnable else None,
+        paused_at=None if runnable else previous.get("paused_at") or created_at,
+        paused_reason=None if runnable else previous.get("paused_reason") or AWAITING_ACTIVATION,
+    )
+    return replacement
+
+
 def _reconcile(current: list, definitions: dict) -> tuple[list, set[str]]:
     updated, removed = [], set()
     pending = dict(definitions)
     for existing in current:
         job_id = existing.get("id")
         source_id = existing.get(_OWNER) or _legacy_source(existing)
-        if source_id in definitions:
+        if isinstance(source_id, str) and source_id in definitions:
             declaration = pending.pop(source_id, None)
             if declaration is None:
                 raise ValueError("More than one native job matches an OMA declaration")
-            if _OWNER not in existing and (existing.get("deliver") != "local" or any(
-                existing.get(key) for key in ("script", "no_agent", "monitor_script", "monitor_url", "skills", "skill", "origin")
-            )):
+            if _OWNER not in existing and not _can_manage_legacy_job(existing):
                 raise ValueError("An existing job uses a reserved OMA name but is not a local OMA review")
-            # Only replace the declared settings, not operator-owned delivery or native options.
-            definition = {**existing, **{k: v for k, v in declaration.items() if k != "deliver"}}
-            # An unchanged "in 2h" must keep its original absolute instant.
-            display = declaration["schedule_display"]
-            if display.startswith("once in ") and (existing.get("schedule") or {}).get("display") == display:
-                definition["schedule"] = existing["schedule"]
-            merged = merge_job_definition({**existing, _OWNER: source_id}, definition)
-            times = merged["repeat"]["times"]
-            if times is not None and merged["repeat"]["completed"] >= times and merged.get("enabled", True):
-                merged.update(enabled=False, state="completed", next_run_at=None)
-                merged.pop("pending_slot", None)
-            updated.append(merged)
+            if _matches_declaration(existing, declaration):
+                updated.append({**existing, _OWNER: source_id})
+            else:
+                updated.append(_new_job(source_id, declaration, existing))
+                removed.add(job_id)
         elif _OWNER in existing:
             removed.add(job_id)
         else:
             updated.append(existing)
-    native_ids = {job.get("id") for job in current}
     for source_id, declaration in pending.items():
-        job_id = "oma-" + sha256(source_id.encode()).hexdigest()[:24]
-        if job_id in native_ids:
-            raise ValueError("An OMA job ID conflicts with an existing native job")
-        if declaration["schedule"]["kind"] == "once" and compute_next_run(
-            declaration["schedule"], timezone=declaration["timezone"],
-        ) is None:
-            raise ValueError(f"OMA job {source_id!r} has a one-time schedule in the past")
-        created_at = now().isoformat()
-        seed = {"id": job_id, _OWNER: source_id, "state": "paused", "enabled": False,
-                "created_at": created_at, "paused_at": created_at, "next_run_at": None,
-                "paused_reason": AWAITING_ACTIVATION}
-        updated.append(merge_job_definition(seed, declaration))
+        updated.append(_new_job(source_id, declaration))
     return updated, removed
 
 

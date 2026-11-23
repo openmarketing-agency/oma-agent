@@ -13,7 +13,7 @@ metadata:
 
 # OMA Campaigns Skill
 
-Use this skill in the default OMA Agent profile to design and provision campaigns from the saved brand and playbook. Each campaign has one orchestrator to plan and assign work on its Kanban board and a separate publishing agent to apply authorized content or edits. There are no campaign or agent templates.
+Use this skill in the default OMA Agent profile to design and provision campaigns from the saved brand and playbook. Each campaign has one orchestrator to plan and assign work on its Kanban board and a separate publishing agent to apply authorized content or edits. The templates below are drafting references; the installer reads only the saved campaign and agent records.
 
 ## When to Use
 
@@ -21,7 +21,7 @@ Use this skill in the default OMA Agent profile to design and provision campaign
 
 ## Prerequisites
 
-Resolve the default Hermes home with `hermes -p default config path`. Read `oma/brand/config.yaml` and `oma/playbook/config.yaml` from that home before designing a team. For record formats load `oma-agents` with `skill_view`. `oma-bundle/skills/` supplies reusable skills only; find them with `search_skills` and read relevant ones with `skill_view`. Do not look for campaign templates or use the onboarding URL as a source of executable definitions.
+Resolve the default Hermes home with `hermes -p default config path`. Read `oma/brand/config.yaml` and `oma/playbook/config.yaml` from that home before designing a team. For agent record formats load `oma-agents` with `skill_view`; when drafting a roster, load its `references/base-agent-template.md` for the config and persona examples. `oma-bundle/skills/` supplies reusable skills only; find them with `search_skills` and read relevant ones with `skill_view`. Do not use the onboarding URL as a source of executable definitions.
 
 ## How to Run
 
@@ -36,29 +36,31 @@ Use `terminal` to run `scripts/campaign.py` from the installed skill directory (
 | `integrations` | List candidate integration IDs from observed brand integrations and verified social channels. Does not check account access. |
 | `validate <kind> <path>` | Check a `brand`, `playbook`, `campaign`, or `agent` YAML record without applying it. |
 
+## Campaign Templates
+
+When drafting a new campaign, load the closest reference with `skill_view(name="oma-campaigns", file_path="references/...")`:
+
+| Campaign | Use when the playbook prioritizes |
+|---|---|
+| [Website build](references/website-build-template.md) | Creating the client's missing official site and primary conversion path. |
+| [Blog build](references/blog-build-template.md) | Creating a missing blog and publishing its first useful articles. |
+| [Public docs build](references/docs-build-template.md) | Creating a missing public docs destination and first tested quickstart. |
+| [Docs](references/docs-template.md) | Improving documentation on an existing publishing destination. |
+| [SEO](references/seo-template.md) | Growing qualified organic discovery and conversions. |
+| [Social media](references/social-media-template.md) | Reaching an audience and responding on verified social channels. |
+| [Product launch](references/product-launch-template.md) | Driving adoption around a dated product or feature release. |
+
+Adapt the example IDs, integrations, goals, ordered plans, roster, and review cadence to the saved brand and playbook. Do not install examples verbatim, create one campaign per template, or overwrite an existing campaign to match one. If none fits, draft from the campaign config rules below.
+
+### Build missing owned channels
+
+When brand research confirms a website, blog, or public docs are absent and the playbook calls for one, draft the corresponding build campaign instead of assuming there is already a destination. Treat unchecked channels as unknown. Reuse fitting campaigns and shared hosting; if a blog or docs depends on the new site, put the hosting dependency first rather than repeating it.
+
+Keep content and publication with the campaign team. For hosting or app setup, load `references/maintenance-handoff.md` from `oma-agents`: the campaign orchestrator defines the dependency, `default` routes the authorized request to the installed `maintenance` profile on the operations board, and `maintenance` uses `omactl`. Do not add `maintenance` to the campaign roster, install `omactl` on campaign agents, or treat campaign setup as permission to make infrastructure changes. Verify separate CMS access before enabling work that requires it.
+
 ## Campaign Config
 
-Save the editable config at `oma/campaigns/<campaign_id>/config.yaml`. Use the campaign ID as the directory name. For example, not as a template to install verbatim:
-
-```yaml
-id: seo
-name: SEO
-description: Improve the site's organic visibility.
-orchestrator: seo__orchestrator
-agents:
-  - seo__orchestrator
-  - seo__researcher
-  - seo__publisher
-kanban_board: campaign-seo
-kanban_board_name: SEO
-integrations: [google-search-console, wordpress-com, google-analytics]
-goals:
-  - Help prospective buyers discover the product through organic search and increase qualified sign-ups from that channel.
-plans:
-  - First, review Search Console performance and prioritize topics and landing-page fixes that match buyer intent.
-  - Then, publish the prioritized blog posts and apply the landing-page and internal-link edits on the brand's WordPress.com site.
-  - After publication, review qualified organic visits and sign-ups in Google Analytics, then decide which pages to improve next.
-```
+Save the editable config at `oma/campaigns/<campaign_id>/config.yaml`. Use the campaign ID as the directory name.
 
 - **Playbook — overall strategy:** `oma/playbook/config.yaml` defines what marketing should focus on and why across all campaigns. Use its priorities to decide which campaigns are needed, not as a list of tasks.
 - **Campaign `goals` — purpose and outcomes:** Say why this campaign exists, what should change, and how to recognize success when measurable. Publishing a blog post is an action, not the outcome it serves.
@@ -71,7 +73,7 @@ Use exactly one orchestrator, `<campaign_id>__orchestrator`, in the ordered `age
 ## Campaign Integrations
 
 - Every campaign must declare a non-empty `integrations` list in its `config.yaml`. Use unique canonical OMA catalog IDs, not display names, URLs, or connector aliases. Select the smallest set that the campaign needs for its plans and measurement; don't copy the brand's entire inventory. If no catalog integration fits, leave the campaign unprovisioned and report the gap rather than adding an unrelated integration.
-- Start with the saved brand's `integrations` and `channels` (social, blog, newsletter). Use `integrations` in the launcher to shortlist observed integrations and verified social channels. Compare what best serves the campaign with what the brand already uses. Prefer a verified, usable existing connection when it meets the need; if no existing connection meets the need, declare the best-fit required integration and report it as a setup blocker.
+- Start with the saved brand's `integrations` and `channels` (social, blog, newsletter). Use `integrations` in the launcher to shortlist observed integrations and verified social channels; it is not the full catalog. Prefer verified, suitable existing connections. When a required connection is missing, consult the OMA integrations catalog and [integration intake guide](references/integration-intake.md), then ask the user to connect the smallest set required by the plan. Include media generation only if a role actually needs it; ask for the provider and scope, not raw credentials.
 - Brand evidence and a saved integration ID do not prove access. Before activating the campaign or enabling its jobs, verify each required connection for the intended account or property and the owning profile's needed read or write permissions. If a required connection is missing or unverified, save the campaign without activating it or enabling jobs and report what must be connected. This is a skill check, not a gate enforced by the YAML validator or lifecycle command.
 
 ## Publishing Agent
@@ -85,10 +87,6 @@ Use exactly one orchestrator, `<campaign_id>__orchestrator`, in the ordered `age
 - Give every campaign a recurring review owned by `<campaign_id>__orchestrator`. Declare it in that agent's `jobs` list with a stable ID such as `campaign-review`, a native Hermes `schedule`, and a bounded `prompt`. Use the user's cadence when specified. Otherwise, choose the slowest cadence that meets the campaign's response needs, given data freshness, rate limits, and run cost. Reuse an existing equivalent job and preserve operator pauses.
 - Name the checks in the saved `prompt` itself. For Social & Community, tell the orchestrator to read new comments and replies on the brand's posts, @mentions and tagged posts, and any relevant community threads. Include inbox messages only where the campaign covers them and read access is authorized. Name the verified channels/accounts and their available read tools; verifying access or reading engagement totals is not a substitute for checking activity. For other campaigns, use their own signals (e.g. search performance for SEO).
 - Each review checks the saved goals and plans, the campaign's Kanban board, and new evidence since the last review. Decide what to continue, change, or queue; propose changes outside the orchestrator's authority and route authorized publication or edits to the publisher. Record material decisions and stop without creating duplicate tasks or rewriting plans when nothing meaningful changed. When data or access is missing, note the gap rather than inventing a trend.
-
-Example Social & Community review prompt (replace the channel and account with the campaign's own verified targets):
-
-> On the connected account `example` on LinkedIn, check new comments and replies on our posts, @mentions, and posts tagging the brand since the last successful check. Record the links or item IDs and keep a checkpoint for each source in your saves notes. If a source can't be read, report what wasn't checked and don't advance its checkpoint. Compare actionable items with the campaign goals, plan, and open Kanban tasks. Queue only new follow-up work; route authorized replies or edits to the publisher. Do not post or send messages from this review. Record material decisions and stop.
 
 ## Procedure
 
@@ -106,7 +104,7 @@ Example Social & Community review prompt (replace the channel and account with t
 
 ## Pitfalls
 
-- A missing optional skill does not prevent authoring a team that does not need it. Never look for another campaign template or fetch a cached release.
+- A missing optional skill does not prevent authoring a team that does not need it. Use the local drafting references above; do not look for an installable template or fetch a cached release.
 - Installing an already recorded campaign does not replace its board, tasks, or profiles. Older campaigns installed without a board are not retrofitted by `configure`. If a board slug is already occupied by another board or an installation is incomplete, report the conflict; do not delete anything to retry.
 
 ## Verification
