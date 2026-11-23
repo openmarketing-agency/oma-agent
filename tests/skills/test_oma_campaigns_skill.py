@@ -403,7 +403,7 @@ def test_agent_and_campaign_sync_share_inheritance_and_keep_campaign_persona_con
 
 
 def test_campaign_sync_reconciles_only_oma_jobs_and_skills(bundle, capsys):
-    from cron.jobs import create_job, list_jobs, resume_job, use_cron_store
+    from cron.jobs import create_job, list_jobs, mark_job_run, resume_job, use_cron_store
     from hermes_cli.config import atomic_config_replace
     from hermes_cli.oma_campaigns.source import read_mapping
     from hermes_cli.oma_campaigns.sync import main as sync
@@ -424,6 +424,7 @@ def test_campaign_sync_reconciles_only_oma_jobs_and_skills(bundle, capsys):
         managed, = [job for job in list_jobs(include_disabled=True) if job["id"] != unrelated["id"]]
         assert (managed["state"], managed["enabled"], managed["next_run_at"]) == ("paused", False, None)
         resume_job(managed["id"])
+        assert mark_job_run(managed["id"], success=True)
 
     current = read_mapping(record)
     job = {**current["jobs"][0], "name": "Updated review", "schedule": "0 9 * * *",
@@ -436,8 +437,10 @@ def test_campaign_sync_reconciles_only_oma_jobs_and_skills(bundle, capsys):
     with use_cron_store(profile):
         by_name = {j["name"]: j for j in list_jobs(include_disabled=True)}
     updated = by_name["Updated review"]
-    assert (updated["id"], updated["enabled"], updated["timezone"], updated["prompt"]) == (
-        managed["id"], True, "UTC", "Check new evidence.")
+    assert updated["id"] != managed["id"] and managed["name"] not in by_name
+    assert (updated["enabled"], updated["timezone"], updated["prompt"], updated["repeat"]["completed"]) == (
+        True, "UTC", "Check new evidence.", 0)
+    assert updated["next_run_at"] and not updated.get("last_run_at")
     assert not by_name["Second review"]["enabled"]
 
     atomic_config_replace(record, {**read_mapping(record), "jobs": [], "oma_skills": []})
@@ -462,6 +465,84 @@ def test_sync_reuses_legacy_oma_schedule_and_preserves_operator_pause(bundle):
         job, = list_jobs(include_disabled=True)
         assert (job["id"], job["enabled"], job["paused_reason"]) == (legacy["id"], False, "Operator paused this")
     assert sync_campaign(home, "demo")["updated_agents"] == ["demo__worker"]
+
+
+@pytest.mark.parametrize("paused", [False, True], ids=["scheduled", "operator-paused"])
+def test_campaign_sync_adopts_identical_local_review_with_api_origin(bundle, paused):
+    from cron.jobs import create_job, list_jobs, use_cron_store
+    from hermes_cli.oma_campaigns.sync import sync_campaign
+
+    home, _, main = bundle
+    assert main(["install", "demo"]) == 0
+    profile = home / "profiles/demo__orchestrator"
+    with use_cron_store(profile):
+        original = create_job(name="oma:sample", prompt="Review evidence.", schedule="every 1d",
+                              deliver="local", origin={"platform": "api_server", "chat_id": "api"},
+                              paused=paused, paused_reason="Operator paused this" if paused else None)
+    assert "demo__orchestrator" in sync_campaign(home, "demo")["updated_agents"]
+    assert sync_campaign(home, "demo")["updated_agents"] == []
+    with use_cron_store(profile):
+        job, = list_jobs(include_disabled=True)
+    assert job["oma_job_id"] == "sample"
+    for key in ("id", "created_at", "enabled", "state", "paused_reason", "next_run_at", "repeat", "deliver", "origin"):
+        assert job[key] == original[key]
+
+
+@pytest.mark.parametrize("override", [
+    {"deliver": "origin"}, {"failure_deliver": "origin"}, {"skills": ["shared"]},
+], ids=["delivery", "failure-delivery", "skills"])
+def test_campaign_sync_leaves_conflicting_api_origin_job_untouched(bundle, override):
+    from cron.jobs import create_job, use_cron_store
+    from hermes_cli.oma_campaigns.sync import sync_campaign
+
+    home, _, main = bundle
+    assert main(["install", "demo"]) == 0
+    profile = home / "profiles/demo__orchestrator"
+    with use_cron_store(profile):
+        create_job(**{
+            "name": "oma:sample", "prompt": "Review evidence.", "schedule": "1d", "deliver": "local",
+            "origin": {"platform": "api_server", "chat_id": "api"}, **override,
+        })
+    store = profile / "cron/jobs.json"
+    before = store.read_bytes()
+    with pytest.raises(ValueError, match="reserved OMA name"):
+        sync_campaign(home, "demo")
+    assert store.read_bytes() == before
+
+
+@pytest.mark.parametrize("delta", [
+    {"name": "Renamed review"}, {"prompt": "Review only new evidence."}, {"schedule": "2d"},
+    {"repeat": 3}, {"timezone": "UTC"},
+], ids=["name", "prompt", "schedule", "repeat", "timezone"])
+def test_campaign_sync_recreates_changed_local_review_with_api_origin(bundle, delta):
+    from cron.jobs import create_job, list_jobs, parse_schedule, use_cron_store
+    from hermes_cli.config import atomic_config_replace
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import sync_campaign
+
+    home, source, main = bundle
+    assert main(["install", "demo"]) == 0
+    profile = home / "profiles/demo__orchestrator"
+    with use_cron_store(profile):
+        original = create_job(name="oma:sample", prompt="Review evidence.", schedule="1d", deliver="local",
+                              origin={"platform": "api_server", "chat_id": "api"},
+                              paused=True, paused_reason="Operator paused this")
+    path = source / "agents/demo__orchestrator/config.yaml"
+    record = read_mapping(path)
+    job = {**record["jobs"][0], **delta}
+    atomic_config_replace(path, {**record, "jobs": [job]})
+
+    assert "demo__orchestrator" in sync_campaign(home, "demo")["updated_agents"]
+    assert sync_campaign(home, "demo")["updated_agents"] == []
+    with use_cron_store(profile):
+        replacement, = list_jobs(include_disabled=True)
+    assert replacement["id"] != original["id"] and replacement["oma_job_id"] == "sample"
+    assert not replacement["enabled"] and replacement["paused_reason"] == "Operator paused this"
+    assert replacement["name"] == job.get("name", "oma:sample")
+    assert replacement["prompt"] == job["prompt"]
+    assert replacement["schedule"] == parse_schedule(job["schedule"])
+    assert replacement.get("timezone") == job.get("timezone")
+    assert replacement["repeat"] == {"times": job.get("repeat"), "completed": 0}
 
 
 def test_agent_sync_leaves_unchanged_relative_one_shot_anchored(bundle, capsys):
