@@ -122,22 +122,23 @@ def test_sync_applies_only_saved_settings_to_the_owning_profile(tmp_path, monkey
     settings = {"model": {"default": "new-model", "api_key": "${MODEL_KEY}"},
                 "mcp_servers": {"example": {"url": "https://example.invalid/mcp"}}}
     atomic_config_replace(record, {**read_mapping(record), **settings,
-                                   "agent": {"enabled_toolsets": [], "disabled_toolsets": ["terminal"], "max_turns": 99},
+                                   "agent": {"enabled_toolsets": [], "disabled_toolsets": ["terminal"],
+                                             "reasoning_effort": "high", "max_turns": 99},
                                    "tools": {"tool_search": {"enabled": "off", "eager_toolsets": None}}})
-    (source / "SOUL.md").write_text("Do not apply me", encoding="utf-8")
+    (source / "SOUL.md").write_text("Updated persona.\n", encoding="utf-8")
     with pytest.raises(StaleRecord):
         sync_standalone_agent(tmp_path, role, revision=old_revision)
     assert read_user_config_raw(native / "config.yaml")["model"] != settings["model"]
 
-    assert sync_standalone_agent(tmp_path, role)["updated"] == [
+    assert set(sync_standalone_agent(tmp_path, role)["updated"]) == {
         "model", "mcp_servers", "agent.enabled_toolsets", "agent.disabled_toolsets",
-        "tools.tool_search.eager_toolsets", "tools.tool_search.enabled",
-    ]
+        "tools.tool_search.eager_toolsets", "tools.tool_search.enabled", "agent.reasoning_effort", "SOUL.md",
+    }
     applied = read_user_config_raw(native / "config.yaml")
     assert {key: applied[key] for key in settings} == settings
-    assert applied["agent"] == {"enabled_toolsets": [], "disabled_toolsets": ["terminal"]}
+    assert applied["agent"] == {"enabled_toolsets": [], "disabled_toolsets": ["terminal"], "reasoning_effort": "high"}
     assert applied["tools"]["tool_search"] == {"enabled": "off", "eager_toolsets": None}
-    assert (native / "SOUL.md").read_bytes() != b"Do not apply me"
+    assert (native / "SOUL.md").read_bytes() == b"Updated persona.\n"
     assert (untouched / "config.yaml").read_bytes() == untouched_bytes
     assert sync_standalone_agent(tmp_path, role)["updated"] == []
 

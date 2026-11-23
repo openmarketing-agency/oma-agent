@@ -11,7 +11,7 @@
     "campaign_id": { "type": ["string", "null"], "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])" },
     "oma_skills": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/profile_id" } },
     "jobs": { "type": "array", "items": { "$ref": "#/$defs/job" } },
-    "model": { "$ref": "#/$defs/model", "description": "The agent's editable model. Provisioning seeds it from the campaign when omitted." },
+    "model": { "$ref": "#/$defs/model", "description": "The agent's explicit model override. Omit it to inherit the campaign model." },
     "mcp_servers": { "$ref": "#/$defs/mcp_servers" },
     "effective": {
       "type": "object", "additionalProperties": false, "readOnly": true,

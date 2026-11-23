@@ -63,18 +63,20 @@ def _inherited_model(model: object, env_path: Path) -> tuple[object, dict[str, s
     return model, credential
 
 
-def snapshot(home: Path, campaign: dict) -> tuple[dict, object, dict[str, str]]:
+def snapshot(home: Path, campaign: dict) -> tuple[dict, dict[str, str]]:
     """Read saved settings, not the current turn or the merged runtime defaults."""
     saved = read_user_config_raw(home / "config.yaml")
     agent = saved.get("agent")
-    effort = agent.get("reasoning_effort") if isinstance(agent, dict) else None
+    campaign_agent = campaign.get("agent", {})
+    if isinstance(agent, dict) and agent.get("reasoning_effort") is not None and "reasoning_effort" not in campaign_agent:
+        campaign = {**campaign, "agent": {**campaign_agent, "reasoning_effort": agent["reasoning_effort"]}}
     if "model" in campaign:
-        return campaign, effort, {}
+        return campaign, {}
     model, credential = _inherited_model(saved.get("model"), home / ".env")
-    return ({**campaign, "model": model} if model is not None else campaign), effort, credential
+    return ({**campaign, "model": model} if model is not None else campaign), credential
 
 
-def agent_defaults(config: dict, effort: object, agent_id: str, *, orchestrator: bool) -> dict:
+def agent_defaults(config: dict, agent_id: str, *, orchestrator: bool) -> dict:
     raw_agent = config.get("agent")
     agent = dict(raw_agent) if isinstance(raw_agent, dict) else {}
     enabled = agent.get("enabled_toolsets")
@@ -83,8 +85,6 @@ def agent_defaults(config: dict, effort: object, agent_id: str, *, orchestrator:
     if orchestrator and "kanban" not in enabled:
         raise ValueError(f"{agent_id}: include kanban in the orchestrator's agent.enabled_toolsets")
 
-    if effort is not None:
-        agent.setdefault("reasoning_effort", effort)
     tools = config.get("tools", {})
     if not isinstance(tools, dict) or not isinstance(tools.get("tool_search", {}), dict):
         raise ValueError(f"{agent_id}: tools and tools.tool_search must be mappings")

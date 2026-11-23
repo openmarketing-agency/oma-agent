@@ -86,7 +86,7 @@ preserved and old templates are ignored.
 Docker also creates `oma/agents/default/` and `oma/agents/maintenance/` on the
 data volume. These are standalone records (`campaign_id: null`), not campaign
 members. Startup fills missing files from the corresponding native profile and
-preserves saved edits. A new record copies saved toolsets, Tool Search, disabled
+preserves saved edits. A new record copies saved reasoning effort, toolsets, Tool Search, disabled
 skills, approvals, Kanban routing, the config version, and plugin selection and
 installation metadata when present. The Camofox installer runs separately: its
 installation marker is absent from the snapshot if installation hasn't finished
@@ -95,19 +95,7 @@ when the record is created. The `default` profile gets `oma-agents`, `oma-brand`
 These starter skills don't need `oma_skills` entries. Docker places their
 source packages under `oma-bundle/skills/oma/`.
 
-After editing a standalone agent's `config.yaml`, run
-`python -m hermes_cli.oma_campaigns.standalone sync <id>` in the agent's
-environment. It applies the saved `model`, `mcp_servers`, toolset settings, and
-extra packages listed under `oma_skills`. Trusted workspace callers can supply an
-optional `env` object in the private agent sync request, as with campaign sync.
-The runtime accepts those values as JSON on `--env-stdin` and saves every valid
-supplied profile key to that agent's `.env`, even without a YAML reference.
-Omitted keys leave saved credentials unchanged. Sync refreshes `all-keys` and
-`available-keys` in the OMA record without writing values to YAML. An explicit `oma_skills: []` removes
-only the previously synced extras. Omitting the field leaves skills alone, and
-legacy entries naming the profile's starter skills are ignored.
-Unrelated skills, shared source packages, unrelated credentials and native `SOUL.md`
-are not changed by sync. Start a new session to see changes to session setup.
+Use [Agent Sync](#sync-saved-oma-settings) to apply edits to one standalone or campaign agent.
 
 Editable campaign records live at `$HERMES_HOME/oma/campaigns/<id>/config.yaml`.
 They contain `id`, `name`, `description`, and inline `goals` and `plans`. Campaign
@@ -126,9 +114,7 @@ agents also get a `tmp/` beside their authored records for scratch files.
 
 Scheduled work is declared in each owning agent's `jobs` list. For social
 reviews, the prompt names the channels and asks the orchestrator to check new
-comments, replies, mentions, and tagged posts. Saving a declaration does not
-schedule or update a job; onboarding registers eligible jobs with native cron
-after verifying the provisioned profiles and their personas.
+comments, replies, mentions, and tagged posts. Saving a declaration alone does not schedule a job.
 
 New campaign roles must specify `agent.enabled_toolsets`. Include `kanban`
 for the orchestrator and for any worker that needs it; `[]` selects no tools
@@ -139,61 +125,59 @@ get the saved URL and key from `default` only when both are present. Where the
 tool is available, use it as the first browser fallback for public-page
 rendering failures, not to retry a bot challenge or explicit access denial.
 
-### Sync campaign model and MCP settings
+### Sync saved OMA settings
 
-Put native Hermes `model` and `mcp_servers` settings in the campaign config as
-defaults. Installation seeds an omitted agent `model` as a top-level field.
-Edit that field to change the agent's model; later campaign edits do not
-replace it. `effective.model` is not accepted.
-`mcp_servers` combines entries by name: an agent can add a server,
-replace a named server's entire definition, or set `enabled: false` for that
-server. Omit an override to inherit; an empty agent `mcp_servers: {}` adds no
-overrides. The helper passes through the native settings, including nested
-options, rather than maintaining a separate OMA schema for them.
-
-For new campaigns with no explicit `model`, provisioning snapshots the saved
-`default` profile's model and passes only its matching saved API key to roles
-that inherit it. Missing keys don't block installation. YAML stores references,
-not copied key values. A role without `agent.reasoning_effort` takes the saved
-default effort when present, even if a model was specified explicitly.
-Existing campaigns are not backfilled. After an edit, run
-`sync-campaign` from the default OMA home to update an installed campaign.
-The script is on `PATH` in the Docker image; in a source checkout use
-`scripts/sync-campaign` with that installation's `hermes` on `PATH`.
+Run from the default OMA home after saving your edits. Agent Sync accepts `default`,
+`maintenance`, or the full ID of a member of a fully installed campaign. Campaign Sync
+applies the same settings to the installed roster. The campaign command is on `PATH`
+in Docker; from a source checkout use `scripts/sync-campaign` with that installation's
+`hermes` on `PATH`.
 
 ```sh
 sync-campaign my-campaign
+python -m hermes_cli.oma_campaigns.standalone sync my-campaign__orchestrator
 ```
 
-Both campaign sync and standalone agent sync read toolset settings from each
-agent's own `oma/agents/<id>/config.yaml`, not from a campaign-wide default:
+Both apply these settings from the saved OMA records:
 
-- `agent.enabled_toolsets` and `agent.disabled_toolsets` select toolsets.
-- `tools.tool_search.enabled`, `listing`, `eager_toolsets`, and `defer_toolsets`
-  control which selected tools are shown upfront or found on demand.
+- **Model and reasoning:** A campaign supplies `model` and `agent.reasoning_effort`
+  defaults. Omit either field on an agent to inherit it on every sync; an explicit
+  agent value wins. Old records may contain values copied at installation; these
+  still count as overrides. Remove the copied agent field to opt into inheritance.
+  If neither record declares the field, the native setting is left alone.
+  `effective.model` is not supported.
+- **MCP:** Campaign and agent `mcp_servers` combine by name. Replace an entire
+  named server or set `enabled: false` on that agent; `{}` adds no campaign
+  overrides. A standalone agent's explicit map replaces its native MCP map.
+  `effective.mcp_servers` records what sync managed; don't edit it. Select
+  `mcp-<server-name>` explicitly in an agent's toolset allowlist to use its tools.
+- **Tool and skill settings:** Each agent controls `agent.enabled_toolsets`,
+  `agent.disabled_toolsets`, `tools.tool_search.{enabled,listing,eager_toolsets,defer_toolsets}`,
+  and `skills.{enabled,disabled,auto_load}`. An explicit list replaces that list;
+  omission leaves it alone. Campaign orchestrators must keep Kanban enabled.
+- **Persona and skills:** The authored `SOUL.md` becomes the native persona,
+  including generated campaign context and board routing for campaign members.
+  `oma_skills` reconciles packages from the shared bundle. Omit it to leave packages
+  alone, or use `[]` to remove OMA-managed extras. Starter and unrelated skills
+  stay intact. Old campaign copies without ownership metadata are not pruned
+  until sync has tracked them as declared packages.
+- **Schedules:** `jobs` adds or edits OMA-owned jobs in the owning profile.
+  Newly registered jobs are paused; existing jobs retain their pause and completion
+  state. Legacy local jobs named `oma:<id>` are reused when they match a declaration.
+  Omit `jobs` to leave the store alone; `jobs: []` removes tracked OMA jobs only.
+  Activate a desired job separately with native Hermes cron.
 
-An explicit list replaces the native list; `[]` is not the same as omitting the
-setting. Omitted settings and unrelated native config, including
-`platform_toolsets`, are left alone. Campaign orchestrators must keep `kanban`
-enabled. Sync neither grants access to missing integrations nor changes the
-tool catalog of an existing conversation; open a new session to see the changes.
+New campaigns can snapshot omitted model and reasoning defaults from the saved
+`default` profile at installation. Only profiles inheriting that root model
+receive its matching saved API key, if any. Sync never rereads root defaults.
 
-For a Next.js integration, save the authored YAML atomically and invoke this
-command server-side with the campaign ID as its only argument and no shell.
-Pass credentials only in the child's environment; don't forward unrelated
-application credentials. YAML keeps references like `${CAMPAIGN_MODEL_KEY}` or
-`Authorization: "Bearer ${CAMPAIGN_MCP_TOKEN}"`. The script saves nonempty
-matching values to the corresponding profiles' `.env` files. Missing or empty
-values don't block sync and don't change existing `.env` entries. Use distinct
-variable names for distinct credentials in the same invocation. An endpoint
-that can edit MCP configurations must be
-restricted to trusted administrators: native stdio MCP entries can launch
-programs under the Hermes service account.
-
-For an explicit request, `sync-campaign <id> --env-stdin` reads a JSON object and
-saves each valid supplied profile key to every installed campaign agent. The
-private workspace endpoint uses this path and does not import ambient variables.
-Both forms preserve omitted values and reject unsafe runtime variable names.
+Both commands accept an explicit JSON key map on `--env-stdin`. Campaign Sync
+saves each supplied value to every roster member's `.env`; Agent Sync saves it
+only to the selected profile. Use Agent Sync for a credential meant for one
+agent. Omitted values stay unchanged and neither command imports ambient process
+variables. Keep `${KEY_NAME}` references in YAML and pass values only through a
+trusted server-side caller, never through command-line arguments. Restrict MCP
+edits to trusted administrators: native stdio MCP entries can launch programs.
 
 After sync, the campaign and OMA agent configs contain two generated lists:
 
@@ -205,20 +189,15 @@ After sync, the campaign and OMA agent configs contain two generated lists:
   it has a saved value.
 
 The difference between the lists is what's missing. Keys introduced by an
-agent override appear in the campaign lists too. The lists contain names only,
-don't verify provider authentication, and refresh on each `sync-campaign` run.
+agent override appear in the campaign lists too. The lists contain names only
+and don't verify provider authentication.
 
-The helper updates generated `effective.mcp_servers` and the two native
-settings in `profiles/<agent-id>/config.yaml`. Don't edit `effective`: it
-records which previously synced MCP servers to remove when deleted from both
-sources. Other profile settings
-and toolset allowlists are preserved. On profiles with an explicit
-`agent.enabled_toolsets` list, list `mcp-<server-name>` there separately to
-make its tools available. Sync does not restart the gateway or force an open
-conversation to reload. Serialize save-and-sync requests and rerun sync if a
-filesystem error interrupts publication; replacement is atomic per file,
-not across the whole roster. The CLI returns JSON on stdout (`id`, `agents`,
-`updated_agents`) and progress or errors on stderr.
+Sync leaves membership, campaign lifecycle, Kanban boards and tasks, notes,
+memories, conversations, and unrelated native settings alone. Goals and plans
+stay in the campaign record. Sync doesn't restart the gateway or reload an open
+conversation; start a new session to see session-level changes. If a filesystem
+error interrupts publication, rerun sync after resolving it: files are replaced
+individually, not as one transaction across a team.
 
 ### Campaign pause and resume
 
