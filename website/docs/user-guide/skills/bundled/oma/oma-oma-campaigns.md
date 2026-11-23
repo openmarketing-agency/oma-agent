@@ -51,6 +51,7 @@ Use `terminal` to run `scripts/campaign.py` from the installed skill directory (
 | `list` | List installed or incomplete campaigns. |
 | `status <id>` | Show the saved roster, provisioning state, and profiles verified against the campaign board. |
 | `configure <id>` | Fill missing routing fields in the existing campaign config from the verified board and profiles. Does not reprovision agents or create a board. |
+| `integrations` | List candidate integration IDs from observed brand integrations and verified social channels. Does not check account access. |
 | `validate <kind> <path>` | Check a `brand`, `playbook`, `campaign`, or `agent` YAML record without applying it. |
 
 ## Campaign Config
@@ -68,12 +69,13 @@ agents:
   - seo__publisher
 kanban_board: campaign-seo
 kanban_board_name: SEO
+integrations: [google-search-console, wordpress-com, google-analytics]
 goals:
   - Help prospective buyers discover the product through organic search and increase qualified sign-ups from that channel.
 plans:
-  - First, review search performance and prioritize topics and landing-page fixes that match buyer intent.
-  - Then, publish the prioritized blog posts and apply the landing-page and internal-link edits.
-  - After publication, review qualified organic visits and sign-ups, then decide which pages to improve next.
+  - First, review Search Console performance and prioritize topics and landing-page fixes that match buyer intent.
+  - Then, publish the prioritized blog posts and apply the landing-page and internal-link edits on the brand's WordPress.com site.
+  - After publication, review qualified organic visits and sign-ups in Google Analytics, then decide which pages to improve next.
 ```
 
 - **Playbook — overall strategy:** `oma/playbook/config.yaml` defines what marketing should focus on and why across all campaigns. Use its priorities to decide which campaigns are needed, not as a list of tasks.
@@ -83,6 +85,12 @@ plans:
 Goals and plans are inline YAML lists of text. Do not add a `playbook` field or rewrite older records just to remove it. Do not add `version` to campaign or agent records. The helper stores `installation_state` in the campaign config; do not set it by hand.
 
 Use exactly one orchestrator, `<campaign_id>__orchestrator`, in the ordered `agents` list. Use canonical `<campaign_id>__<agent_id>` IDs unchanged and without duplicates. Before provisioning, the list is the proposed roster; after provisioning verify it against `present_profiles`. The helper fills missing `kanban_board` and `kanban_board_name`. Use the board slug in commands. Editing a record does not reconfigure an installed board or profile.
+
+## Campaign Integrations
+
+- Every campaign must declare a non-empty `integrations` list in its `config.yaml`. Use unique canonical OMA catalog IDs, not display names, URLs, or connector aliases. Select the smallest set that the campaign needs for its plans and measurement; don't copy the brand's entire inventory. If no catalog integration fits, leave the campaign unprovisioned and report the gap rather than adding an unrelated integration.
+- Start with the saved brand's `integrations` and `channels` (social, blog, newsletter). Use `integrations` in the launcher to shortlist observed integrations and verified social channels. Compare what best serves the campaign with what the brand already uses. Prefer a verified, usable existing connection when it meets the need; if no existing connection meets the need, declare the best-fit required integration and report it as a setup blocker.
+- Brand evidence and a saved integration ID do not prove access. Before activating the campaign or enabling its jobs, verify each required connection for the intended account or property and the owning profile's needed read or write permissions. If a required connection is missing or unverified, save the campaign without activating it or enabling jobs and report what must be connected. This is a skill check, not a gate enforced by the YAML validator or lifecycle command.
 
 ## Publishing Agent
 
@@ -103,10 +111,10 @@ Example Social & Community review prompt (replace the channel and account with t
 ## Procedure
 
 1. **Derive campaigns from the strategy.** Read the singleton playbook's priorities and recommendations alongside the compiled brand. Choose the smallest set of campaigns that advances those priorities, considering channel fit, existing work, prerequisites, and verified capabilities. For each, identify the strategic priority it serves, write a distinct outcome in `goals`, and put the actions and their order in `plans`. Include the orchestrator and publisher, then add only specialists with distinct responsibilities and handoffs. Use `list` and `status` first on a rerun; reuse installed teams and preserve edits, notes, and manual pauses rather than creating duplicates.
-2. **Save the campaign and agent records.** Use `write_file` or `patch` for the campaign config and each `oma/agents/<agent-id>/config.yaml` and `SOUL.md`. Record canonical `id`, `name`, `description`, and `campaign_id` for each role; use the same ID for the future profile. Give the orchestrator responsibility for deciding Kanban tasks and handoffs rather than hardcoding a pipeline. Choose only needed toolsets and existing shared skills; use `oma_skills` for exact package IDs to install, or `[]` for none. Keep `saves/` and link each persona to its own absolute saves path. Never copy credentials or grant authority inferred from a website.
+2. **Save the campaign and agent records.** Select and save the required `integrations` as described above. Use `write_file` or `patch` for the campaign config and each `oma/agents/<agent-id>/config.yaml` and `SOUL.md`. Record canonical `id`, `name`, `description`, and `campaign_id` for each role; use the same ID for the future profile. Give the orchestrator responsibility for deciding Kanban tasks and handoffs rather than hardcoding a pipeline. Choose only needed toolsets and existing shared skills; use `oma_skills` for exact package IDs to install, or `[]` for none. Keep `saves/` and link each persona to its own absolute saves path. Never copy credentials or grant authority inferred from a website.
 3. **Declare the orchestrator review and any other recurring work.** Follow the review guidance above. Assign each other genuine recurring obligation to exactly one role. A specialist can own an independent check it can actually perform; do not schedule it to duplicate the orchestrator's review. Leave one-off work, handoffs, and event-driven work on Kanban. Save `jobs: []` for unscheduled specialists. For each job use a stable `id`, a native Hermes `schedule`, and a bounded `prompt` with clear stop conditions; add `timezone` or positive `repeat` only when needed. Do not add per-job skills, scripts, or remote delivery.
 4. **Provision and verify.** For a new campaign, use `read_file` to verify that every ID in `agents` has a nonempty, role-specific `oma/agents/<agent-id>/SOUL.md` beside its `config.yaml`, with the correct saves path. YAML validation alone doesn't check the persona. If a write was blocked or a file is missing, report the affected role and leave the campaign a draft. Do not bypass the block or substitute `default`'s SOUL. Once the records are complete, run `install <id>`. Before enabling jobs, check that `status <id>` reports `installed`, the expected orchestrator and board, and a complete `present_profiles` list; resolve each profile's home via `hermes -p <agent-id> config path` and verify its adjacent `SOUL.md`. The helper wires the same board into the team without switching the shared current board. It does not start turns, copy launch credentials, create jobs, or seed tasks. Use `configure <id>` to fill missing routing fields in the existing config without reinstalling.
-5. **Register eligible jobs.** Use each verified owning profile's native cron commands in the next section when provisioning includes scheduling. When editing only goals or plans, patch those fields without registering jobs or starting campaign work.
+5. **Register eligible jobs.** After verifying required integration access, use each verified owning profile's native cron commands in the next section when provisioning includes scheduling. When editing only goals or plans, patch those fields without registering jobs or starting campaign work.
 
 ## Register Campaign Cron Jobs
 
@@ -120,5 +128,7 @@ Example Social & Community review prompt (replace the channel and account with t
 - Installing an already recorded campaign does not replace its board, tasks, or profiles. Older campaigns installed without a board are not retrofitted by `configure`. If a board slug is already occupied by another board or an installation is incomplete, report the conflict; do not delete anything to retry.
 
 ## Verification
+
+Check that the saved campaign declares a non-empty `integrations` list and that each ID serves a need in the plan or its measurement. Report any missing declaration on existing campaigns during inspection; don't silently change their records or running state. Report which required connections were verified and which still block activation.
 
 Verify the campaign config, the canonical roster (including the orchestrator and publisher), the agent records and saves paths, and the routing from `status <id>`. Check that the publisher's persona specifies what it can publish or edit and that its profile appears in `present_profiles` after provisioning. Read the saved orchestrator job prompt and confirm it names the channels and tells the agent what activity to check; if scheduling was in scope, verify the registered prompt, cadence, and state in the orchestrator's own cron store. New agents get a `tmp/` directory beside their `config.yaml` for scratch files. Report what was provisioned, which jobs were registered or skipped, and any blockers. A saved job, an enabled job, a healthy scheduler, and an observed run are separate outcomes.
