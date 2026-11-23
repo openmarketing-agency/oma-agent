@@ -11,14 +11,18 @@ import sys
 from tempfile import TemporaryDirectory
 
 from agent.runtime_scope import bind_profile_scope
+from agent.secret_scope import load_env_file
 from hermes_cli.active_sessions import _FileLock
-from hermes_cli.config import atomic_config_replace, require_readable_config_before_write
+from hermes_cli.config import atomic_config_replace, cfg_get, require_readable_config_before_write
 from hermes_cli.config_backend import config_version, require_file_tooling, supports_file_tooling
 from hermes_cli.oma_campaigns.bundle import seed_bundle, seed_role_skills
+from hermes_cli.oma_campaigns.credentials import (
+    apply_credential_updates, key_status, plan_credential_updates, read_sync_env, validate_sync_env,
+)
 from hermes_cli.oma_campaigns.install import default_home
 from hermes_cli.oma_campaigns.role_skills import apply_role_skills
 from hermes_cli.oma_campaigns.schema import validate_record
-from hermes_cli.oma_campaigns.settings import ENV_REFERENCE, apply_toolset_settings, settings_from
+from hermes_cli.oma_campaigns.settings import ENV_REFERENCE, apply_toolset_settings, credential_keys, settings_from
 from hermes_cli.oma_campaigns.source import _member
 from hermes_constants import named_profile_is_live
 from hermes_yaml import YAMLError, safe_load
@@ -29,6 +33,32 @@ _AGENTS = {
 }
 _IDENTIFIER = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_./:@+\-]{0,199}")
 _MAX_RECORD_BYTES = 256 * 1024
+
+_MISSING = object()
+# Copy only the requested settings, not entire native sections that may contain
+# credentials, plugin-specific options, or machine-local data.
+_SEED_FIELDS = (
+    ("agent", "enabled_toolsets"),
+    ("agent", "disabled_toolsets"),
+    ("tools", "tool_search", "enabled"),
+    ("tools", "tool_search", "eager_toolsets"),
+    ("tools", "tool_search", "defer_toolsets"),
+    ("tools", "tool_search", "listing"),
+    ("skills", "disabled"),
+    ("approvals", "mode"),
+    ("approvals", "timeout"),
+    ("approvals", "cron_mode"),
+    ("approvals", "single_query_mode"),
+    ("approvals", "unattended_mode"),
+    ("approvals", "approvers"),
+    ("approvals", "mcp_reload_confirm"),
+    ("approvals", "destructive_slash_confirm"),
+    ("_config_version",),
+    ("kanban", "orchestrator_profile"),
+    ("plugins", "enabled"),
+    ("plugins", "disabled"),
+    ("_default_plugins_installed",),
+)
 
 
 class StaleRecord(ValueError):
@@ -66,6 +96,19 @@ def _existing_model(value):
     return dict(value)
 
 
+def _seed_settings(native: dict) -> dict:
+    settings: dict = {}
+    for path in _SEED_FIELDS:
+        value = cfg_get(native, *path, default=_MISSING)
+        if value is _MISSING:
+            continue
+        node = settings
+        for key in path[:-1]:
+            node = node.setdefault(key, {})
+        node[path[-1]] = value
+    return settings
+
+
 def _seed_record(home: Path, agent_id: str) -> bool:
     directory = _record_dir(home, agent_id)
     target = _member(directory, "config.yaml")
@@ -77,10 +120,12 @@ def _seed_record(home: Path, agent_id: str) -> bool:
     native = _member(profile, "config.yaml")
     with bind_profile_scope(profile, hydrate_secrets=False):
         config_version(native)  # Do not adopt an absent profile configuration.
-        model = _existing_model(require_readable_config_before_write(native).get("model"))
+        saved = require_readable_config_before_write(native)
     record = {"id": agent_id, "name": name, "description": description, "campaign_id": None}
+    model = _existing_model(saved.get("model"))
     if model is not None:
         record["model"] = model
+    record.update(_seed_settings(saved))
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     seeded = False
     # Publish missing files atomically and never replace an editor's concurrent save.
@@ -132,8 +177,11 @@ def _read_saved(path: Path, agent_id: str, revision: str | None) -> tuple[dict, 
     return record, digest
 
 
-def sync_standalone_agent(home: Path, agent_id: str, *, revision: str | None = None) -> dict:
+def sync_standalone_agent(
+    home: Path, agent_id: str, *, revision: str | None = None, env: dict[str, str] | None = None,
+) -> dict:
     require_file_tooling("OMA standalone agent sync")
+    supplied = validate_sync_env(env) if env is not None else {}
     directory = _record_dir(home, agent_id)
     path = _member(directory, "config.yaml")
     if not path.is_file():  # config-reader: ok — authored OMA record, not native config
@@ -149,12 +197,23 @@ def sync_standalone_agent(home: Path, agent_id: str, *, revision: str | None = N
         updated = [key for key, value in settings.items() if current.get(key) != value]
         next_native, toolset_updates = apply_toolset_settings({**current, **settings}, record, agent_id)
         updated.extend(toolset_updates)
+        stored = load_env_file(_member(profile, ".env"))
+        credentials = plan_credential_updates(profile, set(supplied), stored, supplied)
+        names, available = key_status(credential_keys(settings), {**stored, **credentials})
+        summary = {"all-keys": sorted(names), "available-keys": sorted(available)}
         with apply_role_skills(home, profile, record.get("oma_skills")) as skills_changed:
             if config_version(native) != before:
                 raise StaleRecord("The native profile changed during sync")
             _read_saved(path, agent_id, digest)
+            apply_credential_updates(profile, credentials)
             if updated:
                 atomic_config_replace(native, next_native)
+            if any(record.get(key) != value for key, value in summary.items()):
+                _read_saved(path, agent_id, digest)
+                atomic_config_replace(path, {**record, **summary})
+                _, digest = _read_saved(path, agent_id, None)
+        if credentials:
+            updated.append("env")
         if skills_changed:
             updated.append("oma_skills")
     return {"id": agent_id, "revision": digest, "updated": updated}
@@ -169,6 +228,7 @@ def main(argv=None) -> int:
     sync = commands.add_parser("sync", help="Apply saved model, MCP configuration, toolsets, and bundle skills to one profile")
     sync.add_argument("id", choices=_AGENTS)
     sync.add_argument("--revision")
+    sync.add_argument("--env-stdin", action="store_true", help="Read a JSON map of credential values from stdin")
     args = parser.parse_args(argv)
     try:
         home = default_home()
@@ -178,7 +238,8 @@ def main(argv=None) -> int:
             with bind_profile_scope(home, hydrate_secrets=False):
                 _seed_maintenance_profile(home)
         result = (seed_standalone_agents(home, install_dir=args.install_dir) if args.action == "seed"
-                  else sync_standalone_agent(home, args.id, revision=args.revision))
+                  else sync_standalone_agent(home, args.id, revision=args.revision,
+                                             env=read_sync_env() if args.env_stdin else None))
         print(json.dumps(result))
         return 0
     except StaleRecord:

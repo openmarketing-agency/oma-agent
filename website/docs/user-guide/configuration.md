@@ -85,8 +85,12 @@ preserved and old templates are ignored.
 
 Docker also creates `oma/agents/default/` and `oma/agents/maintenance/` on the
 data volume. These are standalone records (`campaign_id: null`), not campaign
-members. Startup fills missing files from existing native profiles and preserves
-saved edits. The `default` profile gets `oma-agents`, `oma-brand`,
+members. Startup fills missing files from the corresponding native profile and
+preserves saved edits. A new record copies saved toolsets, Tool Search, disabled
+skills, approvals, Kanban routing, the config version, and plugin selection and
+installation metadata when present. The Camofox installer runs separately: its
+installation marker is absent from the snapshot if installation hasn't finished
+when the record is created. The `default` profile gets `oma-agents`, `oma-brand`,
 `oma-campaigns`, `oma-onboarding`, and `oma-playbook`; `maintenance` gets `omactl`.
 These starter skills don't need `oma_skills` entries. Docker places their
 source packages under `oma-bundle/skills/oma/`.
@@ -94,10 +98,15 @@ source packages under `oma-bundle/skills/oma/`.
 After editing a standalone agent's `config.yaml`, run
 `python -m hermes_cli.oma_campaigns.standalone sync <id>` in the agent's
 environment. It applies the saved `model`, `mcp_servers`, toolset settings, and
-extra packages listed under `oma_skills`. An explicit `oma_skills: []` removes
+extra packages listed under `oma_skills`. Trusted workspace callers can supply an
+optional `env` object in the private agent sync request, as with campaign sync.
+The runtime accepts those values as JSON on `--env-stdin` and saves every valid
+supplied profile key to that agent's `.env`, even without a YAML reference.
+Omitted keys leave saved credentials unchanged. Sync refreshes `all-keys` and
+`available-keys` in the OMA record without writing values to YAML. An explicit `oma_skills: []` removes
 only the previously synced extras. Omitting the field leaves skills alone, and
 legacy entries naming the profile's starter skills are ignored.
-Unrelated skills, shared source packages, credentials and native `SOUL.md`
+Unrelated skills, shared source packages, unrelated credentials and native `SOUL.md`
 are not changed by sync. Start a new session to see changes to session setup.
 
 Editable campaign records live at `$HERMES_HOME/oma/campaigns/<id>/config.yaml`.
@@ -181,14 +190,19 @@ that can edit MCP configurations must be
 restricted to trusted administrators: native stdio MCP entries can launch
 programs under the Hermes service account.
 
+For an explicit request, `sync-campaign <id> --env-stdin` reads a JSON object and
+saves each valid supplied profile key to every installed campaign agent. The
+private workspace endpoint uses this path and does not import ambient variables.
+Both forms preserve omitted values and reject unsafe runtime variable names.
+
 After sync, the campaign and OMA agent configs contain two generated lists:
 
-- `all-keys`: environment variable names referenced by the effective model and
-  enabled MCP servers, excluding runtime variables such as `HOME`. The
+- `all-keys`: profile `.env` names plus names referenced by the effective model
+  and enabled MCP servers, excluding runtime variables such as `HOME`. The
   campaign lists the union across its agents.
 - `available-keys`: the subset with nonempty values saved in the profile's
-  `.env`. At campaign level a key is available only if every agent that
-  references it has a saved value.
+  `.env`. At campaign level a key is available only if every agent that lists
+  it has a saved value.
 
 The difference between the lists is what's missing. Keys introduced by an
 agent override appear in the campaign lists too. The lists contain names only,
@@ -216,16 +230,19 @@ profile work without stopping the default gateway. It requests cancellation
 of active work and preserves queued tasks and individually paused jobs. Check
 whether an interrupted publisher already posted before retrying its task.
 
+Resuming requires a nonblank `model` string or `model.default` in the saved
+campaign config. A missing model leaves the campaign paused and reports
+`missing_model`. Resume does not check model credentials, run inference, or
+probe integration connections.
+
 `hermes_cli/oma_campaigns/schemas/integrations.json` is the canonical OMA ID
 catalog. Run `python -m hermes_cli.oma_campaigns integrations` to derive
 candidates from observed `integrations` and verified `channels.social` in
 `$HERMES_HOME/oma/brand/config.yaml`. Save only the required subset as
 `integrations` in `oma/campaigns/<id>/config.yaml`. Use `google-analytics` and
 `x` in OMA records; `google_analytics` and `twitter` are Composio toolkit slugs.
-Resuming checks the orchestrator's Composio session for a campaign with its own
-`composio` MCP configuration, otherwise the workspace default profile's session.
-A missing or unverified requirement leaves
-the campaign paused. WordPress has an OMA ID but no verified Composio mapping.
+This list records which integrations the campaign needs for its work; it does
+not gate resume. WordPress has an OMA ID but no verified Composio mapping.
 
 ### Shared brand and playbook
 
