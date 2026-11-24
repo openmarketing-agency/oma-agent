@@ -1,7 +1,7 @@
 ---
 name: oma-brand
 description: Manage the brand's identity, assets, and knowledge.
-version: 0.4.1
+version: 0.4.2
 author: Open Marketing Agency (OMA)
 license: MIT
 platforms: [linux, macos, windows]
@@ -13,11 +13,11 @@ metadata:
 
 # OMA Brand Skill
 
-Research, create, inspect, and update the single OMA brand for this workspace. Turn a website URL, a GitHub repository URL, or both into structured findings, cited research, and reusable brand assets. Keep research read-only outside the workspace; saving a brand is not permission to publish, install campaigns, connect accounts, or run repository code.
+Research, create, inspect, and update the single OMA brand for this workspace. Turn a website, public brand profile, or GitHub repository URL into structured findings, cited research, and brand references. Keep research read-only outside the workspace; saving a brand is not permission to publish, install campaigns, connect accounts, or run repository code.
 
 ## When to Use
 
-- The user supplies a website or GitHub repository for brand setup or asks to enrich an existing brand.
+- The user supplies a website, public social profile, or GitHub repository for brand setup or asks to enrich an existing brand.
 - The user asks to save or update brand assets, fonts, colors, or knowledge, or wants to use the saved brand.
 - An operator requests a refresh, a connected data source becomes available, or an authorized recurring brand review is due.
 
@@ -27,7 +27,7 @@ Resolve the default profile's home with `hermes -p default config path`. Use `<h
 
 ## How to Run
 
-1. Check `oma/brand/config.yaml` before researching or writing. Use every supplied URL. If only one is supplied, follow verified links to discover its companion website or repository without requiring a second input. Ask for a URL only when research was requested and no usable source is supplied or saved.
+1. Check `oma/brand/config.yaml` before researching or writing. Use every supplied URL to identify the source and its brand. A public social profile is a sufficient starting point; record it under `channels.social`, not `website`. Follow verified links to discover the brand's site, social profiles, or repository without requiring a second input. Ask for a URL only when research was requested and no usable source is supplied or saved.
 2. Confirm that the sources describe the same product using links from the site, repository metadata, or another official source. Do not merge unrelated brands or replace the singleton without explicit confirmation. Reruns fill gaps and refresh stale, evidence-backed findings without overwriting unrelated fields, approved knowledge, or custom assets.
 3. Work through all relevant checks below. Record the coverage and sources in the corresponding Markdown reports. A blocked or unchecked source is not a negative finding.
 
@@ -80,7 +80,7 @@ Use the saved OMA brand and its knowledge base as the context for these skills. 
 
 ### Capture visual references and reusable assets
 
-1. On brand creation, load the verified official homepage in `browser_exec`, wait for the page to render, and use `capture_screenshot()` for a desktop reference. Add a mobile or key product-page capture when useful and supported. Copy the actual returned file into `screenshots/` with a stable page/viewport name and its real image extension. Verify the file is nonempty and viewable before adding a `screenshots` item with brand-relative `file` and verified `source_url`. Record the capture date and viewport in `design/assets.md`. If capture is blocked or unavailable, omit the entry and report the gap. Do not capture authenticated pages or personal data.
+1. On creation and onboarding reruns with missing visuals, load the [visual asset inventory](references/visual-references.md) via `skill_view` with `file_path: references/visual-references.md`. Inventory and collect every distinct verified logo, illustration, icon, background, and image on the reviewed public pages, and capture those pages automatically during research. Prefer full-page desktop views; add mobile references and capture tall or independently scrolling content in sections. Do not record login, challenge, or error pages as brand references.
 2. Inspect authorized official brand/press/design pages, product pages, repository assets, and rendered styles for the logos, typefaces, palette, components, icons, illustrations, backgrounds, and imagery actually used. Save reusable files under their existing asset directories, keeping relative paths, exact source URLs, attribution, and license or permission evidence in `design/assets.md`. For assets without reuse permission, document the visual reference instead of copying them. Capture is not permission to reuse the page artwork in marketing.
 3. Save or enrich `design/DESIGN.md` with observed typography roles, colors, layout, components, and usage constraints, marking inferred conventions as such. Link the screenshots and reusable assets. If only a typeface name is verified, record the name rather than referencing a nonexistent font file. Preserve custom assets and previous captures unless replacement was requested.
 
