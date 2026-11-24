@@ -9,6 +9,9 @@ from pathlib import Path
 import pytest
 
 
+DEMO_AGENTS = ("demo__orchestrator", "demo__worker", "demo__publisher")
+
+
 @pytest.fixture
 def bundle(tmp_path, monkeypatch):
     from hermes_cli import default_plugins
@@ -29,11 +32,13 @@ def bundle(tmp_path, monkeypatch):
     team.mkdir(parents=True)
     (team / "config.yaml").write_text(
         "id: demo\nname: Demo\ndescription: Test team.\norchestrator: demo__orchestrator\n"
-        "agents: [demo__orchestrator, demo__worker]\ngoals: [Measure demand]\nplans: [Review evidence]\n",
+        f"agents: [{', '.join(DEMO_AGENTS)}]\ngoals: [Measure demand]\nplans: [Review evidence]\n",
         encoding="utf-8",
     )
-    for role, dependencies in (("orchestrator", "[shared]"), ("worker", "[]")):
-        candidate = source / "agents" / f"demo__{role}"
+    for agent_id in DEMO_AGENTS:
+        role = agent_id.removeprefix("demo__")
+        dependencies = "[shared]" if role == "orchestrator" else "[]"
+        candidate = source / "agents" / agent_id
         candidate.mkdir(parents=True)
         jobs = "[{id: sample, schedule: '1d', prompt: Review evidence.}]" if role == "orchestrator" else "[]"
         (candidate / "config.yaml").write_text(
@@ -48,6 +53,44 @@ def bundle(tmp_path, monkeypatch):
                                        encoding="utf-8")
         (skill / "support.txt").write_text("Support file.", encoding="utf-8")
     return home, source, cli.main
+
+
+def test_install_requires_campaign_publisher_before_provisioning(bundle, capsys):
+    from hermes_cli import kanban_db
+    from hermes_cli.config import atomic_config_write
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, main = bundle
+    path = source / "campaigns/demo/config.yaml"
+    config = read_mapping(path)
+    atomic_config_write(path, {**config, "agents": [agent for agent in config["agents"] if agent != "demo__publisher"]})
+    before = path.read_bytes()
+
+    assert main(["install", "demo"]) == 1
+    assert "roster must contain the canonical publisher demo__publisher" in capsys.readouterr().err
+    assert path.read_bytes() == before
+    assert not kanban_db.board_exists("campaign-demo")
+    assert not (home / "profiles/demo__orchestrator").exists()
+
+
+def test_already_installed_campaign_without_publisher_is_left_unchanged(bundle, capsys):
+    from hermes_cli.config import atomic_config_write
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, main = bundle
+    assert main(["install", "demo"]) == 0
+    capsys.readouterr()
+    path = source / "campaigns/demo/config.yaml"
+    atomic_config_write(path, {**read_mapping(path), "agents": list(DEMO_AGENTS[:2])})
+    publisher = home / "profiles/demo__publisher"
+    publisher.rename(home / "previous-publisher")
+    before = path.read_bytes()
+
+    assert main(["install", "demo"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["state"] == "installed" and result["present_profiles"] == list(DEMO_AGENTS[:2])
+    assert path.read_bytes() == before
+    assert not publisher.exists()
 
 
 def test_campaign_integration_candidates_use_brand_evidence(bundle, capsys):
@@ -160,13 +203,8 @@ def test_campaign_publications_handoff(bundle, capsys, mode):
     config = read_mapping(config_path)
     if mode is not None:
         config["mode"] = mode
-    atomic_config_write(config_path, {**config, "model": "provider/test-model",
-                                     "agents": [*config["agents"], "demo__publisher"]})
+    atomic_config_write(config_path, {**config, "model": "provider/test-model"})
     role = source / "agents" / "demo__publisher"
-    role.mkdir()
-    worker = source / "agents" / "demo__worker"
-    atomic_config_write(role / "config.yaml", {**read_mapping(worker / "config.yaml"), "id": role.name})
-    (role / "SOUL.md").write_text("I publish approved publications.\n", encoding="utf-8")
     assert main(["install", "demo"]) == 0
     assert json.loads(capsys.readouterr().out)["mode"] == (mode or "approve")
     assert main(["lifecycle", "demo", "resumed"]) == 0
@@ -266,7 +304,7 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     assert record["description"] == "Test team."
     assert "version" not in record
     assert record["state"] == "installed"
-    assert record["present_profiles"] == ["demo__orchestrator", "demo__worker"]
+    assert record["present_profiles"] == list(DEMO_AGENTS)
     assert not (home / "playbooks").exists()
     assert not (source / "installations").exists()
     config_path = source / "campaigns" / "demo" / "config.yaml"
@@ -276,11 +314,11 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
         "id": "demo", "name": "Demo", "description": "Test team.",
         "goals": ["Measure demand"], "plans": ["Review evidence"],
         "integrations": [],
-        "agents": ["demo__orchestrator", "demo__worker"],
+        "agents": list(DEMO_AGENTS),
         "orchestrator": "demo__orchestrator", "kanban_board": "campaign-demo",
         "kanban_board_name": "Demo", "installation_state": "installed", "lifecycle_state": "paused",
     }
-    assert record["agents"] == ["demo__orchestrator", "demo__worker"]
+    assert record["agents"] == list(DEMO_AGENTS)
     for agent_id in record["agents"]:
         profile = home / "profiles" / agent_id
         scratch = source / "agents" / agent_id / "tmp"
@@ -351,10 +389,11 @@ def test_sync_materializes_defaults_and_agent_overrides(bundle, capsys):
     atomic_config_write(worker, {**read_mapping(worker), **override})
 
     assert sync(["demo"]) == 0
-    assert json.loads(capsys.readouterr().out)["updated_agents"] == ["demo__orchestrator", "demo__worker"]
+    assert json.loads(capsys.readouterr().out)["updated_agents"] == list(DEMO_AGENTS)
     for path, expected in (
         (orchestrator, campaign_defaults),
         (worker, {**override, "mcp_servers": {**campaign_defaults["mcp_servers"], **override["mcp_servers"]}}),
+        (source / "agents/demo__publisher/config.yaml", campaign_defaults),
     ):
         authored = read_mapping(path)
         assert authored.get("model") == (override["model"] if path == worker else None)
@@ -526,7 +565,7 @@ def test_sync_reuses_legacy_oma_schedule_and_preserves_operator_pause(bundle):
     with use_cron_store(profile):
         job, = list_jobs(include_disabled=True)
         assert (job["id"], job["enabled"], job["paused_reason"]) == (legacy["id"], False, "Operator paused this")
-    assert sync_campaign(home, "demo")["updated_agents"] == ["demo__worker"]
+    assert sync_campaign(home, "demo")["updated_agents"] == ["demo__worker", "demo__publisher"]
 
 
 @pytest.mark.parametrize("paused", [False, True], ids=["scheduled", "operator-paused"])
@@ -710,7 +749,7 @@ def test_campaign_sync_rejects_bad_toolsets_before_applying_other_roles(bundle, 
     worker = source / "agents" / "demo__worker" / "config.yaml"
     invalid, other = (worker, owner) if role == "worker" else (owner, worker)
     atomic_config_replace(other, {**read_mapping(other), "model": "unapplied-model"})
-    profiles = tuple(home / "profiles" / name / "config.yaml" for name in ("demo__orchestrator", "demo__worker"))
+    profiles = tuple(home / "profiles" / name / "config.yaml" for name in DEMO_AGENTS)
     before = [path.read_bytes() for path in profiles]
     atomic_config_replace(invalid, {**read_mapping(invalid), "agent": policy})
     assert sync(["demo"]) == 1
@@ -763,7 +802,6 @@ def test_sync_campaign_script_accepts_explicit_env_but_never_imports_ambient_val
     campaign = source / "campaigns" / "demo" / "config.yaml"
     record = source / "agents" / "demo__worker" / "config.yaml"
     worker = home / "profiles" / "demo__worker"
-    orchestrator = home / "profiles" / "demo__orchestrator"
     with bind_profile_scope(worker, hydrate_secrets=False):
         save_env_value("UNRELATED_OMA_REGRESSION", "leave-alone")
     atomic_config_write(campaign, {**read_mapping(campaign), "model": {
@@ -779,19 +817,20 @@ def test_sync_campaign_script_accepts_explicit_env_but_never_imports_ambient_val
         return run_campaign_script("sync-campaign", *args, UNLISTED_OMA_REGRESSION="do-not-copy", **values)
 
     # Provisioning can seed an empty .env; sync without supplied values must not touch it.
-    env_paths = [profile / ".env" for profile in (orchestrator, worker)]
+    profiles = [home / "profiles" / role for role in DEMO_AGENTS]
+    env_paths = [profile / ".env" for profile in profiles]
     original = [path.read_bytes() if path.exists() else None for path in env_paths]
     first = run("demo", TEAM_SYNC_TOKEN="ambient-same-name", WORKER_SYNC_TOKEN="ambient-worker")
     assert first.returncode == 0, first.stderr
-    assert json.loads(first.stdout)["updated_agents"] == ["demo__orchestrator", "demo__worker"]
+    assert json.loads(first.stdout)["updated_agents"] == list(DEMO_AGENTS)
     assert [path.read_bytes() if path.exists() else None for path in env_paths] == original
     assert "${env:WORKER_SYNC_TOKEN}" in (worker / "config.yaml").read_text(encoding="utf-8-sig")
 
     result = run("demo", "--env-stdin", stdin=json.dumps({"TEAM_SYNC_TOKEN": team_value, "WORKER_SYNC_TOKEN": worker_value}))
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout)["updated_agents"] == ["demo__orchestrator", "demo__worker"]
+    assert json.loads(result.stdout)["updated_agents"] == list(DEMO_AGENTS)
     assert worker_value not in result.stdout + result.stderr
-    for profile in (orchestrator, worker):
+    for profile in profiles:
         env = load_env_file(profile / ".env")
         assert env["TEAM_SYNC_TOKEN"] == team_value
         assert not {"UNLISTED_OMA_REGRESSION", "HOME"} & env.keys()
@@ -818,7 +857,7 @@ def test_sync_campaign_saves_explicit_env_without_model_or_mcp_reference(bundle,
     assert main(["install", "demo"]) == 0
     monkeypatch.setenv("OMA_AMBIENT_TOKEN", "never-copy")
     expected = {"EXTRA_TOOL_TOKEN": "fixture-explicit-value"}
-    roles = ("demo__orchestrator", "demo__worker")
+    roles = DEMO_AGENTS
     assert sync_campaign(home, "demo", env=expected)["updated_agents"] == list(roles)
     assert sync_campaign(home, "demo", env={})["updated_agents"] == []
     for role in roles:
@@ -994,7 +1033,7 @@ def test_saved_agent_model_persists_and_can_be_edited_independently_of_campaign(
                                      "model": "new-campaign-default"})
     atomic_config_write(agent, {**read_mapping(agent), "model": "edited-worker-model"})
     assert sync(["demo"]) == 0
-    assert json.loads(capsys.readouterr().out)["updated_agents"] == ["demo__orchestrator", "demo__worker"]
+    assert json.loads(capsys.readouterr().out)["updated_agents"] == list(DEMO_AGENTS)
     assert read_user_config_raw(native)["model"] == "edited-worker-model"
     owner_native = home / "profiles" / "demo__orchestrator" / "config.yaml"
     assert read_user_config_raw(owner_native)["model"] == "new-campaign-default"

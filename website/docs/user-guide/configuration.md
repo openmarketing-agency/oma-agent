@@ -105,8 +105,11 @@ and agent records do not need a `version` field. The installer writes
 incomplete installs, or installed campaigns. `configure <id>` fills missing board
 routing fields in an existing record without reinstalling or replacing user edits.
 
-Each campaign has one `<campaign-id>__orchestrator` and an ordered `agents`
-list of full profile IDs. Each agent has `config.yaml`, `SOUL.md`, and `saves/`
+New campaigns must list `<campaign-id>__orchestrator` and `<campaign-id>__publisher`
+in the ordered `agents` list. The orchestrator coordinates analysis and preparation;
+the publisher applies the resulting authorized changes. Installation checks both
+roles before creating the board or any profiles. Existing installations are not
+migrated. Each agent has `config.yaml`, `SOUL.md`, and `saves/`
 under `oma/agents/<agent-id>/`. A missing or empty authored `SOUL.md` prevents
 installation. The installed persona lives at `profiles/<agent-id>/SOUL.md`,
 separate from the root `default` persona at `$HERMES_HOME/SOUL.md`. Provisioned

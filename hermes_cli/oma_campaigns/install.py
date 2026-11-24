@@ -329,6 +329,9 @@ def install(home: Path, campaign_id: str) -> dict:
         if record["state"] == "incomplete":
             raise ValueError(f"Campaign {campaign_id!r} has an incomplete installation; no profiles were changed")
         validate_record("campaign", config, config_path)
+        publisher = f"{campaign_id}__publisher"
+        if publisher not in record["agents"]:
+            raise ValueError(f"{campaign_id}: roster must contain the canonical publisher {publisher}")
         campaign = resolve(home, campaign_id)
         policies = _check_profiles(home, campaign)
         paths = {agent.id: (_agent_data_dir(home, agent.id, "saves"), _agent_data_dir(home, agent.id, "tmp"))
