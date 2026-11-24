@@ -93,7 +93,9 @@ installation marker is absent from the snapshot if installation hasn't finished
 when the record is created. The `default` profile gets `oma-agents`, `oma-brand`,
 `oma-campaigns`, `oma-onboarding`, and `oma-playbook`; `maintenance` gets `omactl`.
 These starter skills don't need `oma_skills` entries. Docker places their
-source packages under `oma-bundle/skills/oma/`.
+source packages under `oma-bundle/skills/oma/`. The general `open-webui`
+integration is bundled separately under `skills/integrations/` and synced only
+to `default`.
 
 Use [Agent Sync](#sync-saved-oma-settings) to apply edits to one standalone or campaign agent.
 

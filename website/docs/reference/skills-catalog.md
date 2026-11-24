@@ -19,6 +19,12 @@ If a skill is missing from this list but present in the repo, the catalog is reg
 | [`computer-use`](../user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-computer-use.md) | Drive the desktop background-first; escalate on signal. | `autonomous-ai-agents/computer-use` |
 | [`hermes-agent`](../user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-hermes-agent.md) | Use, configure, theme, extend, and orchestrate Hermes Agent. | `autonomous-ai-agents/hermes-agent` |
 
+## integrations
+
+| Skill | Description | Path |
+|-------|-------------|------|
+| [`open-webui`](../user-guide/skills/bundled/integrations/integrations-open-webui.md) | Use Open WebUI models, chat, and knowledge via API. | `integrations/open-webui` |
+
 ## oma
 
 | Skill | Description | Path |

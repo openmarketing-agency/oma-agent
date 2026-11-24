@@ -31,6 +31,7 @@ def test_startup_adopts_existing_profiles_and_bundles_default_only_skills(tmp_pa
     maintenance = _profile(tmp_path / "profiles" / "maintenance", {"api_key": "fixture-private-value"}, "Custom ops persona")
     source = Path(__file__).resolve().parents[2]
     seed_standalone_agents(tmp_path, install_dir=source)
+    assert not list((tmp_path / "oma-bundle" / "skills").rglob("open-webui"))
     records = tmp_path / "oma" / "agents"
     default, ops = (records / role for role in ("default", "maintenance"))
     refs = OMA_DEFAULT_ONLY_SKILLS - OMA_RETIRED_SKILLS
