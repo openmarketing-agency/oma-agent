@@ -1,0 +1,116 @@
+id: search-intent-ads
+version: 1
+name: Search-Intent Ads
+summary: Buy search ads only for searches that show someone is ready to buy, send each ad group to a landing page that matches it, and move budget toward what turns into customers.
+ideas: [146, 147, 148]
+example: example.md
+
+fits:
+  product_types: [local, b2b, saas, ecommerce, creator]
+  stages: [early, growth]
+  best_when:
+    - People search for the service with clear intent, such as "near me", a price or "hire".
+    - A customer is worth enough to pay for clicks, and conversions can be tracked.
+  avoid_when:
+    - No budget has been approved.
+    - Conversions can't be tracked.
+
+outcome: "People searching for {service} find {business} and {conversion} at a cost per customer the business can afford."
+horizon: ongoing
+time_to_signal: Clicks in the first days; enough conversions to judge in two to four weeks.
+
+requires:
+  - {channel: ads, mode: read, fallback: research_only}
+  - {channel: ads, mode: write, fallback: assisted, note: "Every change that spends money is approved first."}
+  - {channel: site, mode: write, fallback: assisted}
+  - {channel: analytics, mode: read, fallback: research_only}
+  - {channel: search_console, mode: read, fallback: research_only, optional: true}
+
+roster:
+  - role: orchestrator
+    does: Holds spend inside the approved budget, reads results against cost per customer, and decides what to pause, keep or test next.
+    per_run: Spend against budget, cost per lead per ad group, the changes proposed for approval, and a review note.
+    toolsets: [file, web, skills, memory, session_search, kanban, integrations]
+    reads: [ads, analytics, search_console]
+    untrusted_input: true
+    skills: [ads, conversion-tracking]
+  - role: keyword-planner
+    does: Builds tight ad groups from searches with buying intent, with negative keywords that keep out researchers, job seekers and do-it-yourselfers.
+    per_run: Ad groups with their keywords, match types and negative keywords, each with the intent it targets and its estimated cost per click.
+    toolsets: [file, web, skills, memory, kanban, integrations]
+    reads: [ads, search_console]
+    untrusted_input: true
+    skills: [ads, audience-research]
+  - role: ad-writer
+    does: Writes search ads that match the search and the landing page, within platform and professional advertising rules.
+    per_run: Headlines and descriptions for every ad group, with sitelinks and callouts, each claim checked against the brand record.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: false
+    skills: [ad-creative, copywriting]
+  - role: landing-page-writer
+    does: Writes one landing page per ad group that makes the same promise as the ad and asks for one action.
+    per_run: A landing page per new ad group, with headline, proof, price, next step and form, ready to publish.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: false
+    skills: [copywriting, cro]
+  - role: publisher
+    does: Applies approved ad changes through the ad platform's API, publishes approved landing pages, and records what changed.
+    per_run: Every approved change applied with a change log entry, every approved page published with its URL, and conversion tracking confirmed.
+    toolsets: [file, skills, memory, kanban, integrations]
+    writes: [ads, site]
+    untrusted_input: false
+    skills: []
+
+deliverables:
+  - {id: ad-groups, what: "Ad groups with keywords and negatives", cadence: per_event, owner: keyword-planner, approval: per_item}
+  - {id: ads, what: "Search ads per ad group", cadence: per_event, owner: ad-writer, approval: per_item}
+  - {id: landing-page, what: "Landing page per ad group", cadence: per_event, owner: landing-page-writer, approval: per_item}
+  - {id: optimization, what: "Weekly pause, keep and test changes", cadence: weekly, owner: orchestrator, approval: per_item}
+
+jobs:
+  - id: campaign-review
+    owner: orchestrator
+    cadence: weekly
+    checks:
+      - Spend against the approved budget and daily caps
+      - Cost per lead and per customer by ad group
+      - Search terms that triggered ads, for new negatives
+      - Ad disapprovals and policy notices
+    max_items: 50
+  - id: spend-watch
+    owner: orchestrator
+    cadence: daily
+    checks:
+      - Spend pacing against daily caps, and any disapproved ad
+    max_items: 10
+
+kpis:
+  leading: [Click-through rate, Cost per click, Landing page conversion rate]
+  lagging: [Cost per lead, Cost per customer]
+  targets: after_baseline
+  baseline_weeks: 3
+
+limits:
+  budget_changes_without_approval: 0
+  new_campaigns_per_week: 1
+
+slots:
+  - {id: business, required: true, source: brand, ask: "What the business sells."}
+  - {id: service, required: true, source: playbook, ask: "The service people search for."}
+  - {id: conversion, required: true, source: playbook, ask: "The action that counts, such as a booked call."}
+  - {id: budget, required: true, source: brand, ask: "The approved monthly budget and daily cap."}
+  - {id: customer_value, required: true, source: brand, ask: "What a customer is worth, to set the cost per customer limit."}
+
+kickoff:
+  - {owner: orchestrator, task: "Confirm conversion tracking fires on the booked action before any spend."}
+  - {owner: keyword-planner, task: "Build the first three ad groups from the searches with the clearest intent."}
+  - {owner: ad-writer, task: "Write ads for the first three ad groups."}
+  - {owner: landing-page-writer, task: "Write a landing page for each of the first three ad groups."}
+
+plan:
+  - Launch three tight ad groups with matching landing pages and tracking confirmed.
+  - Add negatives weekly from the search terms report.
+  - Pause ad groups above the cost per customer limit and move budget to the ones below it.
+  - Add one new ad group a week once the first three are judged.
+
+rules: rules.md

@@ -1,0 +1,101 @@
+id: seo-blog-engine
+version: 1
+name: SEO Blog Engine
+summary: Publish intent-matched articles, fair comparison pages and refreshes on a fixed weekly cadence, and grow non-brand search traffic that converts.
+ideas: [8, 11, 15, 18]
+example: example.md
+
+fits:
+  product_types: [saas, devtool, b2b, ecommerce, creator, local]
+  stages: [early, growth]
+  best_when:
+    - People already search for the problem, the category or alternatives to competitors.
+    - The business has first-hand material to add, such as product data, screenshots or expert input.
+  avoid_when:
+    - Results are needed within weeks. Search pays off over months.
+
+outcome: "More {audience} find {product} through non-brand search and go on to {conversion}."
+horizon: ongoing
+time_to_signal: Impressions within 2 to 4 weeks of publishing; clicks and conversions over 2 to 4 months.
+
+requires:
+  - {channel: blog, mode: write, fallback: assisted}
+  - {channel: search_console, mode: read, fallback: research_only}
+  - {channel: analytics, mode: read, fallback: research_only, optional: true}
+  - {channel: site, mode: write, fallback: assisted, optional: true, note: "Comparison pages and internal links outside the blog."}
+
+roster:
+  - role: orchestrator
+    does: Owns the keyword map and the publishing calendar. Picks what to write, refresh or compare each week from search data, approves briefs, and runs the weekly review.
+    per_run: Next week's two article topics and any refresh picked from the keyword map and Search Console, queued as briefed tasks, plus a five-line review note.
+    toolsets: [file, web, skills, memory, session_search, kanban, integrations]
+    reads: [search_console, analytics]
+    untrusted_input: true
+    skills: [content-strategy, seo-audit]
+  - role: researcher
+    does: Studies what ranks for each target query and turns it into a brief a writer can work from without re-researching.
+    per_run: One complete brief per task, with target query and intent, the top five ranking pages and what they miss, an outline, sources, internal links and the call to action.
+    toolsets: [file, web, browser, skills, memory, kanban, integrations]
+    reads: [search_console]
+    untrusted_input: true
+    skills: [seo-audit, competitors, ai-seo, programmatic-seo]
+  - role: writer
+    does: Writes articles, comparison pages and refreshes from briefs in the brand voice, with every fact sourced and first-hand material added.
+    per_run: One finished draft per task, either an article of 1,500 to 2,500 words, a comparison page, or a refresh with the changes marked, humanized and with title, meta description and image notes.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: true
+    skills: [copywriting, copy-editing, competitors, writing-style-and-tone]
+  - role: publisher
+    does: Publishes approved drafts with metadata, schema and internal links, reads each page back, and records the live URL.
+    per_run: Every approved draft published in the CMS with its slug, meta, schema and internal links, indexing requested, and the live URL recorded on the task.
+    toolsets: [file, web, skills, memory, kanban, integrations]
+    writes: [blog, site]
+    untrusted_input: false
+    skills: [schema]
+
+deliverables:
+  - {id: article, what: "New article for one keyword cluster", cadence: 2/week, owner: writer, approval: per_item, standing_ok: true}
+  - {id: comparison-page, what: "Fair alternatives or vs page for a competitor buyers consider", cadence: 1/month, owner: writer, approval: per_item}
+  - {id: refresh, what: "Rewrite of a page losing clicks or position", cadence: 2/month, owner: writer, approval: per_item, standing_ok: true}
+  - {id: brief, what: "Brief for the next article or comparison page", cadence: 2/week, owner: researcher, approval: none}
+
+jobs:
+  - id: campaign-review
+    owner: orchestrator
+    cadence: weekly
+    checks:
+      - Search Console clicks, impressions and position for target clusters, last 28 days against the previous 28
+      - Pages that lost clicks or dropped out of the top 10
+      - Organic conversions, where analytics is connected
+      - Drafts and published pages on the board against plan
+    max_items: 30
+
+kpis:
+  leading: [Pages published against plan, Impressions for target clusters, Average position for target clusters]
+  lagging: [Non-brand organic clicks, Organic signups or leads]
+  targets: after_baseline
+  baseline_weeks: 4
+
+limits:
+  max_new_pages_per_week: 3
+  max_refreshes_per_week: 2
+
+slots:
+  - {id: product, required: true, source: brand, ask: "What the product is and does, in one sentence."}
+  - {id: audience, required: true, source: playbook, ask: "Who should find the product through search."}
+  - {id: conversion, required: true, source: playbook, ask: "What a searcher should do next, such as start a trial."}
+  - {id: seed_topics, required: true, source: research, ask: "Three to five problems or categories to rank for."}
+  - {id: competitors, required: false, source: brand, ask: "Competitors buyers compare the product with."}
+  - {id: author, required: true, source: brand, ask: "Whose name and bio appear on articles."}
+
+kickoff:
+  - {owner: researcher, task: "Write the briefs for the first two articles from the keyword map saved at creation."}
+  - {owner: writer, task: "Draft the first article for approval."}
+  - {owner: orchestrator, task: "Pull the Search Console baseline for the last 3 months."}
+
+plan:
+  - Publish the first two articles from the keyword map built at creation.
+  - Keep two articles a week, a comparison page a month and two refreshes a month.
+  - Review weekly over 28-day windows and move effort to the clusters gaining impressions and clicks.
+
+rules: rules.md

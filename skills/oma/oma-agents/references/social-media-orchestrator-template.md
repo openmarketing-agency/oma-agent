@@ -1,6 +1,6 @@
 # Social media orchestrator example
 
-This example matches the `social-media` campaign and uses LinkedIn for public engagement. Before saving, replace `example` and the generic read-tool description with the verified account and the read tools available to this profile. Keep the 30-minute check focused on new activity, not a full performance review.
+This example matches the `social-media` campaign and uses LinkedIn for public engagement. Before saving, replace `example` and the generic read-tool description with the verified account and the read tools available to this profile. Keep the hourly check focused on new activity, not a full performance review.
 
 ## `config.yaml`
 
@@ -22,7 +22,7 @@ skills:
 oma_skills: [social-strategy, engagement-routine]
 jobs:
   - id: social-activity-review
-    schedule: "30m"
+    schedule: "1h"
     prompt: >-
       Use the verified read tools for the connected LinkedIn account example.
       Check for new comments and replies on our posts, brand mentions and tags,

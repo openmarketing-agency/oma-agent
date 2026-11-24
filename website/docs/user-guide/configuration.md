@@ -233,6 +233,11 @@ candidates from observed `integrations` and verified `channels.social` in
 This list records which integrations the campaign needs for its work; it does
 not gate resume. Use `wordpress-com` for the Composio toolkit `wordpress_com`.
 
+Set `integration_categories: ["social media accounts", analytics]` in the campaign
+record to suggest types of tools, including before choosing a connector. Use exact
+labels from `hermes_cli/oma_campaigns/schemas/composio-categories.json`. The list is
+optional, and does not connect accounts or replace the IDs in `integrations`.
+
 ### Shared brand and playbook
 
 The default profile manages one brand with `oma-brand` and one playbook with

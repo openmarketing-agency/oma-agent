@@ -1,0 +1,109 @@
+id: discord-community
+version: 1
+name: Discord Community
+summary: Run the brand's own Discord server so questions get answered fast, answers turn into a searchable FAQ, and a weekly event gives members a reason to come back.
+ideas: [102, 101, 103]
+example: example.md
+
+fits:
+  product_types: [consumer_app, devtool, saas, oss]
+  stages: [early, growth]
+  best_when:
+    - The brand already has a Discord server, or its users gather on Discord.
+    - Members ask the same questions again and again.
+  avoid_when:
+    - There is no server and no audience that uses Discord.
+
+outcome: "{audience} get help fast in {server}, come back for weekly events and {conversion}."
+horizon: ongoing
+time_to_signal: Faster answers in the first week; more returning members within a month.
+
+requires:
+  - {channel: discord_server, mode: read, fallback: research_only}
+  - {channel: discord_server, mode: write, fallback: assisted, note: "Posts go out through the brand's bot in its own server only."}
+  - {channel: site, mode: write, fallback: assisted, optional: true}
+
+roster:
+  - role: orchestrator
+    does: Watches the server's health, picks questions to answer and topics for the FAQ, plans the weekly event and flags anything a person must handle.
+    per_run: Open questions assigned, the week's FAQ topics and event chosen, escalations flagged to the team, and a review note.
+    toolsets: [file, web, skills, memory, session_search, kanban, integrations]
+    reads: [discord_server]
+    untrusted_input: true
+    skills: [community-marketing, customer-research]
+  - role: responder
+    does: Drafts answers to open questions in help channels, using the FAQ and docs, and says plainly when a person from the team needs to step in.
+    per_run: An answer draft for every open question assigned, each linking the FAQ entry or doc it comes from, or flagged for the team.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: true
+    skills: [reply-and-comment-writer, writing-style-and-tone]
+  - role: knowledge-keeper
+    does: Turns answered questions into FAQ entries and keeps them current when the product changes.
+    per_run: New FAQ entries for questions answered twice or more, and corrections to entries that the latest release or patch made wrong.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: true
+    skills: [educational-content-and-how-to, copywriting]
+  - role: events-host
+    does: Plans and writes the weekly event, such as a challenge, a Q&A or a showcase, with its announcement, reminder and recap.
+    per_run: The week's event with its announcement, reminder, rules, and a recap of the last event with winners or highlights.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: true
+    skills: [events, community-marketing, writing-style-and-tone]
+  - role: publisher
+    does: Posts approved answers, FAQ updates and event messages through the brand's bot in its own server, and records each message link.
+    per_run: Every approved message posted in its channel through the bot with its link recorded, and FAQ pages updated on the site.
+    toolsets: [file, skills, memory, kanban, integrations]
+    writes: [discord_server, site]
+    untrusted_input: false
+    skills: []
+
+deliverables:
+  - {id: answer, what: "Answer to an open question in a help channel", cadence: daily, owner: responder, approval: per_item, standing_ok: true}
+  - {id: faq-entry, what: "FAQ entry for a repeated question", cadence: 3/week, owner: knowledge-keeper, approval: per_item, standing_ok: true}
+  - {id: weekly-event, what: "Weekly event with announcement, reminder and recap", cadence: weekly, owner: events-host, approval: per_item}
+
+jobs:
+  - id: campaign-review
+    owner: orchestrator
+    cadence: weekly
+    checks:
+      - Time to first answer in help channels
+      - Questions asked again that the FAQ already covers
+      - Event turnout and returning members
+      - Messages that need a person, such as bug reports, refunds or conduct reports
+    max_items: 40
+  - id: help-sweep
+    owner: orchestrator
+    cadence: hourly
+    checks:
+      - Unanswered questions in help channels older than two hours
+    max_items: 30
+
+kpis:
+  leading: [Median time to first answer, FAQ entries published, Event turnout]
+  lagging: [Weekly returning members, "Members who take the next step"]
+  targets: after_baseline
+  baseline_weeks: 4
+
+limits:
+  unsolicited_dms: 0
+  messages_just_to_keep_server_active: 0
+
+slots:
+  - {id: server, required: true, source: brand, ask: "The Discord server and its help and announcement channels."}
+  - {id: audience, required: true, source: playbook, ask: "Who the members are."}
+  - {id: conversion, required: true, source: playbook, ask: "What members should do, such as buy, wishlist or upgrade."}
+  - {id: escalation, required: true, source: brand, ask: "Who on the team takes bug reports, refunds and conduct reports."}
+
+kickoff:
+  - {owner: responder, task: "Answer every open question in help channels from the last week."}
+  - {owner: knowledge-keeper, task: "Write FAQ entries for the ten most repeated questions in the server's history."}
+  - {owner: events-host, task: "Plan and announce the first weekly event."}
+
+plan:
+  - Clear the open questions and publish the first ten FAQ entries.
+  - Answer new help questions daily and turn repeats into FAQ entries.
+  - Run one event a week with announcement, reminder and recap.
+  - Review weekly and pass bug reports and feedback to the team.
+
+rules: rules.md

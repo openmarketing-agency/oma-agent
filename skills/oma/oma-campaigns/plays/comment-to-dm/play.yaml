@@ -1,0 +1,113 @@
+id: comment-to-dm
+version: 1
+name: Comment-to-DM Funnel
+summary: Post content that invites a keyword comment, send each commenter the promised resource in one private reply, and turn the conversations that follow into sales.
+ideas: [69, 67, 71, 61]
+example: example.md
+
+fits:
+  product_types: [ecommerce, consumer_app, creator, local, saas]
+  stages: [early, growth]
+  best_when:
+    - The account has an engaged audience on Instagram or a Facebook Page.
+    - There is a genuinely useful free resource or offer to send.
+  avoid_when:
+    - The account can't use the official messaging API.
+
+outcome: "{audience} comment for {resource}, receive it in their DMs, and go on to {conversion}."
+horizon: ongoing
+time_to_signal: Comments and replies within days of each keyword post; sales within the first month.
+
+requires:
+  - {channel: instagram, mode: write, fallback: assisted}
+  - {channel: instagram, mode: read, fallback: research_only}
+  - {channel: storefront, mode: read, fallback: research_only, optional: true}
+  - {channel: analytics, mode: read, fallback: research_only, optional: true}
+
+roster:
+  - role: orchestrator
+    does: Plans the keyword posts and offers, watches which ones convert, and decides what to repeat or drop.
+    per_run: The next three keyword posts planned with offer, keyword and format, plus a review note on comments, replies and sales per post.
+    toolsets: [file, web, skills, memory, session_search, kanban, integrations]
+    reads: [instagram, storefront, analytics]
+    untrusted_input: true
+    skills: [social, offers, instagram-growth]
+  - role: content-maker
+    does: Makes the keyword posts, carousels and Reel scripts that teach something real and end with a clear comment keyword.
+    per_run: One finished keyword post per task, as a carousel with slide copy and image prompts or a Reel script with hook, shots and on-screen text, plus the caption with the keyword.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: true
+    skills: [carousel-writer, reels-script, caption-writer, hook-writer]
+  - role: dm-writer
+    does: Writes the private reply each commenter receives and the follow-up messages for people who answer.
+    per_run: The complete message set for one keyword post, with the private reply, the delivery message with the resource link, and two follow-ups for questions and buying intent.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: true
+    skills: [social-selling-and-dm, copywriting, writing-style-and-tone]
+  - role: publisher
+    does: Posts approved content, sends the private reply to each keyword commenter through the official API, continues conversations inside the messaging window, and hands anything unusual to a person.
+    per_run: Approved posts published with URLs recorded, a private reply sent to every new keyword comment within the window, and conversations needing a person flagged.
+    toolsets: [file, web, skills, memory, kanban, integrations]
+    reads: [instagram]
+    writes: [instagram]
+    untrusted_input: true
+    skills: [reply-and-comment-writer]
+
+deliverables:
+  - {id: keyword-post, what: "Carousel or Reel with a comment keyword", cadence: 3/week, owner: content-maker, approval: per_item, standing_ok: true}
+  - {id: message-set, what: "Private reply, delivery message and follow-ups for one keyword post", cadence: 3/week, owner: dm-writer, approval: per_item, standing_ok: true}
+  - {id: lead-resource, what: "Free guide, checklist or code that commenters receive", cadence: 1/month, owner: content-maker, approval: per_item}
+  - {id: comment-replies, what: "Public replies to new comments on keyword posts", cadence: daily, owner: dm-writer, approval: batch, standing_ok: true}
+
+jobs:
+  - id: campaign-review
+    owner: orchestrator
+    cadence: hourly
+    checks:
+      - New public comments and non-keyword questions that need a response or escalation
+      - New reply handoffs or unresolved publisher blockers since the last check; do not send messages or duplicate the publisher's keyword queue
+    max_items: 25
+  - id: performance-review
+    owner: orchestrator
+    cadence: weekly
+    checks:
+      - Comments, keyword comments and private replies sent per post
+      - Replies to private replies and link clicks
+      - Orders or signups with the campaign's code or link, where connected
+    max_items: 40
+  - id: keyword-replies
+    owner: publisher
+    cadence: hourly
+    checks:
+      - New keyword comments on active posts that haven't had a private reply
+      - New replies in conversations still inside the messaging window
+    max_items: 25
+
+kpis:
+  leading: [Keyword comments per post, Private replies sent within the window, Reply rate to the private reply]
+  lagging: [Orders or signups from DM links, Revenue per keyword post]
+  targets: after_baseline
+  baseline_weeks: 3
+
+limits:
+  private_replies_per_comment: 1
+  max_feed_posts_per_day: 2
+
+slots:
+  - {id: audience, required: true, source: playbook, ask: "Who the posts are for."}
+  - {id: resource, required: true, source: research, ask: "The free guide, checklist or code commenters get."}
+  - {id: conversion, required: true, source: playbook, ask: "What people should do after getting it, such as buy a starter kit."}
+  - {id: keyword, required: true, source: research, ask: "The word people comment, such as ROUTINE."}
+
+kickoff:
+  - {owner: content-maker, task: "Make the lead resource and the first keyword carousel."}
+  - {owner: dm-writer, task: "Write the message set for the first keyword post."}
+  - {owner: orchestrator, task: "Plan the first three keyword posts and their offers."}
+
+plan:
+  - Publish the first keyword carousel with its lead resource and message set.
+  - Keep three keyword posts a week, alternating carousels and Reels.
+  - Reply privately to every keyword comment within the window and continue the conversations that answer.
+  - Review weekly and repeat the formats and offers that turn comments into sales.
+
+rules: rules.md

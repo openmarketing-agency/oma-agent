@@ -1,0 +1,106 @@
+id: podcast-tour
+version: 1
+name: Podcast Tour
+summary: Book the founder on podcasts their buyers listen to, with researched one-to-one pitches, a guest sheet, prep for every recording, and a recap that turns each episode into a page and posts.
+ideas: [36, 30, 35]
+example: example.md
+
+fits:
+  product_types: [b2b, saas, devtool, creator, consumer_app]
+  stages: [early, growth]
+  best_when:
+    - The founder has real expertise and stories the buyers care about.
+    - Buyers listen to niche podcasts in their field.
+  avoid_when:
+    - Nobody on the team can record an hour-long conversation each week.
+
+outcome: "{guest} appears on podcasts {audience} listen to, and listeners {conversion}."
+horizon: ongoing
+time_to_signal: Replies to pitches within two weeks; first episodes air four to eight weeks after booking.
+
+requires:
+  - {channel: email, mode: write, fallback: assisted}
+  - {channel: inbox, mode: read, fallback: research_only}
+  - {channel: podcasts, mode: write, fallback: assisted, note: "Bookings and appearances are done by the guest."}
+  - {channel: blog, mode: write, fallback: assisted, optional: true}
+  - {channel: analytics, mode: read, fallback: research_only, optional: true}
+
+roster:
+  - role: orchestrator
+    does: Owns the target list and the booking pipeline, decides which shows to pitch next, and tracks replies, bookings and air dates.
+    per_run: The pipeline updated with shows pitched, replied, booked and aired, the next batch of shows approved for pitching, and a review note.
+    toolsets: [file, web, skills, memory, session_search, kanban, integrations]
+    reads: [inbox, analytics]
+    untrusted_input: true
+    skills: [public-relations]
+  - role: show-researcher
+    does: Finds podcasts the buyers listen to and researches each one well enough to write a specific pitch.
+    per_run: Five qualified shows, each with host, audience, recent episodes, the angle that fits, and the contact route.
+    toolsets: [file, web, browser, skills, memory, kanban]
+    untrusted_input: true
+    skills: [public-relations, audience-research, podcast-and-audiograms]
+  - role: pitch-writer
+    does: Writes one-to-one pitches in the guest's voice, and keeps the guest sheet current.
+    per_run: Five individual pitches for the shows researched, each naming the episodes it builds on and offering three topics, plus guest sheet updates.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: true
+    skills: [public-relations, cold-email, copywriting, writing-style-and-tone]
+  - role: prep-writer
+    does: Prepares the guest for each recording and turns each aired episode into owned content.
+    per_run: For each booked episode, a prep brief with host background, likely questions and three stories with numbers; for each aired episode, a recap post and three social snippets.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: true
+    skills: [podcast-and-audiograms, copywriting, educational-content-and-how-to, writing-style-and-tone]
+  - role: publisher
+    does: Sends approved pitches from the guest's own mailbox, hands bookings to the guest, and publishes approved recap posts.
+    per_run: Every approved pitch and follow-up sent and logged, each booking handed to the guest with the prep brief, and approved recaps published with URLs recorded.
+    toolsets: [file, web, skills, memory, kanban, integrations]
+    writes: [email, podcasts, blog]
+    untrusted_input: false
+    skills: []
+
+deliverables:
+  - {id: show-list, what: "Five researched shows", cadence: weekly, owner: show-researcher, approval: none}
+  - {id: pitch, what: "One-to-one pitch to a host", cadence: 5/week, owner: pitch-writer, approval: per_item, standing_ok: true}
+  - {id: guest-sheet, what: "One-page guest sheet with bio, topics, past appearances and headshot", cadence: once, owner: pitch-writer, approval: per_item}
+  - {id: prep-brief, what: "Prep brief for a booked episode", cadence: per_event, owner: prep-writer, approval: none}
+  - {id: episode-recap, what: "Recap post and social snippets for an aired episode", cadence: per_event, owner: prep-writer, approval: per_item}
+
+jobs:
+  - id: campaign-review
+    owner: orchestrator
+    cadence: weekly
+    checks:
+      - Replies to pitches in the guest's inbox since the last run
+      - Bookings, recording dates and air dates
+      - Visits from podcast links, where analytics is connected
+    max_items: 30
+
+kpis:
+  leading: [Pitches sent, Reply rate, Bookings]
+  lagging: [Episodes aired, Visits and leads from episode links]
+  targets: after_baseline
+  baseline_weeks: 4
+
+limits:
+  max_new_pitches_per_week: 10
+  follow_ups_per_pitch: 1
+
+slots:
+  - {id: guest, required: true, source: brand, ask: "Who appears as the guest, with a short bio."}
+  - {id: audience, required: true, source: playbook, ask: "Who the guest should reach."}
+  - {id: conversion, required: true, source: playbook, ask: "What listeners should do, such as book a call."}
+  - {id: topics, required: true, source: research, ask: "Three topics the guest can speak on with real stories."}
+
+kickoff:
+  - {owner: pitch-writer, task: "Write the guest sheet."}
+  - {owner: show-researcher, task: "Research the first five shows."}
+  - {owner: pitch-writer, task: "Write the first five pitches."}
+
+plan:
+  - Send the first five pitches with the guest sheet.
+  - Keep five new pitches a week, with one follow-up each.
+  - Prepare the guest for every booking and turn every aired episode into a recap post.
+  - Review weekly and pitch more shows like the ones that book.
+
+rules: rules.md

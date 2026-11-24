@@ -1,0 +1,99 @@
+id: abandoned-cart-recovery
+version: 1
+name: Abandoned Cart Recovery
+summary: Build and keep improving the email flows that bring shoppers back to the cart, the browse and the next purchase, with real products, real stock and honest offers.
+ideas: [132, 133, 134]
+example: example.md
+
+fits:
+  product_types: [ecommerce]
+  stages: [early, growth]
+  best_when:
+    - The store is connected and has enough traffic that carts are abandoned every day.
+    - Shoppers' email consent is recorded in the store.
+  avoid_when:
+    - The store has no way to send email from recorded consent.
+
+outcome: "Shoppers who leave {store} with items in the cart come back and {conversion}."
+horizon: ongoing
+time_to_signal: Recovered orders within the first week of the flow going live.
+
+requires:
+  - {channel: storefront, mode: read, fallback: none}
+  - {channel: email, mode: write, fallback: assisted}
+  - {channel: email, mode: read, fallback: research_only}
+  - {channel: analytics, mode: read, fallback: research_only, optional: true}
+
+roster:
+  - role: orchestrator
+    does: Owns the flows, decides which test to run next from flow data, and runs the weekly review.
+    per_run: The next flow test picked with its hypothesis, queued as tasks, plus a review note on recovery rate and revenue per flow.
+    toolsets: [file, web, skills, memory, session_search, kanban, integrations]
+    reads: [storefront, email, analytics]
+    untrusted_input: false
+    skills: [emails, cro, analytics]
+  - role: flow-writer
+    does: Writes the emails in each flow in the brand's voice, built around the shopper's actual items, with one clear way back to the cart.
+    per_run: One finished email or test variant per task, with three subject lines, preview text, body, the product block layout and the call to action.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: false
+    skills: [emails, copywriting, marketing-psychology, writing-style-and-tone]
+  - role: merchandiser
+    does: Picks what each email shows from the store, such as the abandoned items, sizes in stock, reviews, fit notes and the best next product.
+    per_run: The product rules for one flow, covering which items to show, stock and size checks, the review snippet to pull, and the cross-sell picks by category.
+    toolsets: [file, web, skills, memory, kanban, integrations]
+    reads: [storefront]
+    untrusted_input: false
+    skills: [offers]
+  - role: publisher
+    does: Builds approved emails and flows in the sending tool with consent rules and stop conditions, tests them, and turns them on.
+    per_run: Every approved email or flow change built in the sending tool, test sends checked on desktop and mobile, the change switched on, and its state recorded.
+    toolsets: [file, web, skills, memory, kanban, integrations]
+    writes: [email]
+    untrusted_input: false
+    skills: [emails]
+
+deliverables:
+  - {id: cart-flow, what: "Three-email abandoned cart flow", cadence: once, owner: flow-writer, approval: per_item}
+  - {id: browse-flow, what: "Two-email browse abandonment flow", cadence: once, owner: flow-writer, approval: per_item}
+  - {id: cross-sell-flow, what: "Post-purchase cross-sell email", cadence: once, owner: flow-writer, approval: per_item}
+  - {id: flow-test, what: "New subject line, offer or layout variant for one flow", cadence: 2/month, owner: flow-writer, approval: per_item, standing_ok: true}
+  - {id: product-rules, what: "Product and stock rules for one flow", cadence: 2/month, owner: merchandiser, approval: none}
+
+jobs:
+  - id: campaign-review
+    owner: orchestrator
+    cadence: weekly
+    checks:
+      - Carts abandoned, emails sent, opens, clicks and recovered orders per flow, last 7 days
+      - Unsubscribes and spam complaints per flow
+      - Results of running tests
+    max_items: 30
+
+kpis:
+  leading: [Flow emails sent, Click rate per email, Unsubscribe and complaint rate]
+  lagging: [Recovered orders, Recovered revenue, Repeat purchase rate from the cross-sell]
+  targets: after_baseline
+  baseline_weeks: 2
+
+limits:
+  max_cart_emails_per_cart: 3
+  max_discount_percent: 10
+
+slots:
+  - {id: store, required: true, source: brand, ask: "The store's name."}
+  - {id: conversion, required: true, source: playbook, ask: "What counts as a recovered sale."}
+  - {id: offer, required: false, source: research, ask: "Any discount or free-shipping offer the store allows in the last email."}
+  - {id: voice, required: true, source: brand, ask: "How the brand sounds in email."}
+
+kickoff:
+  - {owner: merchandiser, task: "Write the product and stock rules for the cart flow."}
+  - {owner: flow-writer, task: "Write the three cart emails for approval."}
+  - {owner: orchestrator, task: "Record the current cart recovery baseline from the store."}
+
+plan:
+  - Ship the three-email cart flow, with real items, stock and reviews.
+  - Add the browse abandonment flow and the post-purchase cross-sell.
+  - Run two tests a month and keep the winners.
+
+rules: rules.md
