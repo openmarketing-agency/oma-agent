@@ -1,6 +1,6 @@
 # Website, blog, and docs build publisher example
 
-Use this role to apply approved content and page changes after hosting is ready. This example is for `website-build` on self-hosted WordPress. Configure authorized CMS access separately; neither the `wordpress` campaign integration ID nor an `omactl` installation grants that access. An available browser is not a credential or permission to publish.
+Use this role to apply approved content and page changes once the intended site is ready. This example is for `website-build` using the campaign's `wordpress-com` connection. Verify that the connection can publish to the intended WordPress.com site. For a self-hosted variant, verify its CMS access separately; neither `omactl` nor browser availability grants permission to publish.
 
 ## `config.yaml`
 

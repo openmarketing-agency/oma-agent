@@ -1785,7 +1785,6 @@
   "wolfram-alpha-api": {"name": "Wolfram alpha api", "composio": "wolfram_alpha_api"},
   "woodpecker-co": {"name": "Woodpecker co", "composio": "woodpecker_co"},
   "woop-social": {"name": "WoopSocial", "composio": "woop_social"},
-  "wordpress": {"name": "WordPress", "composio": null},
   "wordpress-com": {"name": "WordPress.com", "composio": "wordpress_com"},
   "words-into-music": {"name": "Words into Music (Savuko)", "composio": "words_into_music"},
   "workable": {"name": "Workable", "composio": "workable"},
