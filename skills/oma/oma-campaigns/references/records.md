@@ -82,5 +82,5 @@ A good SOUL states the role's job for this business, what it hands over each run
 
 Created on the campaign board when the campaign is activated, assigned to the orchestrator, with idempotency key `kickoff:seo`:
 
-- **Title:** Kickoff: SEO
-- **Body:** Objective and first deliverables from the campaign config; the play's kickoff tasks to assign; and any remaining nonblocking gaps. Acceptance: specialist tasks have clear inputs and gaps are visible to the user.
+- **Title:** Choose the first search pages to improve
+- **Body:** Review the campaign plan and use Search Console to pick the first two pages worth improving. For each page, explain which search need it should address, link the evidence, and assign the next step to the right person. If Search Console access is missing, note what we can't verify and who can unblock it. Keep site edits and publishing out of this kickoff.

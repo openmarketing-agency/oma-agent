@@ -4,7 +4,7 @@ import base64
 import json
 from pathlib import Path
 import runpy
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
@@ -225,3 +225,45 @@ def test_stage_assets_only_reads_approved_observed_entries(visual_helper, tmp_pa
     assert visual_helper["stage_assets"](manifest, tmp_path / "library", ["backgrounds-1"],
                                          js=inspect, cdp=browser) == {"backgrounds-1": {"status": "changed"}}
     inspect.assert_called_once()
+
+
+@pytest.fixture
+def camofox_helper(visual_helper):
+    script = Path(visual_helper["__file__"]).with_name("camofox_visual_reference.py")
+    return runpy.run_path(str(script))
+
+
+@pytest.mark.parametrize(("destination_status", "evaluate_status", "challenge", "expected"), [
+    (200, 501, False, "unavailable"),
+    (403, 200, False, "blocked"),
+    (200, 200, True, "blocked"),
+])
+def test_camofox_fallback_is_for_unavailable_backends_not_blocked_sites(
+    camofox_helper, tmp_path, destination_status, evaluate_status, challenge, expected,
+):
+    url = "https://brand.example/"
+    page = {"url": url, "title": "Brand", "body": "Shop", "images": [], "blocked": challenge}
+    api = Mock()
+
+    def response(method, endpoint, **kwargs):
+        reply = MagicMock(status_code=200)
+        reply.__enter__.return_value = reply
+        if endpoint.endswith("/tabs"):
+            reply.json.return_value = {"tabId": "tab-1"}
+        elif endpoint.endswith("/navigate"):
+            reply.json.return_value = {"url": url, "httpStatus": destination_status}
+        elif endpoint.endswith("/evaluate"):
+            reply.status_code = evaluate_status
+            reply.json.return_value = {"result": page}
+        else:
+            reply.json.return_value = {"ok": True}
+        return reply
+
+    api.request.side_effect = response
+    tab = camofox_helper["CamofoxTab"](api, "http://camofox:9377")
+    output = tmp_path / "capture"
+    result = camofox_helper["run"](tab, url, output, name="home", validate=Mock())
+    assert result["status"] == expected
+    assert not output.exists()
+    assert not any(call.args[1].endswith("/screenshot") for call in api.request.call_args_list)
+    assert api.request.call_args.args == ("DELETE", f"http://camofox:9377/sessions/{tab.user}")
