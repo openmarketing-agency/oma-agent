@@ -1,0 +1,114 @@
+id: buying-intent-listening
+version: 1
+name: Buying-Intent Listening
+summary: Find people asking for what the business sells, draft a genuinely helpful reply for each that a person posts, and turn the questions that keep coming into answer pages people can link to.
+ideas: [2, 99, 16, 44]
+example: example.md
+
+fits:
+  product_types: [saas, b2b, devtool, consumer_app, local, creator, ecommerce]
+  stages: [early, growth]
+  best_when:
+    - People ask for recommendations in communities and on social media.
+    - Someone on the team can post replies from their own account a few times a week.
+  avoid_when:
+    - Nobody can post replies personally.
+
+outcome: "{audience} asking for help find a useful answer from {business} and {conversion}."
+horizon: ongoing
+time_to_signal: Replies posted within the first week; referral visits and leads within a month.
+
+requires:
+  - {channel: reddit, mode: read, fallback: research_only}
+  - {channel: reddit, mode: write, fallback: assisted}
+  - {channel: x, mode: read, fallback: research_only}
+  - {channel: x, mode: write, fallback: assisted, note: "Replies to people who didn't ask the brand are posted by a person."}
+  - {channel: blog, mode: write, fallback: assisted}
+  - {channel: analytics, mode: read, fallback: research_only, optional: true}
+
+roster:
+  - role: orchestrator
+    does: Keeps the query list sharp, picks which threads get a reply within the daily limits, and decides which recurring questions deserve an answer page.
+    per_run: The day's picked threads within limits, assigned for drafting, the next answer page chosen from recurring questions, and a review note.
+    toolsets: [file, web, skills, memory, session_search, kanban, integrations]
+    reads: [reddit, x, analytics]
+    untrusted_input: true
+    skills: [community-marketing, customer-research]
+  - role: scout
+    does: Searches communities and social media for people asking for what the business sells, and records each thread with the venue's rules.
+    per_run: Up to 15 new buying-intent threads, each with link, venue and its rules on promotion, age, what the person needs, and why it fits.
+    toolsets: [file, web, browser, skills, memory, kanban]
+    reads: [reddit, x]
+    untrusted_input: true
+    skills: [reddit-marketing, audience-research]
+  - role: responder
+    does: Drafts replies that answer the question fully on their own, mention the business only when it's a genuine fit, and disclose the affiliation.
+    per_run: A reply draft for every thread picked, each useful with the product removed, with disclosure where the product comes up and the best link.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: true
+    skills: [reply-and-comment-writer, reddit-marketing, writing-style-and-tone]
+  - role: answer-writer
+    does: Turns the questions that keep coming up into complete answer pages that replies can link to.
+    per_run: One answer page per task, covering the question, the full answer with examples, when to get help, and a call to action.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: true
+    skills: [educational-content-and-how-to, copywriting, writing-style-and-tone]
+  - role: publisher
+    does: Hands approved reply drafts to the person who posts them, records each posted URL, and publishes approved answer pages.
+    per_run: Every approved reply handed over with its thread link and its posted URL recorded, and every approved answer page published with its URL.
+    toolsets: [file, web, skills, memory, kanban, integrations]
+    writes: [reddit, x, blog]
+    untrusted_input: false
+    skills: []
+
+deliverables:
+  - {id: thread-list, what: "New buying-intent threads with venue rules", cadence: 3/week, owner: scout, approval: none}
+  - {id: reply-draft, what: "Reply draft for a picked thread", cadence: 10/week, owner: responder, approval: per_item}
+  - {id: answer-page, what: "Answer page for a recurring question", cadence: 1/week, owner: answer-writer, approval: per_item, standing_ok: true}
+
+jobs:
+  - id: campaign-review
+    owner: orchestrator
+    cadence: weekly
+    checks:
+      - Replies posted and how they were received, such as upvotes, replies and removals
+      - Referral visits from community domains and answer pages
+      - Questions that came up three or more times
+    max_items: 30
+  - id: listening
+    owner: scout
+    cadence: 3/week
+    checks:
+      - New posts matching the query list in the mapped communities and on X since the last run
+    max_items: 60
+
+kpis:
+  leading: [Replies posted, Replies kept up without removal, Answer pages published]
+  lagging: [Referral visits from communities, Leads that name a community or answer page]
+  targets: after_baseline
+  baseline_weeks: 4
+
+limits:
+  max_replies_per_community_per_day: 2
+  product_mention_share_percent: 20
+  automated_replies_to_strangers: 0
+
+slots:
+  - {id: business, required: true, source: brand, ask: "What the business sells, in one sentence."}
+  - {id: audience, required: true, source: playbook, ask: "Who asks for it."}
+  - {id: conversion, required: true, source: playbook, ask: "What a helped person should do next."}
+  - {id: queries, required: true, source: research, ask: "Phrases people use when they need this, such as 'need an accountant for'."}
+  - {id: poster, required: true, source: brand, ask: "Who posts replies from their own account."}
+
+kickoff:
+  - {owner: scout, task: "Run the first search across the mapped communities and record 15 threads."}
+  - {owner: responder, task: "Draft replies for the five best threads."}
+  - {owner: answer-writer, task: "Write the first answer page for the most common question."}
+
+plan:
+  - Post the first five replies and publish the first answer page.
+  - Keep ten replies a week within each community's rules, and one answer page a week.
+  - Link replies to answer pages where the venue allows links.
+  - Review weekly and focus on the communities whose threads lead to visits and leads.
+
+rules: rules.md

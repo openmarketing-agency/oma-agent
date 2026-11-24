@@ -23,7 +23,7 @@ Research, create, inspect, and update the single OMA brand for this workspace. T
 
 ## Prerequisites
 
-Resolve the default profile's home with `hermes -p default config path`. Use `<home>/oma/brand/`, never another profile, the current directory, or a per-brand ID directory. Use `web_extract` and `web_search` for public sources, `browser_exec` for rendered pages, network evidence, and screenshots, and `terminal` with Git for static repository inspection. If a required capability is unavailable, finish the accessible checks and report the gap; do not bypass access controls.
+Resolve the default profile's home with `hermes -p default config path`. Use `<home>/oma/brand/`, never another profile, the current directory, or a per-brand ID directory. Use `web_extract` and `web_search` for public sources, `browser_exec` for network evidence, and `terminal` with Git for static repository inspection. For screenshots and rendered visual asset discovery, use Camofox first if it is available to this profile, then fall back to the Hermes browser (`browser_exec`) when Camofox is unavailable. Do not switch browsers to retry a site denial, login wall, or challenge.
 
 ## How to Run
 

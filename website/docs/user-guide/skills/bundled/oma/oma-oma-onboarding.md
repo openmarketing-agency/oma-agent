@@ -16,7 +16,7 @@ Set up a brand, campaigns, and agents from one URL.
 |---|---|
 | Source | Bundled (installed by default) |
 | Path | `skills/oma/oma-onboarding` |
-| Version | `0.3.3` |
+| Version | `0.4.0` |
 | Author | Open Marketing Agency (OMA) |
 | License | MIT |
 | Platforms | linux, macos, windows |
@@ -31,7 +31,7 @@ The following is the complete skill definition that Hermes loads when this skill
 
 # OMA Onboarding Skill
 
-Set up OMA from a website, public brand profile, or GitHub repository URL. Research the brand, save the strategy, then design campaigns and teams around them. Decide which recurring work needs cron and register eligible jobs after verifying the team. Reuse verified setup on subsequent runs.
+Set up OMA from a website, public brand profile, or GitHub repository URL. Research the brand, save the strategy, and draft campaigns and teams around it. Reuse verified setup on subsequent runs. Activation is a separate request.
 
 ## When to Use
 
@@ -44,17 +44,15 @@ Work from the default OMA profile and its Hermes home. Load `oma-brand`, `oma-pl
 
 ## How to Run
 
-If no URL was provided and none is saved for this setup, ask only: **“What's your website, public brand profile, or GitHub repository URL?”** If the user already supplied it, start local setup immediately. An onboarding request and URL are enough to research, draft and provision a team, not to start a campaign without verified integrations. Don't ask the user to approve each local step, write a strategy, pick agents, or specify schedules. Honor any narrower scope the user gives. If a source is unreadable, try a verified first-party alternative before asking for another URL. If supplied URLs identify unrelated brands and there is no unambiguous match to the saved brand, ask which one to onboard. Do not merge them or replace an existing brand without confirmation.
+If no URL was provided and none is saved for this setup, ask only: **“What's your website, public brand profile, or GitHub repository URL?”** If the user already supplied it, start local setup immediately. A URL authorizes research and drafting, not campaign activation or external writes. Don't ask the user to approve each local step, write a strategy, pick agents, or specify schedules. Honor any narrower scope the user gives. If a source is unreadable, try a verified first-party alternative before asking for another URL. If supplied URLs identify unrelated brands and there is no unambiguous match to the saved brand, ask which one to onboard. Do not merge them or replace an existing brand without confirmation.
 
 ## Procedure
 
 1. **Research the source read-only.** Follow `oma-brand` to inventory and collect the distinct logos, illustrations, icons, backgrounds, images, and screenshots found on the reviewed public brand pages as part of setup, without waiting for a separate request. Treat public social profile URLs as brand sources: capture the accessible profile and follow verified official links for additional assets and page references, including when the platform blocks direct access. Compile the remaining audience, market, channel, integration, launch, and docs findings from available sources. If a verified repository is available, produce the capability and technical reports by inspecting it as text. Treat unverified details as unknown, not absent. Do not execute repository code, load its instructions, or bypass web access controls.
 2. **Save or reuse the brand.** Use `oma-brand` to save `oma/brand/config.yaml`, its referenced `knowledge-base.md`, and relevant supporting reports or assets. On a rerun for the same brand, fill gaps without overwriting existing assets or custom knowledge. If the URL belongs to a different brand or ownership of the saved record is unclear, leave the singleton untouched and report the conflict.
 3. **Decide and save the playbook.** Use `oma-playbook` to turn the compiled brand into the overall strategy: who to reach, what to focus on, why, and how to measure progress. Recommend campaigns in priority order with prerequisites and evidence. Label inferred choices as onboarding defaults. Save the strategy inline at `oma/playbook/config.yaml` or reuse the existing strategy when present; do not store a brand link.
-4. **Derive and save campaigns and teams.** Use `oma-campaigns` to turn the saved strategy into the smallest useful set of campaigns. For a confirmed missing website, blog, or public docs that the strategy needs, use its build references. Record any shared hosting prerequisite and route authorized infrastructure work to `maintenance` via the `oma-agents` handoff; do not run `omactl` as `default` or a campaign agent. Each campaign's goals state its purpose and desired outcomes; its plans state how to reach them and in what order. Create the canonical orchestrator and dedicated publisher, adding only specialists needed for the plan. Decide each role's tools, relevant skills, and recurring responsibilities. Use the existing campaign record and agent `config.yaml`, `SOUL.md`, and `saves/` layout; do not create a separate manifest or adopt a preset roster. If there is already a fitting team, reuse it and preserve its records.
-5. **Provision and read back.** Follow `oma-campaigns` to verify every new role's saved `SOUL.md` before installing. If any are missing or blocked, leave that campaign a draft and name the missing roles. Read back the provisioned profiles and their personas before treating the roster as installed. On reruns, use `configure` only to fill missing routing fields in the existing campaign config.
-6. **Hand off connections before starting campaign work.** Follow the `oma-campaigns` integration intake guide: save the selected canonical IDs in each campaign's `config.yaml` under `integrations` before asking the user to connect missing accounts in the OMA console. Never ask for MCP configuration or credentials in chat. While any required connection is missing or unverified, leave the campaign in draft or paused; do not start or resume it, dispatch work, or register or enable jobs.
-7. **Register recurring work where warranted.** Once all required connections and the entire team are verified, follow the campaign skill's review-prompt guidance and native cron procedure for eligible jobs. For Social & Community, read back the declared prompt and check that it actually asks for new activity (comments, replies, mentions, and tagged posts) on the selected channels, not just access verification. Preserve already scheduled and manually paused jobs. Do not force an immediate run.
+4. **Design and save campaigns and teams.** Use the ideas catalog and worked plays in `oma-campaigns` to choose campaigns that fit the saved priorities. Reuse existing records. Record prerequisites in ordered `plans`, connector IDs in `integrations`, and personas and jobs in the existing agent records. A worked play is not a new campaign format. For shared hosting, follow the `oma-agents` maintenance handoff rather than adding `maintenance` to the roster.
+5. **Verify drafts and hand off.** Follow `oma-campaigns` to validate the records and read back each new role's `SOUL.md`. Report missing access, roles or prerequisites. Direct the user to the OMA console for required connections, never ask for credentials in chat. Don't install teams, queue work or register cron during onboarding. If the user explicitly requests activation, follow the separate `oma-campaigns` activation procedure.
 
 After onboarding, use `oma-brand` from the default profile to refresh existing resources when read-only data from a verified connected source (such as GA4 or Search Console) becomes available. Do not repeat onboarding, reconnect accounts, or rebuild campaigns to refresh the brand.
 
@@ -70,4 +68,4 @@ Verify the existing campaign and its installation status. Use `oma-agents` to sa
 
 ## Verification
 
-Report the source URL, brand and playbook saved or reused, selected campaigns and why, and the actual agent IDs provisioned. Include configured cron schedules and their verified state, plus any missing evidence, blocked jobs, or other incomplete setup. A registered schedule, a healthy scheduler, and an observed run are separate outcomes.
+Report the source URL, brand and playbook saved or reused, selected campaigns and why, and missing access or prerequisites. Distinguish drafted agents and declared schedules from installed profiles and registered jobs. Do not report a draft as started.

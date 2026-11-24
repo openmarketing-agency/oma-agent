@@ -93,7 +93,9 @@ installation marker is absent from the snapshot if installation hasn't finished
 when the record is created. The `default` profile gets `oma-agents`, `oma-brand`,
 `oma-campaigns`, `oma-onboarding`, and `oma-playbook`; `maintenance` gets `omactl`.
 These starter skills don't need `oma_skills` entries. Docker places their
-source packages under `oma-bundle/skills/oma/`.
+source packages under `oma-bundle/skills/oma/`. The general `open-webui`
+integration is bundled separately under `skills/integrations/` and synced only
+to `default`.
 
 Use [Agent Sync](#sync-saved-oma-settings) to apply edits to one standalone or campaign agent.
 
@@ -232,6 +234,11 @@ candidates from observed `integrations` and verified `channels.social` in
 `x` in OMA records; `google_analytics` and `twitter` are Composio toolkit slugs.
 This list records which integrations the campaign needs for its work; it does
 not gate resume. Use `wordpress-com` for the Composio toolkit `wordpress_com`.
+
+Set `integration_categories: ["social media accounts", analytics]` in the campaign
+record to suggest types of tools, including before choosing a connector. Use exact
+labels from `hermes_cli/oma_campaigns/schemas/composio-categories.json`. The list is
+optional, and does not connect accounts or replace the IDs in `integrations`.
 
 ### Shared brand and playbook
 

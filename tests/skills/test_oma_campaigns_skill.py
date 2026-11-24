@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+from importlib.resources import files
 from pathlib import Path
 
 import pytest
@@ -125,7 +126,9 @@ def test_campaign_resume_requires_saved_model_but_not_connected_integrations(bun
     home, source, main = bundle
     config = source / "campaigns" / "demo" / "config.yaml"
     declared = ["google-analytics", "workspace-managed-tool"]
-    atomic_config_write(config, {**read_mapping(config), "integrations": declared})
+    suggested = ["analytics", "social media accounts"]
+    atomic_config_write(config, {**read_mapping(config), "integrations": declared,
+                                 "integration_categories": suggested})
     assert main(["install", "demo"]) == 0
     assert json.loads(capsys.readouterr().out)["lifecycle_state"] == "paused"
     assert kanban_db.board_exists("campaign-demo")
@@ -141,7 +144,9 @@ def test_campaign_resume_requires_saved_model_but_not_connected_integrations(bun
     assert not (home / "profiles" / "demo__orchestrator" / "cron" / "jobs.json").exists()
     assert main(["lifecycle", "demo", "paused"]) == 0
     assert sync_campaign(home, "demo")["id"] == "demo"
-    assert read_mapping(config)["integrations"] == declared
+    record = read_mapping(config)
+    assert record["integrations"] == declared
+    assert record["integration_categories"] == suggested
 
 
 def test_campaign_pause_blocks_gateway_cron_and_kanban_without_editing_job_state(bundle, capsys):
@@ -788,6 +793,62 @@ def test_campaign_helper_uses_installed_runtime(bundle, run_campaign_script):
     result = run_campaign_script(helper, "validate", "campaign", str(source / "campaigns" / "demo" / "config.yaml"))
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {"kind": "campaign", "valid": True}
+
+
+def test_social_play_drafts_hourly_jobs_without_installing(bundle, run_campaign_script):
+    from cron.jobs import parse_schedule
+    from hermes_cli._startup_fast import project_root_str
+    from hermes_cli.config import atomic_config_write
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, _ = bundle
+    root = Path(project_root_str())
+    skill = root / "skills/oma/oma-campaigns"
+    campaign = source / "campaigns/demo/config.yaml"
+    atomic_config_write(campaign, {**read_mapping(campaign), "integrations": ["instagram"]})
+    before = campaign.read_bytes()
+    result = run_campaign_script(skill / "scripts/campaign.py", "validate", "campaign", str(campaign))
+    assert result.returncode == 0, result.stderr
+    jobs = {}
+    for owner in ("orchestrator", "publisher"):
+        result = run_campaign_script(skill / "scripts/plays.py", "jobs", "demo", "--home", str(home), "--json",
+                                     "--play", "comment-to-dm", "--agent", owner,
+                                     "--sources", "Verified Instagram comments", PYTHONPATH=str(root))
+        assert result.returncode == 0, result.stdout + result.stderr
+        entries = json.loads(result.stdout)["scheduled"]
+        assert all(entry["agent"] == f"demo__{owner}" for entry in entries)
+        jobs.update((entry["job"]["id"], entry) for entry in entries)
+    for job_id, owner in (("campaign-review", "orchestrator"), ("keyword-replies", "publisher")):
+        entry = jobs[job_id]
+        assert entry["agent"] == f"demo__{owner}"
+        job = entry["job"]
+        assert parse_schedule(job["schedule"])["kind"] == "cron"
+        assert job["schedule"].split()[1:] == ["*"] * 4
+        assert "Verified Instagram comments" in job["prompt"]
+        assert "Do not post or send messages" in job["prompt"]
+    assert jobs["performance-review"]["job"]["schedule"].split()[-1] != "*"
+    assert campaign.read_bytes() == before
+    assert not (home / "profiles").exists()
+
+
+def test_bundled_plays_show_valid_existing_campaign_records():
+    import hermes_yaml as yaml
+    from hermes_cli.oma_campaigns.integrations import integration_catalog
+    from hermes_cli.oma_campaigns.schema import validate_record
+
+    skill = Path(__file__).resolve().parents[2] / "skills/oma/oma-campaigns"
+    examples = sorted((skill / "plays").glob("*/example.md"))
+    assert examples
+    resource = files("hermes_cli.oma_campaigns").joinpath("schemas", "composio-categories.json")
+    categories = json.loads(resource.read_text(encoding="utf-8"))["categories"]
+    integrations = integration_catalog()
+    for path in [*examples, skill / "references/records.md"]:
+        raw = path.read_text(encoding="utf-8").split("```yaml\n", 1)[1].split("```", 1)[0]
+        record = yaml.safe_load(raw)
+        validate_record("campaign", record, path)
+        assert set(record["integrations"]) <= integrations.keys(), path
+        assert record["integration_categories"], path
+        assert set(record["integration_categories"]) <= categories.keys(), path
 
 
 def test_sync_campaign_script_accepts_explicit_env_but_never_imports_ambient_values(bundle, capsys, run_campaign_script):

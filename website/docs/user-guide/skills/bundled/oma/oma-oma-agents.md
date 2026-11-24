@@ -50,7 +50,7 @@ When drafting a record, load the matching reference with `skill_view` (`name: om
 | --- | --- |
 | [Base agent (researcher)](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-agents/references/base-agent-template.md) | Investigate a campaign question and hand back evidence. |
 | [Orchestrator](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-agents/references/orchestrator-template.md) | Plan work, assign tasks, and run a bounded recurring review. |
-| [Social media orchestrator](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-agents/references/social-media-orchestrator-template.md) | Check new social activity every 30 minutes and queue follow-up. |
+| [Social media orchestrator](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-agents/references/social-media-orchestrator-template.md) | Check new social activity hourly and queue follow-up. |
 | [Product Hunt orchestrator](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-agents/references/product-hunt-orchestrator-template.md) | Review new products and substantial features for launch every 10 days. |
 | [Publisher](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-agents/references/publisher-template.md) | Apply authorized revisions and verify the live result. |
 | [Writer](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-agents/references/writer-template.md) | Draft and revise copy without publishing it. |

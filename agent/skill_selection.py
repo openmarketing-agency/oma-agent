@@ -19,6 +19,7 @@ OMA_DEFAULT_STARTER_SKILLS = frozenset({
 OMA_DEFAULT_ONLY_SKILLS = OMA_RETIRED_SKILLS | OMA_DEFAULT_STARTER_SKILLS
 OMA_MAINTENANCE_ONLY_SKILLS = frozenset({"omactl"})
 OMA_SKILL_INVENTORY = ".oma-managed.json"
+DEFAULT_ONLY_BUNDLED_SKILLS = frozenset({"open-webui"})
 
 
 @lru_cache(maxsize=16)
@@ -52,10 +53,10 @@ def profile_excluded_skills(home: Path | None = None, *, include_pruned: bool = 
         excluded = OMA_RETIRED_SKILLS | OMA_MAINTENANCE_ONLY_SKILLS
         starters = OMA_DEFAULT_STARTER_SKILLS
     elif resolved == root / "profiles" / "maintenance":
-        excluded = OMA_DEFAULT_ONLY_SKILLS
+        excluded = OMA_DEFAULT_ONLY_SKILLS | DEFAULT_ONLY_BUNDLED_SKILLS
         starters = OMA_MAINTENANCE_ONLY_SKILLS
     else:
-        return OMA_DEFAULT_ONLY_SKILLS | OMA_MAINTENANCE_ONLY_SKILLS
+        return OMA_DEFAULT_ONLY_SKILLS | OMA_MAINTENANCE_ONLY_SKILLS | DEFAULT_ONLY_BUNDLED_SKILLS
     # Old sync inventories could hide starters that are now independent of extras.
     return excluded | (_profile_pruned_skills(home) - starters) if include_pruned else excluded
 

@@ -1,0 +1,111 @@
+id: review-asks
+version: 1
+name: Review Asks and Replies
+summary: Ask every recent customer for an honest review, reply to every review that comes in, and keep the Business Profile active with weekly posts.
+ideas: [144, 143, 125]
+example: example.md
+
+fits:
+  product_types: [local, ecommerce, saas, b2b]
+  stages: [early, growth]
+  best_when:
+    - Customers choose by star rating and review count, as for local services.
+    - There is a reliable list of recent customers with permission to email them.
+  avoid_when:
+    - There is no way to reach customers after the visit or purchase.
+
+outcome: "More {audience} leave honest reviews of {business}, and more people searching nearby {conversion}."
+horizon: ongoing
+time_to_signal: New reviews within the first two weeks of requests; profile actions within a month.
+
+requires:
+  - {channel: business_profile, mode: write, fallback: assisted}
+  - {channel: business_profile, mode: read, fallback: research_only}
+  - {channel: email, mode: write, fallback: assisted}
+  - {channel: crm, mode: read, fallback: none, note: "The appointment or customer list the requests go to."}
+
+roster:
+  - role: orchestrator
+    does: Defines each week's request cohort, watches review volume and themes, and passes recurring complaints to the business.
+    per_run: This week's cohort defined from the customer list, the request batch queued, and a review note on new reviews, rating and themes.
+    toolsets: [file, web, skills, memory, session_search, kanban, integrations]
+    reads: [business_profile, crm]
+    untrusted_input: true
+    skills: [social-proof-and-testimonials]
+  - role: request-writer
+    does: Writes the neutral review request and reminder, personalized only by first name and visit date.
+    per_run: The week's request batch, with one request per customer in the cohort and the reminder for last week's non-responders, all from the approved template.
+    toolsets: [file, web, skills, memory, kanban, integrations]
+    reads: [crm]
+    untrusted_input: false
+    skills: [emails, copywriting]
+  - role: reply-writer
+    does: Drafts a reply to every new review, warm and specific without revealing anything the reviewer didn't say.
+    per_run: A reply draft for every new review since the last run, with negative reviews flagged to the owner with a suggested private follow-up.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: true
+    skills: [reply-and-comment-writer, crisis-and-moderation, writing-style-and-tone]
+  - role: post-writer
+    does: Writes the weekly Business Profile post about the team, a service, a seasonal reminder or an update.
+    per_run: One Business Profile post with text, a photo brief and a call-to-action button.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: false
+    skills: [copywriting]
+  - role: publisher
+    does: Sends approved requests by email, posts approved replies and profile posts through the Business Profile API, and records each one.
+    per_run: Every approved request sent, every approved reply and post published, and each recorded with its link or send log.
+    toolsets: [file, web, skills, memory, kanban, integrations]
+    writes: [business_profile, email]
+    untrusted_input: false
+    skills: []
+
+deliverables:
+  - {id: request-batch, what: "Review requests to every customer in the week's cohort, plus reminders", cadence: weekly, owner: request-writer, approval: batch, standing_ok: true}
+  - {id: review-reply, what: "Reply to a new review", cadence: per_event, owner: reply-writer, approval: per_item, standing_ok: true}
+  - {id: profile-post, what: "Business Profile post", cadence: 1/week, owner: post-writer, approval: per_item, standing_ok: true}
+
+jobs:
+  - id: campaign-review
+    owner: orchestrator
+    cadence: weekly
+    checks:
+      - New reviews, star ratings and recurring themes since the last run
+      - Requests sent and responses
+      - Profile calls, direction requests and website clicks
+    max_items: 50
+  - id: new-reviews
+    owner: reply-writer
+    cadence: daily
+    checks:
+      - New reviews on each profile without a reply
+    max_items: 20
+
+kpis:
+  leading: [Requests sent, Response rate, New reviews per week]
+  lagging: [Average rating, Review count, Profile calls and direction requests]
+  targets: after_baseline
+  baseline_weeks: 4
+
+limits:
+  requests_per_customer_per_visit: 1
+  reminders_per_request: 1
+  incentives_offered: 0
+
+slots:
+  - {id: business, required: true, source: brand, ask: "The business name and its locations."}
+  - {id: audience, required: true, source: playbook, ask: "Who the customers are."}
+  - {id: conversion, required: true, source: playbook, ask: "What people searching nearby should do, such as book an appointment."}
+  - {id: cohort_source, required: true, source: integration, ask: "Where the list of recent customers comes from."}
+
+kickoff:
+  - {owner: request-writer, task: "Write the request and reminder templates for approval."}
+  - {owner: reply-writer, task: "Draft replies to every review from the last 90 days that has none."}
+  - {owner: post-writer, task: "Write the first two profile posts."}
+
+plan:
+  - Reply to every unanswered review and publish the first profile post.
+  - Send requests weekly to every customer from the past week, with one reminder.
+  - Reply to every new review within two business days and post weekly.
+  - Pass recurring complaints in reviews to the business owner each month.
+
+rules: rules.md

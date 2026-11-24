@@ -1,0 +1,104 @@
+id: show-hn-launch
+version: 1
+name: Show HN Launch
+summary: Ship a real release people can try, with a README, demo, release notes and a Show HN fact sheet the maker posts from, then turn launch-day attention into users and contributors.
+ideas: [111, 116, 110]
+example: example.md
+
+fits:
+  product_types: [devtool, oss, saas]
+  stages: [launch, early, growth]
+  best_when:
+    - There is something new that developers can try today, ideally without signing up.
+    - The maker can spend launch day answering comments personally.
+  avoid_when:
+    - The release is a landing page, waitlist or fundraise.
+
+outcome: "{audience} try {product} on launch day and the launch cohort reaches {conversion}."
+horizon: 4w
+time_to_signal: Launch-day visits and stars within 24 hours; activation of the launch cohort within 14 days.
+
+requires:
+  - {channel: hacker_news, mode: write, fallback: assisted}
+  - {channel: hacker_news, mode: read, fallback: research_only}
+  - {channel: github, mode: write, fallback: assisted}
+  - {channel: github, mode: read, fallback: research_only}
+  - {channel: analytics, mode: read, fallback: research_only, optional: true}
+  - {channel: site, mode: write, fallback: assisted, optional: true, note: "Launch page and docs links."}
+
+roster:
+  - role: orchestrator
+    does: Owns the launch date, the readiness checklist and the launch-day run sheet, and decides go or no-go from the checklist.
+    per_run: The readiness checklist updated with what passed, what's blocking and who owns it, and the next assets queued until launch.
+    toolsets: [file, web, skills, memory, session_search, kanban, integrations]
+    reads: [github, analytics, hacker_news]
+    untrusted_input: true
+    skills: [launch, analytics]
+  - role: launch-writer
+    does: Writes the launch assets from the release itself, plainly, with nothing on the roadmap presented as shipped.
+    per_run: One finished launch asset per task, such as the README rewrite, release notes, the Show HN fact sheet, the launch blog post or the recap.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: true
+    skills: [launch, copywriting, educational-content-and-how-to, writing-style-and-tone]
+  - role: demo-builder
+    does: Builds the demo that proves the release works, from a clean environment, with real commands and real output.
+    per_run: One runnable demo per task, such as a copy-paste quickstart verified in a fresh container, a terminal recording script, or a sample repository.
+    toolsets: [file, terminal, web, skills, memory, kanban]
+    untrusted_input: false
+    skills: [educational-content-and-how-to]
+  - role: publisher
+    does: Ships approved GitHub changes and site pages, and packages the Show HN fact sheet for the maker, who writes and posts the submission.
+    per_run: Every approved README, release and page change shipped with its URL recorded, and the fact sheet handed to the maker with the submission link recorded once they post.
+    toolsets: [file, web, skills, memory, kanban, integrations]
+    writes: [github, hacker_news, site]
+    untrusted_input: false
+    skills: []
+
+deliverables:
+  - {id: readme, what: "README rewritten around what it does, a 60-second quickstart and a demo", cadence: once, owner: launch-writer, approval: per_item}
+  - {id: quickstart, what: "Copy-paste quickstart verified in a clean environment", cadence: once, owner: demo-builder, approval: per_item}
+  - {id: demo-recording, what: "Terminal recording or GIF of the quickstart", cadence: once, owner: demo-builder, approval: per_item}
+  - {id: release-notes, what: "Release notes with breaking changes first", cadence: once, owner: launch-writer, approval: per_item}
+  - {id: fact-sheet, what: "Show HN fact sheet for the maker: what, how to try, how it's built, limits, likely questions", cadence: once, owner: launch-writer, approval: per_item}
+  - {id: launch-post, what: "Launch blog post or announcement", cadence: once, owner: launch-writer, approval: per_item}
+  - {id: recap, what: "Launch recap with visits, stars, installs, top feedback and follow-up fixes", cadence: once, owner: launch-writer, approval: none}
+
+jobs:
+  - id: campaign-review
+    owner: orchestrator
+    cadence: 2/week
+    checks:
+      - Readiness checklist items closed and still open
+      - New GitHub issues and discussions since the last run
+      - On and after launch day, new comments on the Show HN thread and their answers
+    max_items: 40
+
+kpis:
+  leading: [Readiness checklist done 3 days before launch, Launch-day visits and stars, Time to answer launch comments]
+  lagging: [Launch cohort reaching first successful use within 14 days, New contributors]
+  targets: after_baseline
+  baseline_weeks: 1
+
+limits:
+  show_hn_posts_per_launch: 1
+  vote_requests: 0
+
+slots:
+  - {id: product, required: true, source: brand, ask: "What the project does, in one sentence."}
+  - {id: audience, required: true, source: playbook, ask: "Which developers it's for."}
+  - {id: release, required: true, source: research, ask: "What is new and can be tried today."}
+  - {id: conversion, required: true, source: playbook, ask: "What first success looks like, such as a first successful run."}
+  - {id: maker, required: true, source: brand, ask: "Who posts the Show HN and answers comments."}
+
+kickoff:
+  - {owner: demo-builder, task: "Run the quickstart in a fresh container and fix or document every step that fails."}
+  - {owner: launch-writer, task: "Draft the new README around the verified quickstart."}
+  - {owner: orchestrator, task: "Set the launch date and fill the readiness checklist."}
+
+plan:
+  - Ship the verified quickstart and the new README.
+  - Record the demo, write the release notes and the Show HN fact sheet.
+  - Launch when the checklist passes; the maker posts and answers every comment.
+  - Follow up within a week with fixes the comments asked for and a recap.
+
+rules: rules.md

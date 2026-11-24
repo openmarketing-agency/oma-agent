@@ -175,6 +175,15 @@ const sidebars: SidebarsConfig = {
                 },
                 {
                   type: 'category',
+                  label: 'integrations',
+                  key: 'skills-bundled-integrations',
+                  collapsed: true,
+                  items: [
+                    'user-guide/skills/bundled/integrations/integrations-open-webui',
+                  ],
+                },
+                {
+                  type: 'category',
                   label: 'oma',
                   key: 'skills-bundled-oma',
                   collapsed: true,

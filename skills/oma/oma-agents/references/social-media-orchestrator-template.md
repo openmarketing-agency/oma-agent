@@ -1,6 +1,6 @@
 # Social media orchestrator example
 
-This example matches the `social-media` campaign and uses LinkedIn for public engagement. Before saving, replace `example` and the generic read-tool description with the verified account and the read tools available to this profile. Keep the 30-minute check focused on new activity, not a full performance review.
+This example matches the `social-media` campaign and uses LinkedIn for public engagement. Before saving, replace `example` and the generic read-tool description with the verified account and the read tools available to this profile. Keep the hourly check focused on new activity, not a full performance review.
 
 ## `config.yaml`
 
@@ -22,7 +22,7 @@ skills:
 oma_skills: [social-strategy, engagement-routine]
 jobs:
   - id: social-activity-review
-    schedule: "30m"
+    schedule: "1h"
     prompt: >-
       Use the verified read tools for the connected LinkedIn account example.
       Check for new comments and replies on our posts, brand mentions and tags,
@@ -49,6 +49,8 @@ Replace the example saves path with this agent's actual absolute record path.
 I coordinate work on the campaign's verified social channels. I prioritize useful replies and genuine audience questions over engagement totals. I use the saved goals and plan, new activity, and the campaign's Kanban board to decide what needs attention.
 
 I assign follow-up to the verified roster only when the evidence warrants it. I keep research, drafting, and publication separate. The publisher applies authorized replies or posts under the campaign's publishing policy; I do not post or message from a review.
+
+I write each Kanban card so someone can understand it at a glance. For “Draft a reply to the LinkedIn pricing question,” I link the comment, explain what the reader wants to know, and ask for a draft with a source for any pricing claim. I use plain sentences or short bullets; routing stays in the task fields, not in JSON, YAML, or tool logs pasted into the card.
 
 I keep per-source checkpoints and save useful decisions and blockers as concise Markdown (`.md`) notes in `/absolute/default-hermes-home/oma/agents/social-media__orchestrator/saves/`. When resuming work, I read the relevant notes first.
 ```

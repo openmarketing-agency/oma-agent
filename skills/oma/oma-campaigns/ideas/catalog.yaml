@@ -1,0 +1,1538 @@
+# Campaign ideas. Pick from these first, remix them, and invent only when no idea fits a playbook priority.
+# 'for' is a hint, not a filter. 'gate' suggests a prerequisite to record in the campaign plans.
+# 'example' names the play that shows similar work for one business. Plays are examples, not templates.
+catalog_version: 1
+ideas:
+- id: 1
+  name: Competitor watch
+  what: Sends a weekly digest of competitor launches, pricing, content and messaging changes.
+  integrations:
+  - Hermes web + browser
+  - Telegram
+  for:
+  - All
+  section: Always on
+  example: buying-intent-listening
+- id: 2
+  name: Buying-intent listening
+  what: Finds people asking for what you sell and queues a helpful reply for each one.
+  integrations:
+  - Reddit
+  - X
+  - Hacker News search
+  for:
+  - All
+  section: Always on
+  example: buying-intent-listening
+- id: 3
+  name: Newsjacking
+  what: Posts a fast expert take with a graphic whenever the niche makes news.
+  integrations:
+  - Hermes web
+  - X
+  - LinkedIn
+  for:
+  - All
+  section: Always on
+  example: buying-intent-listening
+- id: 4
+  name: Trend radar
+  what: Lists rising formats, sounds and hashtags each day and makes the brand's version the same day.
+  integrations:
+  - ScrapeCreators
+  - GetAnyAPI
+  - TikTok
+  - Instagram
+  for:
+  - All
+  section: Always on
+  example: daily-shorts
+- id: 5
+  name: Content gap finder
+  what: Finds topics competitors get traffic or views for that you haven't covered.
+  integrations:
+  - Search Console
+  - YouTube Transcript
+  - Hermes web
+  for:
+  - All
+  section: Always on
+  example: seo-blog-engine
+- id: 6
+  name: Repurpose everything
+  what: Turns each piece into a thread, a carousel, a short and a newsletter item.
+  integrations:
+  - All social
+  - Listmonk
+  for:
+  - All
+  section: Always on
+  example: daily-shorts
+- id: 7
+  name: Weekly founder report
+  what: Sends what ran, what worked and what's next to your chat.
+  integrations:
+  - Umami
+  - Search Console
+  - Telegram or WhatsApp
+  for:
+  - All
+  section: Always on
+  example: null
+- id: 8
+  name: SEO blog engine
+  what: Researches, writes, humanizes, verifies and publishes articles on a schedule.
+  integrations:
+  - WordPress or Ghost
+  - Search Console
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 9
+  name: Glossary hub
+  what: Gives every industry term its own page that links into the product.
+  integrations:
+  - WordPress
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 10
+  name: '"Best X for Y" roundups'
+  what: Fair roundups for buying-intent searches that include you.
+  integrations:
+  - WordPress
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 11
+  name: Alternatives and vs pages
+  what: '"X alternative" and "X vs Y" pages for every competitor.'
+  integrations:
+  - WordPress
+  for:
+  - SaaS
+  - OSS
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 12
+  name: Integration pages
+  what: One page for every tool you work with.
+  integrations:
+  - WordPress
+  for:
+  - SaaS
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 13
+  name: Use-case and industry pages
+  what: Programmatic pages for each use case, role or industry.
+  integrations:
+  - WordPress
+  - Search Console
+  for:
+  - SaaS
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 14
+  name: Yearly statistics page
+  what: A roundup of niche stats that bloggers and journalists link to.
+  integrations:
+  - WordPress
+  - Hermes web
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 15
+  name: Pillar guides
+  what: Long guides that anchor each topic cluster.
+  integrations:
+  - WordPress
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 16
+  name: Reddit questions into articles
+  what: Real community questions become posts.
+  integrations:
+  - Reddit
+  - WordPress
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 17
+  name: Videos into articles
+  what: Each video becomes an SEO post with the video embedded.
+  integrations:
+  - YouTube Transcript
+  - WordPress
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 18
+  name: Rank-drop rescue
+  what: Spots pages losing clicks, rewrites them and resubmits them for indexing.
+  integrations:
+  - Search Console
+  - WordPress
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 19
+  name: Quarterly refresh
+  what: Updates top posts with new data to hold rankings.
+  integrations:
+  - Search Console
+  - Ghost or WordPress
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 20
+  name: Featured snippet sniping
+  what: Rewrites intros to win the answer box.
+  integrations:
+  - Search Console
+  - WordPress
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 21
+  name: Technical SEO sweep
+  what: Fixes speed, images, alt text, schema and broken links.
+  integrations:
+  - WordPress
+  - Hermes browser
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 22
+  name: AI answer-engine seeding
+  what: Builds the pages and community presence AI assistants cite.
+  integrations:
+  - WordPress
+  - Reddit
+  - Hermes web
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 23
+  name: Analytics-driven page fixes
+  what: Finds weak pages in analytics and ships copy and call-to-action fixes.
+  integrations:
+  - Umami
+  - WordPress
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 24
+  name: Free template gallery
+  what: Downloadable templates on indexable pages, with an email gate.
+  integrations:
+  - WordPress
+  - Listmonk
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 25
+  name: Free tool magnet
+  what: A small grader or calculator that captures emails and gets shared.
+  integrations:
+  - WordPress
+  - Listmonk
+  for:
+  - SaaS
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 26
+  name: Docs that rank
+  what: Rewrites docs to answer "how to" searches.
+  integrations:
+  - WordPress
+  - Search Console
+  for:
+  - SaaS
+  - OSS
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 27
+  name: Multilingual top pages
+  what: Translates the 20 best pages into new languages.
+  integrations:
+  - WordPress
+  for:
+  - All
+  section: Website, SEO and blog
+  example: seo-blog-engine
+- id: 28
+  name: Unlinked mentions
+  what: Asks sites that mention you without a link to add one.
+  integrations:
+  - Hermes web
+  - Gmail
+  for:
+  - All
+  section: Links and PR
+  example: podcast-tour
+- id: 29
+  name: Broken link building
+  what: Offers your page to replace dead links on resource pages.
+  integrations:
+  - Hermes browser
+  - Gmail
+  for:
+  - All
+  section: Links and PR
+  example: podcast-tour
+- id: 30
+  name: Journalist source requests
+  what: Answers reporters looking for expert quotes, using founder quotes.
+  integrations:
+  - Gmail
+  for:
+  - All
+  section: Links and PR
+  example: podcast-tour
+  note: Answer only where the founder has real expertise; quotes are the founder's own words.
+- id: 31
+  name: Expert roundup
+  what: Asks 30 experts one question; they share the post when it's live.
+  integrations:
+  - Gmail
+  - WordPress
+  for:
+  - All
+  section: Links and PR
+  example: podcast-tour
+- id: 32
+  name: Guest post swaps
+  what: Trades posts with peer blogs.
+  integrations:
+  - Gmail
+  for:
+  - All
+  section: Links and PR
+  example: podcast-tour
+- id: 33
+  name: Best-of and award submissions
+  what: Gets you into roundup articles and awards.
+  integrations:
+  - Hermes web
+  - Gmail
+  for:
+  - All
+  section: Links and PR
+  example: podcast-tour
+- id: 34
+  name: Directory submissions
+  what: Fills SaaS, AI and open-source directory forms; you clear the CAPTCHAs.
+  integrations:
+  - Camofox browser
+  for:
+  - SaaS
+  - OSS
+  section: Links and PR
+  example: podcast-tour
+- id: 35
+  name: Founder story pitch
+  what: Writes the origin story and pitches it to media.
+  integrations:
+  - Ghost
+  - Gmail
+  for:
+  - All
+  section: Links and PR
+  example: podcast-tour
+- id: 36
+  name: Podcast tour
+  what: Finds relevant podcasts and pitches the founder as a guest.
+  integrations:
+  - Hermes web
+  - Gmail
+  for:
+  - All
+  section: Links and PR
+  example: podcast-tour
+- id: 37
+  name: Weekly newsletter
+  what: Curates posts, updates and niche news into one issue.
+  integrations:
+  - Listmonk
+  for:
+  - All
+  section: Email and newsletter
+  example: abandoned-cart-recovery
+- id: 38
+  name: Lead magnet + welcome sequence
+  what: Delivers a free resource, then sends a 5-email welcome series.
+  integrations:
+  - WordPress
+  - Listmonk
+  for:
+  - All
+  section: Email and newsletter
+  example: abandoned-cart-recovery
+- id: 39
+  name: Free email course
+  what: A 5-day course or 30-day challenge that leads into the product.
+  integrations:
+  - Listmonk
+  for:
+  - All
+  section: Email and newsletter
+  example: abandoned-cart-recovery
+- id: 40
+  name: Exit-intent signup
+  what: Shows an offer to visitors who are about to leave.
+  integrations:
+  - WordPress
+  - Listmonk
+  for:
+  - All
+  section: Email and newsletter
+  example: abandoned-cart-recovery
+- id: 41
+  name: Evergreen launch sequence
+  what: Each new subscriber gets their own launch week with a real deadline.
+  integrations:
+  - Listmonk
+  for:
+  - All
+  section: Email and newsletter
+  example: abandoned-cart-recovery
+- id: 42
+  name: Newsletter swaps
+  what: Trades recommendations with similar-sized newsletters.
+  integrations:
+  - Gmail
+  - Listmonk
+  for:
+  - All
+  section: Email and newsletter
+  example: abandoned-cart-recovery
+- id: 43
+  name: Build in public
+  what: A weekly numbers-and-lessons thread plus daily progress posts.
+  integrations:
+  - X
+  - Stripe
+  for:
+  - SaaS
+  - OSS
+  section: X
+  example: buying-intent-listening
+- id: 44
+  name: Reply-around growth
+  what: Sharp early replies under big niche accounts.
+  integrations:
+  - X
+  for:
+  - All
+  section: X
+  example: buying-intent-listening
+  note: X bans automated replies to people who didn't ask. Drafts go to a person who replies by hand.
+- id: 45
+  name: Daily teaching thread
+  what: One educational thread a day.
+  integrations:
+  - X
+  for:
+  - All
+  section: X
+  example: buying-intent-listening
+- id: 46
+  name: Competitor complaint rescue
+  what: Helps people frustrated with a competitor, without pitching.
+  integrations:
+  - X
+  for:
+  - SaaS
+  section: X
+  example: buying-intent-listening
+- id: 47
+  name: '"Reply and I''ll send it"'
+  what: DMs a free resource to everyone who replies to a post.
+  integrations:
+  - X
+  for:
+  - All
+  section: X
+  example: buying-intent-listening
+  note: Only message people who asked, through the official API; X restricts automated DMs.
+- id: 48
+  name: '"Drop your URL" reviews'
+  what: Free quick teardowns in the replies that bring in leads.
+  integrations:
+  - X
+  for:
+  - SaaS
+  section: X
+  example: buying-intent-listening
+- id: 49
+  name: Brand teardown threads
+  what: Breaks down how famous brands grow.
+  integrations:
+  - X
+  - Hermes web
+  for:
+  - All
+  section: X
+  example: buying-intent-listening
+- id: 50
+  name: Data chart posts
+  what: One striking chart a week from product or public data.
+  integrations:
+  - X
+  - Hermes image tools
+  for:
+  - All
+  section: X
+  example: buying-intent-listening
+- id: 51
+  name: Founder daily posts
+  what: One post a day in the founder's own voice.
+  integrations:
+  - LinkedIn
+  for:
+  - SaaS
+  section: LinkedIn
+  example: buying-intent-listening
+- id: 52
+  name: Document carousels
+  what: How-to and mistakes decks as PDF posts.
+  integrations:
+  - LinkedIn
+  - Presenton
+  for:
+  - SaaS
+  section: LinkedIn
+  example: buying-intent-listening
+- id: 53
+  name: LinkedIn newsletter
+  what: A native weekly newsletter that notifies every subscriber.
+  integrations:
+  - LinkedIn
+  for:
+  - SaaS
+  section: LinkedIn
+  example: buying-intent-listening
+- id: 54
+  name: Comment-first growth
+  what: Thoughtful early comments on big voices' posts.
+  integrations:
+  - LinkedIn
+  for:
+  - SaaS
+  section: LinkedIn
+  example: buying-intent-listening
+- id: 55
+  name: '"Comment to get it"'
+  what: Sends a template or guide to everyone who comments.
+  integrations:
+  - LinkedIn
+  - Gmail
+  for:
+  - SaaS
+  section: LinkedIn
+  example: buying-intent-listening
+  note: LinkedIn bans automated messaging. OMA drafts; a person sends.
+- id: 56
+  name: Industry data posts
+  what: Chart posts from product or public data.
+  integrations:
+  - LinkedIn
+  - Hermes web
+  for:
+  - SaaS
+  section: LinkedIn
+  example: buying-intent-listening
+- id: 57
+  name: Company page calendar
+  what: Updates, team and hiring posts on the company page.
+  integrations:
+  - LinkedIn
+  for:
+  - SaaS
+  section: LinkedIn
+  example: buying-intent-listening
+- id: 58
+  name: Employee advocacy
+  what: Ready-to-share posts sent to the team each week.
+  integrations:
+  - LinkedIn
+  - Slack
+  for:
+  - SaaS
+  section: LinkedIn
+  example: buying-intent-listening
+- id: 59
+  name: Live event coverage
+  what: Real-time takes during industry events.
+  integrations:
+  - LinkedIn
+  - X
+  for:
+  - All
+  section: LinkedIn
+  example: buying-intent-listening
+- id: 60
+  name: Daily Page calendar
+  what: A daily mix of photo, multi-photo, poll and link posts.
+  integrations:
+  - Facebook
+  for:
+  - Ecom
+  - Local
+  section: Facebook
+  example: buying-intent-listening
+- id: 61
+  name: Comment-to-Messenger lead magnet
+  what: Everyone who comments the keyword gets the guide or code in Messenger.
+  integrations:
+  - Facebook
+  for:
+  - Ecom
+  - Local
+  section: Facebook
+  example: comment-to-dm
+  note: One private reply per comment, within 7 days of the comment.
+- id: 62
+  name: Messenger sales assistant
+  what: Answers inquiries, qualifies leads, takes orders or books calls.
+  integrations:
+  - Facebook
+  - Shopify
+  for:
+  - Ecom
+  - Local
+  section: Facebook
+  example: comment-to-dm
+- id: 63
+  name: Facebook reply desk
+  what: Replies to every comment within minutes.
+  integrations:
+  - Facebook
+  for:
+  - Ecom
+  - Local
+  section: Facebook
+  example: discord-community
+- id: 64
+  name: Reels cross-posting
+  what: Every short video also goes out as a Facebook Reel.
+  integrations:
+  - Facebook
+  - Hermes video tools
+  for:
+  - All
+  section: Facebook
+  example: daily-shorts
+- id: 65
+  name: Niche group seeding
+  what: Finds the audience's groups and drafts helpful posts for you to post.
+  integrations:
+  - Facebook
+  - Hermes browser
+  for:
+  - All
+  section: Facebook
+  example: buying-intent-listening
+- id: 66
+  name: Event promotion
+  what: Creates Page events for webinars and meetups and posts reminders.
+  integrations:
+  - Facebook
+  for:
+  - Local
+  - All
+  section: Facebook
+  example: discord-community
+- id: 67
+  name: Education carousels
+  what: Turns blog posts into branded carousels three times a week.
+  integrations:
+  - Instagram
+  - Presenton
+  for:
+  - All
+  section: Instagram
+  example: comment-to-dm
+- id: 68
+  name: Daily Reels
+  what: One scripted, captioned Reel a day.
+  integrations:
+  - Instagram
+  - Hermes video + TTS
+  for:
+  - All
+  section: Instagram
+  example: daily-shorts
+- id: 69
+  name: Comment-to-DM giveaway
+  what: Everyone who comments the keyword gets the resource or code by DM.
+  integrations:
+  - Instagram
+  for:
+  - All
+  section: Instagram
+  example: comment-to-dm
+  note: One private reply per comment, within 7 days of the comment.
+- id: 70
+  name: DM sales desk
+  what: Answers product questions in DMs and sends links.
+  integrations:
+  - Instagram
+  - Shopify
+  for:
+  - Ecom
+  section: Instagram
+  example: comment-to-dm
+- id: 71
+  name: Instagram reply desk
+  what: Fast comment replies and spam cleanup.
+  integrations:
+  - Instagram
+  for:
+  - All
+  section: Instagram
+  example: comment-to-dm
+- id: 72
+  name: Before and after
+  what: Transformation carousels and Reels.
+  integrations:
+  - Instagram
+  - Hermes image tools
+  for:
+  - Ecom
+  section: Instagram
+  example: daily-shorts
+- id: 73
+  name: Collab posts
+  what: Co-authored posts with complementary brands.
+  integrations:
+  - Instagram
+  - Gmail
+  for:
+  - All
+  section: Instagram
+  example: podcast-tour
+- id: 74
+  name: Keyword SEO captions
+  what: Captions, alt text and bio built around Instagram searches.
+  integrations:
+  - Instagram
+  for:
+  - All
+  section: Instagram
+  example: comment-to-dm
+- id: 75
+  name: Product drop countdowns
+  what: Teasers, countdown posts and early access for drops.
+  integrations:
+  - Instagram
+  - Shopify
+  - Listmonk
+  for:
+  - Ecom
+  section: Instagram
+  example: abandoned-cart-recovery
+- id: 76
+  name: Link-in-bio funnel
+  what: A bio page that changes with each campaign and tracks which posts drive clicks.
+  integrations:
+  - WordPress
+  - Umami
+  for:
+  - All
+  section: Instagram
+  example: comment-to-dm
+- id: 77
+  name: Search-answer videos
+  what: One tutorial for each question people search on TikTok.
+  integrations:
+  - TikTok
+  - GetAnyAPI keyword search
+  for:
+  - All
+  section: TikTok
+  example: daily-shorts
+- id: 78
+  name: Daily trend-jack
+  what: Makes the brand's version of each day's trending formats.
+  integrations:
+  - TikTok
+  - ScrapeCreators
+  for:
+  - All
+  section: TikTok
+  example: daily-shorts
+- id: 79
+  name: Photo carousels
+  what: Swipeable tip and product carousels.
+  integrations:
+  - TikTok
+  for:
+  - All
+  section: TikTok
+  example: daily-shorts
+- id: 80
+  name: Story series
+  what: A multi-part story that brings viewers back for the next part.
+  integrations:
+  - TikTok
+  - Hermes video + TTS
+  for:
+  - All
+  section: TikTok
+  example: daily-shorts
+- id: 81
+  name: Founder diary
+  what: Build-with-me and behind-the-scenes clips.
+  integrations:
+  - TikTok
+  for:
+  - All
+  section: TikTok
+  example: daily-shorts
+- id: 82
+  name: Drafts mode
+  what: Uploads finished videos to drafts so you add a trending sound and post.
+  integrations:
+  - TikTok
+  for:
+  - All
+  section: TikTok
+  example: daily-shorts
+- id: 83
+  name: Video replies to comments
+  what: Turns the best questions in comments into answer videos.
+  integrations:
+  - TikTok
+  - GetAnyAPI comments
+  for:
+  - All
+  section: TikTok
+  example: daily-shorts
+- id: 84
+  name: Satisfying product demos
+  what: Faceless close-ups, ASMR and "how it's made" clips.
+  integrations:
+  - TikTok
+  - Hermes video tools
+  for:
+  - Ecom
+  section: TikTok
+  example: daily-shorts
+- id: 85
+  name: Viral format remakes
+  what: Breaks down top niche videos and remakes their formats.
+  integrations:
+  - TikHub
+  - ScrapeCreators
+  - TikTok
+  for:
+  - All
+  section: TikTok
+  example: daily-shorts
+- id: 86
+  name: Search-first tutorials
+  what: A "how to" video for each query the audience searches.
+  integrations:
+  - YouTube
+  for:
+  - All
+  section: YouTube
+  example: daily-shorts
+- id: 87
+  name: Faceless explainer channel
+  what: AI-voiced explainers on a fixed schedule.
+  integrations:
+  - YouTube
+  - Hermes TTS
+  for:
+  - All
+  section: YouTube
+  example: daily-shorts
+  note: Label realistic AI content where the platform requires it.
+- id: 88
+  name: Long video into Shorts
+  what: Cuts every long video into 3 to 5 Shorts.
+  integrations:
+  - YouTube
+  - Hermes video tools
+  for:
+  - All
+  section: YouTube
+  example: daily-shorts
+- id: 89
+  name: Daily Shorts
+  what: A daily tip, stat or myth-buster.
+  integrations:
+  - YouTube
+  for:
+  - All
+  section: YouTube
+  example: daily-shorts
+- id: 90
+  name: Thumbnail and title testing
+  what: 2 or 3 options per video; keeps the best click-through.
+  integrations:
+  - YouTube
+  - Hermes image tools
+  for:
+  - All
+  section: YouTube
+  example: daily-shorts
+- id: 91
+  name: '"X vs Y" comparisons'
+  what: Honest comparison videos for buying-intent searches.
+  integrations:
+  - YouTube
+  for:
+  - All
+  section: YouTube
+  example: daily-shorts
+- id: 92
+  name: Product walkthrough series
+  what: Narrated feature demos, organized into a playlist.
+  integrations:
+  - YouTube
+  - Hermes browser + TTS
+  for:
+  - SaaS
+  section: YouTube
+  example: daily-shorts
+  note: Label AI voices where the platform requires it.
+- id: 93
+  name: Weekly live Q&A
+  what: A founder livestream, clipped into Shorts.
+  integrations:
+  - YouTube
+  for:
+  - All
+  section: YouTube
+  example: daily-shorts
+- id: 94
+  name: YouTube reply desk
+  what: Replies to comments, pins a call to action, hides spam.
+  integrations:
+  - YouTube
+  for:
+  - All
+  section: YouTube
+  example: daily-shorts
+- id: 95
+  name: Old video SEO refresh
+  what: Rewrites titles, descriptions and chapters on underperforming videos.
+  integrations:
+  - YouTube
+  for:
+  - All
+  section: YouTube
+  example: daily-shorts
+- id: 96
+  name: Description funnel
+  what: A tracked lead magnet link in every description.
+  integrations:
+  - YouTube
+  - Dub
+  - Listmonk
+  for:
+  - All
+  section: YouTube
+  example: daily-shorts
+- id: 97
+  name: Pinterest keyword boards
+  what: Pins for every post and product, sorted into search-named boards.
+  integrations:
+  - Pinterest
+  for:
+  - Ecom
+  - All
+  section: Other platforms
+  example: seo-blog-engine
+- id: 98
+  name: Threads daily starters
+  what: One question or take a day, plus replies.
+  integrations:
+  - Threads
+  for:
+  - All
+  section: Other platforms
+  example: buying-intent-listening
+- id: 99
+  name: Reddit community answers
+  what: Useful answers wherever the product genuinely helps.
+  integrations:
+  - Reddit
+  for:
+  - All
+  section: Other platforms
+  example: buying-intent-listening
+- id: 100
+  name: Reddit milestone posts
+  what: An "I built X" style post at each milestone.
+  integrations:
+  - Reddit
+  for:
+  - SaaS
+  - OSS
+  section: Other platforms
+  example: show-hn-launch
+- id: 101
+  name: Founder Reddit AMA
+  what: An AMA in a relevant subreddit.
+  integrations:
+  - Reddit
+  for:
+  - SaaS
+  - OSS
+  section: Other platforms
+  example: show-hn-launch
+- id: 102
+  name: Discord community + Q&A bot
+  what: Answers questions, runs weekly events, flags buying signals.
+  integrations:
+  - Discord
+  for:
+  - SaaS
+  - OSS
+  section: Other platforms
+  example: discord-community
+- id: 103
+  name: Telegram channel + bot
+  what: Daily tips and deals, plus a bot that answers questions.
+  integrations:
+  - Telegram
+  for:
+  - All
+  section: Other platforms
+  example: discord-community
+- id: 104
+  name: Bluesky starter packs
+  what: A niche starter pack and daily posts.
+  integrations:
+  - Bluesky API
+  for:
+  - SaaS
+  - OSS
+  section: Other platforms
+  example: buying-intent-listening
+- id: 105
+  name: DEV and Hashnode tutorials
+  what: Multi-part technical tutorials.
+  integrations:
+  - DEV Community
+  - Hashnode
+  for:
+  - SaaS
+  - OSS
+  section: Other platforms
+  example: seo-blog-engine
+- id: 106
+  name: Medium and Substack syndication
+  what: Republishes the best posts with links back.
+  integrations:
+  - Camofox browser
+  for:
+  - All
+  section: Other platforms
+  example: seo-blog-engine
+- id: 107
+  name: Quora answers
+  what: Answers high-traffic questions in the niche.
+  integrations:
+  - Camofox browser
+  for:
+  - All
+  section: Other platforms
+  example: buying-intent-listening
+- id: 108
+  name: Indie Hackers build log
+  what: Weekly progress posts to a founder audience.
+  integrations:
+  - Camofox browser
+  for:
+  - SaaS
+  section: Other platforms
+  example: show-hn-launch
+- id: 109
+  name: Product Hunt launch week
+  what: Builds assets, warms up supporters, coordinates the day and tracks rank.
+  integrations:
+  - Product Hunt
+  - X
+  - LinkedIn
+  - Listmonk
+  for:
+  - SaaS
+  - OSS
+  section: Launches
+  example: show-hn-launch
+  note: Never ask for upvotes, and never pay hunters.
+- id: 110
+  name: Launch-worthiness review
+  what: Checks every 10 days for a release worth launching.
+  integrations:
+  - GitHub
+  - Product Hunt
+  for:
+  - SaaS
+  - OSS
+  section: Launches
+  example: show-hn-launch
+- id: 111
+  name: Show HN
+  what: Drafts the post and first comment and tracks the thread; you post and reply.
+  integrations:
+  - Hacker News search
+  for:
+  - SaaS
+  - OSS
+  section: Launches
+  example: show-hn-launch
+  note: Hacker News bans generated comments. OMA prepares facts; the maker writes and posts.
+- id: 112
+  name: Feature-a-day launch week
+  what: Five features in five days, each with a changelog page, posts and an email.
+  integrations:
+  - Ghost
+  - X
+  - LinkedIn
+  - Listmonk
+  for:
+  - SaaS
+  section: Launches
+  example: show-hn-launch
+- id: 113
+  name: Launch-site relay
+  what: BetaList, then Product Hunt, then Hacker News.
+  integrations:
+  - Camofox browser
+  - Product Hunt
+  for:
+  - SaaS
+  - OSS
+  section: Launches
+  example: show-hn-launch
+  note: Each site's rules apply; Hacker News posts are written by a person.
+- id: 114
+  name: Countdown teaser page
+  what: Unlocks a new teaser each day before launch.
+  integrations:
+  - WordPress
+  - X
+  for:
+  - All
+  section: Launches
+  example: show-hn-launch
+- id: 115
+  name: Waitlist with referral codes
+  what: Referrals move people up the line.
+  integrations:
+  - WordPress
+  - Listmonk
+  for:
+  - All
+  section: Launches
+  example: show-hn-launch
+- id: 116
+  name: Open-source launch
+  what: README, topics, a release and awesome-list PRs.
+  integrations:
+  - GitHub
+  - DEV
+  for:
+  - OSS
+  section: Launches
+  example: show-hn-launch
+- id: 117
+  name: Contributor recruitment
+  what: '"Good first issue" posts to grow contributors.'
+  integrations:
+  - GitHub
+  - X
+  - DEV
+  for:
+  - OSS
+  section: Launches
+  example: show-hn-launch
+- id: 118
+  name: Integration co-launch
+  what: Launches integrations together with partners.
+  integrations:
+  - Gmail
+  - X
+  - LinkedIn
+  for:
+  - SaaS
+  section: Partnerships
+  example: podcast-tour
+- id: 119
+  name: Partner bundles and swaps
+  what: Joint deals and testimonial swaps with complementary products.
+  integrations:
+  - Gmail
+  for:
+  - All
+  section: Partnerships
+  example: podcast-tour
+- id: 120
+  name: Perk-list listings
+  what: Gets you into accelerator and VC portfolio perk lists.
+  integrations:
+  - Gmail
+  for:
+  - SaaS
+  section: Partnerships
+  example: podcast-tour
+- id: 121
+  name: App marketplace listings
+  what: Lists you in other platforms' app stores.
+  integrations:
+  - Camofox browser
+  for:
+  - SaaS
+  section: Partnerships
+  example: podcast-tour
+- id: 122
+  name: Student and nonprofit programs
+  what: Free or discounted plans that earn goodwill and links.
+  integrations:
+  - WordPress
+  - Gmail
+  for:
+  - SaaS
+  - OSS
+  section: Partnerships
+  example: podcast-tour
+- id: 123
+  name: Onboarding email course
+  what: Role-based onboarding emails.
+  integrations:
+  - Listmonk
+  for:
+  - SaaS
+  section: Once there are customers
+  gate: &id001
+    setup: Customers who can be contacted, with permission to email them
+  example: abandoned-cart-recovery
+- id: 124
+  name: Customer case studies
+  what: Books interviews and turns them into stories.
+  integrations:
+  - Gmail
+  - WordPress
+  for:
+  - All
+  section: Once there are customers
+  gate: *id001
+  example: review-asks
+- id: 125
+  name: Testimonial and review asks
+  what: Asks happy customers for quotes and reviews.
+  integrations:
+  - Gmail
+  for:
+  - All
+  section: Once there are customers
+  gate: *id001
+  example: review-asks
+  note: Ask a whole cohort neutrally; no incentives that depend on sentiment.
+- id: 126
+  name: Customer of the week
+  what: Spotlights a customer and tags them so they share it.
+  integrations:
+  - LinkedIn
+  - Instagram
+  for:
+  - All
+  section: Once there are customers
+  gate: *id001
+  example: review-asks
+- id: 127
+  name: Referral ask at success moments
+  what: Asks for a referral right after a win.
+  integrations:
+  - Listmonk
+  - Stripe
+  for:
+  - SaaS
+  section: Once there are customers
+  gate: *id001
+  example: abandoned-cart-recovery
+- id: 128
+  name: Win-back emails
+  what: Brings back churned or quiet customers.
+  integrations:
+  - Gmail
+  - Stripe
+  for:
+  - All
+  section: Once there are customers
+  gate: *id001
+  example: abandoned-cart-recovery
+- id: 129
+  name: Product page SEO
+  what: Rewrites titles, descriptions, alt text and meta tags.
+  integrations:
+  - Shopify
+  - Search Console
+  for:
+  - Ecom
+  section: Shopify (when connected)
+  gate: &id002
+    access: storefront
+  example: abandoned-cart-recovery
+- id: 130
+  name: AI product photoshoot
+  what: Lifestyle and seasonal shots from plain product photos.
+  integrations:
+  - Shopify
+  - Hermes image tools
+  for:
+  - Ecom
+  section: Shopify (when connected)
+  gate: *id002
+  example: abandoned-cart-recovery
+- id: 131
+  name: Collection landing pages
+  what: SEO pages like "gifts under $50".
+  integrations:
+  - Shopify
+  for:
+  - Ecom
+  section: Shopify (when connected)
+  gate: *id002
+  example: abandoned-cart-recovery
+- id: 132
+  name: Abandoned cart recovery
+  what: A 3-step email series with a small last-step incentive.
+  integrations:
+  - Shopify
+  - Listmonk
+  for:
+  - Ecom
+  section: Shopify (when connected)
+  gate: *id002
+  example: abandoned-cart-recovery
+- id: 133
+  name: Post-purchase cross-sell
+  what: Recommends the next product after each order.
+  integrations:
+  - Shopify
+  - Listmonk
+  for:
+  - Ecom
+  section: Shopify (when connected)
+  gate: *id002
+  example: abandoned-cart-recovery
+- id: 134
+  name: Back-in-stock and price-drop alerts
+  what: Emails watchers when items restock or get cheaper.
+  integrations:
+  - Shopify
+  - Listmonk
+  for:
+  - Ecom
+  section: Shopify (when connected)
+  gate: *id002
+  example: abandoned-cart-recovery
+- id: 135
+  name: Product drop calendar
+  what: Scheduled drops with teasers and VIP early access.
+  integrations:
+  - Shopify
+  - Instagram
+  - Listmonk
+  for:
+  - Ecom
+  section: Shopify (when connected)
+  gate: *id002
+  example: abandoned-cart-recovery
+- id: 136
+  name: Gift guides and bundles
+  what: Seasonal bundles promoted on Pinterest and by email.
+  integrations:
+  - Shopify
+  - Pinterest
+  - Listmonk
+  for:
+  - Ecom
+  section: Shopify (when connected)
+  gate: *id002
+  example: abandoned-cart-recovery
+- id: 137
+  name: Shoppable Pinterest catalog
+  what: Product pins that link straight to checkout.
+  integrations:
+  - Shopify
+  - Pinterest
+  for:
+  - Ecom
+  section: Shopify (when connected)
+  gate: *id002
+  example: abandoned-cart-recovery
+- id: 138
+  name: WhatsApp sales assistant
+  what: Answers questions, sends links and takes orders in chat.
+  integrations:
+  - WhatsApp
+  - Shopify
+  for:
+  - Ecom
+  - Local
+  section: WhatsApp (when connected)
+  gate: &id003
+    access: whatsapp
+  example: comment-to-dm
+- id: 139
+  name: Chat button and QR opt-in
+  what: Site buttons and packaging QR codes that start chats and grow the list.
+  integrations:
+  - WordPress
+  - WhatsApp
+  for:
+  - Ecom
+  - Local
+  section: WhatsApp (when connected)
+  gate: *id003
+  example: comment-to-dm
+- id: 140
+  name: Abandoned cart nudge
+  what: A friendly cart reminder for opted-in shoppers.
+  integrations:
+  - WhatsApp
+  - Shopify
+  for:
+  - Ecom
+  section: WhatsApp (when connected)
+  gate: *id003
+  example: abandoned-cart-recovery
+- id: 141
+  name: Order updates with review ask
+  what: Shipping updates that end with a review request.
+  integrations:
+  - WhatsApp
+  - Shopify
+  for:
+  - Ecom
+  section: WhatsApp (when connected)
+  gate: *id003
+  example: abandoned-cart-recovery
+- id: 142
+  name: VIP drop list
+  what: First access to drops and restocks.
+  integrations:
+  - WhatsApp
+  - Shopify
+  for:
+  - Ecom
+  section: WhatsApp (when connected)
+  gate: *id003
+  example: comment-to-dm
+- id: 143
+  name: Google Business weekly posts
+  what: Profile posts plus answers to profile Q&A.
+  integrations:
+  - Google Business Profile
+  for:
+  - Local
+  section: Local businesses
+  gate: &id004
+    access: business_profile
+  example: review-asks
+- id: 144
+  name: Review asks and replies
+  what: Asks for Google reviews and replies to every one.
+  integrations:
+  - Google Business Profile
+  - Gmail
+  for:
+  - Local
+  section: Local businesses
+  gate: *id004
+  example: review-asks
+  note: Ask every customer in a cohort, never only happy ones, and offer no incentives.
+- id: 145
+  name: Boost the organic winners
+  what: Puts a small budget behind the best organic post each week.
+  integrations:
+  - Meta Ads
+  - TikTok Ads
+  for:
+  - All
+  section: Ads (when a budget is set)
+  gate: &id005
+    setup: Budget approved for ads, with daily caps
+  example: search-intent-ads
+- id: 146
+  name: Search intent ads
+  what: Bids on buying-intent searches, each with a matching landing page.
+  integrations:
+  - Google Ads
+  - WordPress
+  for:
+  - SaaS
+  - All
+  section: Ads (when a budget is set)
+  gate: *id005
+  example: search-intent-ads
+- id: 147
+  name: Meta prospecting
+  what: Broad campaigns with many creative variants; budget goes to the winners.
+  integrations:
+  - Meta Ads
+  - Hermes image + video tools
+  for:
+  - Ecom
+  section: Ads (when a budget is set)
+  gate: *id005
+  example: search-intent-ads
+- id: 148
+  name: Catalog retargeting
+  what: Shows shoppers the exact products they viewed.
+  integrations:
+  - Meta Ads
+  - Shopify
+  for:
+  - Ecom
+  section: Ads (when a budget is set)
+  gate: *id005
+  example: search-intent-ads
+- id: 149
+  name: Lead ads with instant follow-up
+  what: Every lead gets an email within minutes.
+  integrations:
+  - Meta Ads
+  - Listmonk
+  for:
+  - All
+  section: Ads (when a budget is set)
+  gate: *id005
+  example: search-intent-ads
+- id: 150
+  name: Click-to-chat ads
+  what: Ads that open Messenger or WhatsApp, where the sales assistant takes over.
+  integrations:
+  - Meta Ads
+  - Facebook
+  - WhatsApp
+  for:
+  - Ecom
+  - Local
+  section: Ads (when a budget is set)
+  gate: *id005
+  example: search-intent-ads

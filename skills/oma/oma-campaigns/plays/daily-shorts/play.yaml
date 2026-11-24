@@ -1,0 +1,108 @@
+id: daily-shorts
+version: 1
+name: Daily Shorts
+summary: Publish one short vertical video a day that answers a real question from the audience, shows the product doing something useful, and points to one next step.
+ideas: [89, 86, 88]
+example: example.md
+
+fits:
+  product_types: [consumer_app, ecommerce, saas, creator, local]
+  stages: [early, growth]
+  best_when:
+    - The product can be shown on screen or in use in under a minute.
+    - The audience searches and scrolls on YouTube, TikTok or Instagram.
+  avoid_when:
+    - There is no footage, screen recording or visual to work from.
+
+outcome: "{audience} find {product} through Shorts and {conversion}."
+horizon: ongoing
+time_to_signal: Views within days; judge a format after 5 to 8 videos; installs or signups within a month.
+
+requires:
+  - {channel: youtube, mode: write, fallback: assisted}
+  - {channel: youtube, mode: read, fallback: research_only}
+  - {channel: product_analytics, mode: read, fallback: research_only, optional: true}
+tools: [video_render]
+
+roster:
+  - role: orchestrator
+    does: Owns the format list, keeps the daily schedule full, and decides from watch time and actions which formats to repeat or drop.
+    per_run: Next week's seven videos assigned to formats and ideas, plus a review note on views, retention and actions per format.
+    toolsets: [file, web, skills, memory, session_search, kanban, integrations]
+    reads: [youtube, product_analytics]
+    untrusted_input: true
+    skills: [goals-and-kpis, content-calendar]
+  - role: idea-scout
+    does: Finds what the audience is asking and watching, from search suggestions, comments on the channel and videos that work in the niche.
+    per_run: Seven video ideas, each with the question it answers, where it came from, a hook and the format.
+    toolsets: [file, web, browser, skills, memory, kanban]
+    reads: [youtube]
+    untrusted_input: true
+    skills: [trend-jacking, audience-research, content-research-and-sourcing]
+  - role: scriptwriter
+    does: Writes tight scripts that hook in the first two seconds, deliver one useful idea, and end with one next step.
+    per_run: Seven scripts, each with two hook options, the beats, on-screen text, the shot list, caption, title and the call to action.
+    toolsets: [file, web, skills, memory, kanban]
+    untrusted_input: false
+    skills: [short-form-video-script, hook-writer, caption-writer]
+  - role: producer
+    does: Turns approved scripts into finished vertical videos from screen recordings, product footage and licensed audio, with captions burned in.
+    per_run: One finished video per script, 15 to 45 seconds, 9:16, captions on screen, AI voice labeled if used, plus a thumbnail frame.
+    toolsets: [file, terminal, web, skills, memory, kanban]
+    untrusted_input: false
+    skills: [captions-and-clipping, ai-video, ai-voiceover, thumbnail-design]
+  - role: publisher
+    does: Uploads approved videos with title, description, disclosures and links, on schedule, and records each URL.
+    per_run: Every approved video uploaded with title, description, AI and paid-promotion settings and the tracked link, scheduled, and its URL recorded.
+    toolsets: [file, web, skills, memory, kanban, integrations]
+    writes: [youtube]
+    untrusted_input: false
+    skills: []
+
+deliverables:
+  - {id: short, what: "Finished vertical video", cadence: daily, owner: producer, approval: per_item, standing_ok: true}
+  - {id: script-batch, what: "Seven scripts for next week", cadence: weekly, owner: scriptwriter, approval: batch, standing_ok: true}
+  - {id: idea-list, what: "Seven video ideas from real questions", cadence: weekly, owner: idea-scout, approval: none}
+
+jobs:
+  - id: campaign-review
+    owner: orchestrator
+    cadence: hourly
+    checks:
+      - New comments, mentions and tagged posts on the verified accounts that need a reply or follow-up
+      - New audience questions worth turning into a video; skip work already queued
+    max_items: 25
+  - id: performance-review
+    owner: orchestrator
+    cadence: weekly
+    checks:
+      - Views, average view duration and retention per video, last 7 days
+      - Installs or signups from the tracked link, where connected
+    max_items: 40
+
+kpis:
+  leading: [Videos published against plan, Average view duration, Comments and shares per 1000 views]
+  lagging: [Link clicks, Installs or signups from the tracked link]
+  targets: after_baseline
+  baseline_weeks: 3
+
+limits:
+  max_uploads_per_day: 2
+
+slots:
+  - {id: product, required: true, source: brand, ask: "What the product is and how it looks on screen."}
+  - {id: audience, required: true, source: playbook, ask: "Who the videos are for."}
+  - {id: conversion, required: true, source: playbook, ask: "The one next step, such as install the app."}
+  - {id: footage, required: true, source: research, ask: "What can be filmed or recorded, such as screen recordings or product shots."}
+
+kickoff:
+  - {owner: idea-scout, task: "Find the first seven ideas from search suggestions and comments."}
+  - {owner: scriptwriter, task: "Write the first seven scripts."}
+  - {owner: producer, task: "Produce the first three videos for approval."}
+
+plan:
+  - Publish the first three Shorts this week from real audience questions.
+  - Keep one Short a day across three or four formats.
+  - Judge each format after five to eight videos; repeat winners, drop losers.
+
+rules: rules.md
