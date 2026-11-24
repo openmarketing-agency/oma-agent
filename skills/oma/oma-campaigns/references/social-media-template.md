@@ -1,6 +1,6 @@
 # Social media campaign template
 
-Use when the playbook prioritizes reaching or responding to an audience on social channels. Before drafting, choose the audience, the verified brand accounts, the types of interactions in scope, and the outcome each channel should drive.
+Use when the playbook prioritizes reaching or responding to an audience on social channels. Choose the audience, intended brand accounts, interactions in scope, and outcome for each channel. Use the platforms the user named or that the saved brand and playbook clearly support; ask only if the choice is unclear.
 
 ## Example campaign config
 
@@ -31,6 +31,8 @@ For the 30-minute job declaration, load the social media orchestrator example wi
 
 For the matching `social-media__content-creator`, load `references/social-media-content-writer-template.md` from `oma-agents`.
 
-## Campaign integrations for generated media
+## Campaign integrations
 
-The example uses `heygen` for presenter videos. Omit it if the plan does not need generated media, or consider `higgsfield` or `runway` instead for visuals or motion. Use the [integration intake guide](integration-intake.md) to choose a provider that meets the plan and ask the user only if the connection is missing.
+Save the selected platform IDs in `integrations` in the campaign's `config.yaml` before asking the user to connect any missing accounts in the OMA console. Do not ask for MCP configuration or credentials in chat. Leave the campaign paused (or a draft) and its jobs unscheduled until the required accounts and permissions are verified. Follow the [integration intake guide](integration-intake.md).
+
+The example uses `heygen` for presenter videos. Omit it if the plan does not need generated media, or consider `higgsfield` or `runway` instead for visuals or motion.
