@@ -3,6 +3,8 @@
 import argparse
 from contextlib import AbstractContextManager, closing, contextmanager
 from datetime import UTC, datetime
+from hashlib import sha256
+from hmac import compare_digest
 import json
 import os
 from pathlib import Path
@@ -21,6 +23,7 @@ from hermes_cli.kanban_db_connect import connect_closing
 from hermes_cli.oma_campaigns.install import _campaign_config_path, _campaigns_dir, _status
 from hermes_cli.oma_campaigns.schema import validate_record
 from hermes_cli.oma_campaigns.source import DEFAULT_CAMPAIGN_MODE, _member, read_mapping
+from hermes_cli.sqlite_safe_read import connect_tracked
 
 _ID = re.compile(r"[a-f0-9]{32}")
 _MAX_DRAFT_BYTES = 96 * 1024
@@ -152,9 +155,32 @@ def list_publications(home: Path, campaign_id: str, *, before: int | None = None
         rows = conn.execute(
             _SELECT + " WHERE (? IS NULL OR p.seq < ?) ORDER BY p.seq DESC LIMIT ?", (before, before, limit + 1),
         ).fetchall() if conn else []
+    publications = [_view(row) for row in rows[:limit]]
+    claimed = [item for item in publications if item["status"] == "publishing" and item["task_id"]]
+    if claimed and (board := config.get("kanban_board")):
+        active = _active_publication_tasks(home, board, [item["task_id"] for item in claimed])
+        if active is not None:
+            for item in claimed:
+                if item["task_id"] not in active:
+                    item["needs_verification"] = True
     return {"campaign_id": campaign_id, "mode": config.get("mode", DEFAULT_CAMPAIGN_MODE),
-            "publications": [_view(row) for row in rows[:limit]],
+            "publications": publications,
             "next_cursor": rows[limit - 1]["seq"] if len(rows) > limit else None}
+
+
+def _active_publication_tasks(home: Path, board: str, task_ids: list[str]) -> set[str] | None:
+    # Keep the publication listing read-only and bounded even if Kanban is busy.
+    slots = ",".join("?" for _ in task_ids)
+    try:
+        with bind_profile_scope(home, hydrate_secrets=False):
+            path = kanban_db.kanban_db_path(board=board).resolve()
+        with closing(connect_tracked(path.as_uri() + "?mode=ro", uri=True, timeout=0.25, tracking_path=path)) as conn:
+            return {row[0] for row in conn.execute(
+                f"SELECT id FROM tasks WHERE status = 'running' AND id IN ({slots})", task_ids,
+            )}
+    except (OSError, sqlite3.Error):
+        # An unavailable board does not tell us whether the current worker stopped.
+        return None
 
 
 def _draft_json(draft: dict) -> str:
@@ -238,8 +264,11 @@ def _enqueue(home: Path, directory: Path, config: dict, publication_id: str, rev
                 body=(f"Publication ID: {publication_id}; revision: {revision}. "
                       f"Claim the saved revision with `python -m hermes_cli.oma_campaigns.publications claim {publication_id} {revision}`. "
                       "Publish the returned content unchanged to its exact account and target. "
-                      "Record the verified provider receipt with the publications finish command. "
-                      "If claim refuses, do not publish. If delivery is uncertain, do not resend; report it for reconciliation."),
+                      f"Before completing this task, run `python -m hermes_cli.oma_campaigns.publications finish "
+                      f"{publication_id} {revision}`. Pass JSON on stdin with `claim_token` from claim and `result` "
+                      "containing the verified `provider_id` and optional `url`, or `error` only for a definitive rejection. "
+                      "If receipt recording fails, retry finish with the same receipt, never the send. "
+                      "If claim refuses, do not publish. If delivery is uncertain, do not resend; report it for verification."),
                 idempotency_key=f"oma-publication:{publication_id}:{revision}",
             )
         conn.execute("UPDATE publications SET task_id = ?, updated_at = ? WHERE id = ?", (task_id, _now(), publication_id))
@@ -289,16 +318,25 @@ def finish_publication(home: Path, campaign_id: str, agent_id: str, publication_
         url = urlsplit(result["url"])
         if url.scheme not in ("http", "https") or not url.hostname or url.username or url.password:
             raise PublicationError(422, "Invalid receipt URL.")
+    if not isinstance(token, str) or not _ID.fullmatch(token):
+        raise PublicationError(409, "The publisher does not own this claim.")
+    receipt_key = sha256(token.encode("ascii")).hexdigest()
     with _db(directory, write=True) as conn:
         row = _row(conn, publication_id)
         _check_revision(row, revision)
-        if row["status"] != "publishing" or not token or row["claim_token"] != token:
+        if row["status"] in ("published", "failed") and compare_digest(row["claim_token"] or "", receipt_key):
+            saved = _view(row)
+            if {key: value for key, value in saved["result"].items() if key != "published_at"} != result:
+                raise PublicationError(409, "A different result is already recorded for this claim.")
+            return saved
+        if row["status"] != "publishing" or not compare_digest(row["claim_token"] or "", token):
             raise PublicationError(409, "The publisher does not own this claim.")
         at = _now()
         status = "failed" if "error" in result else "published"
         result = {**result, "published_at": at} if status == "published" else result
-        conn.execute("UPDATE publications SET status = ?, claim_token = NULL, result = ?, updated_at = ? WHERE id = ?",
-                     (status, json.dumps(result), at, publication_id))
+        # Keep only the digest on a settled claim so a receipt can be replayed, but the token cannot be read back.
+        conn.execute("UPDATE publications SET status = ?, claim_token = ?, result = ?, updated_at = ? WHERE id = ?",
+                     (status, receipt_key, json.dumps(result), at, publication_id))
         return _view(_row(conn, publication_id))
 
 

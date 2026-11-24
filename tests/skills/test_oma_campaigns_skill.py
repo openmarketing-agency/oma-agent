@@ -241,11 +241,29 @@ def test_campaign_publications_handoff(bundle, capsys, mode):
         claim_publication(home, "demo", "demo__worker", item, saved["revision"])
     claim = claim_publication(home, "demo", role.name, item, saved["revision"])
     assert claim["content"] == draft["content"] and claim["target"] == draft["target"]
+    [in_progress] = list_publications(home, "demo")["publications"]
+    assert in_progress["status"] == "publishing" and not in_progress.get("needs_verification")
     with pytest.raises(PublicationError, match="not available"):
         claim_publication(home, "demo", role.name, item, saved["revision"])
-    result = finish_publication(home, "demo", role.name, item, saved["revision"], claim["claim_token"],
-                                {"provider_id": "external-1", "url": "https://x.com/demo/status/1"})
+    with connect_closing(board="campaign-demo") as conn:
+        assert kanban_db.complete_task(conn, task.id, result="Worker ended without recording a receipt.",
+                                       expected_run_id=task.current_run_id)
+    [unconfirmed] = list_publications(home, "demo")["publications"]
+    assert unconfirmed["status"] == "publishing" and unconfirmed.get("needs_verification") is True
+    assert unconfirmed["result"] is None
+    with pytest.raises(PublicationError, match="not available"):
+        claim_publication(home, "demo", role.name, item, saved["revision"])
+
+    receipt = {"provider_id": "external-1", "url": "https://x.com/demo/status/1"}
+    finish = (home, "demo", role.name, item, saved["revision"])
+    result = finish_publication(*finish, claim["claim_token"], receipt)
     assert result["status"] == "published"
+    assert not result.get("needs_verification")
+    assert finish_publication(*finish, claim["claim_token"], receipt) == result
+    with pytest.raises(PublicationError, match="does not own"):
+        finish_publication(*finish, "0" * 32, receipt)
+    with pytest.raises(PublicationError, match="different result"):
+        finish_publication(*finish, claim["claim_token"], {"error": "Definitively rejected"})
     listed = list_publications(home, "demo")["publications"]
     assert listed == [result] and "claim_token" not in listed[0]
 
