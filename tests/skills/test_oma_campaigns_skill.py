@@ -52,6 +52,7 @@ def bundle(tmp_path, monkeypatch):
 
 def test_campaign_integration_candidates_use_brand_evidence(bundle, capsys):
     from hermes_cli.config import atomic_config_write
+    from hermes_cli.oma_campaigns.integrations import integration_catalog
 
     _, source, main = bundle
     brand = source / "brand" / "config.yaml"
@@ -59,12 +60,16 @@ def test_campaign_integration_candidates_use_brand_evidence(bundle, capsys):
     atomic_config_write(brand, {
         "id": "demo", "name": "Demo", "description": "Example brand",
         "integrations": {"google_analytics": {"status": "observed", "evidence": "research/analytics.md"},
-                         "wordpress": {"status": "observed", "evidence": "research/cms.md"}},
+                         "wordpress_com": {"status": "observed", "evidence": "research/cms.md"}},
         "channels": {"social": [{"platform": "twitter", "status": "verified", "url": "https://x.com/demo"},
                                 {"platform": "youtube", "status": "not_checked"}]},
     })
     assert main(["integrations"]) == 0
-    assert json.loads(capsys.readouterr().out) == {"candidates": ["google-analytics", "x"], "unmapped": ["wordpress"]}
+    assert json.loads(capsys.readouterr().out) == {
+        "candidates": ["google-analytics", "wordpress-com", "x"], "unmapped": [],
+    }
+    assert integration_catalog()["wordpress-com"]["composio"] == "wordpress_com"
+    assert "wordpress" not in integration_catalog()
 
 
 @pytest.mark.parametrize("model", ["provider/test-model", {"default": "test-model", "provider": "openrouter"}])

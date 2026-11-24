@@ -228,7 +228,7 @@ candidates from observed `integrations` and verified `channels.social` in
 `integrations` in `oma/campaigns/<id>/config.yaml`. Use `google-analytics` and
 `x` in OMA records; `google_analytics` and `twitter` are Composio toolkit slugs.
 This list records which integrations the campaign needs for its work; it does
-not gate resume. WordPress has an OMA ID but no verified Composio mapping.
+not gate resume. Use `wordpress-com` for the Composio toolkit `wordpress_com`.
 
 ### Shared brand and playbook
 
