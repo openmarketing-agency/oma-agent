@@ -1,18 +1,15 @@
 """Campaign publication records and the publisher's Kanban handoff (no provider calls)."""
 
 import argparse
-from contextlib import AbstractContextManager, closing, contextmanager
+from contextlib import closing
 from datetime import UTC, datetime
 from hashlib import sha256
 from hmac import compare_digest
 import json
-import os
 from pathlib import Path
 import re
 import sqlite3
-import stat
 import sys
-from typing import Literal, overload
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -22,33 +19,12 @@ from hermes_cli import kanban_db
 from hermes_cli.kanban_db_connect import connect_closing
 from hermes_cli.oma_campaigns.install import _campaign_config_path, _campaigns_dir, _status
 from hermes_cli.oma_campaigns.schema import validate_record
-from hermes_cli.oma_campaigns.source import DEFAULT_CAMPAIGN_MODE, _member, read_mapping
+from hermes_cli.oma_campaigns.source import DEFAULT_CAMPAIGN_MODE, read_mapping
+from hermes_cli.oma_campaigns.storage import campaign_data_exists, connect_campaign_data
 from hermes_cli.sqlite_safe_read import connect_tracked
 
 _ID = re.compile(r"[a-f0-9]{32}")
 _MAX_DRAFT_BYTES = 96 * 1024
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS publications (
-    seq INTEGER PRIMARY KEY AUTOINCREMENT,
-    id TEXT NOT NULL UNIQUE,
-    revision INTEGER NOT NULL CHECK (revision > 0),
-    status TEXT NOT NULL CHECK (status IN ('pending_approval', 'approved', 'publishing', 'published', 'failed')),
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    approved_by TEXT,
-    approved_at TEXT,
-    task_id TEXT,
-    claim_token TEXT,
-    result TEXT
-);
-CREATE TABLE IF NOT EXISTS publication_revisions (
-    publication_id TEXT NOT NULL REFERENCES publications(id),
-    revision INTEGER NOT NULL,
-    draft TEXT NOT NULL,
-    PRIMARY KEY (publication_id, revision)
-);
-CREATE INDEX IF NOT EXISTS idx_publications_task ON publications(task_id);
-"""
 _SELECT = """SELECT p.*, r.draft FROM publications p JOIN publication_revisions r
     ON r.publication_id = p.id AND r.revision = p.revision"""
 
@@ -84,40 +60,6 @@ def _publisher(home: Path, config: dict) -> tuple[str, str]:
     return publisher, campaign["kanban_board"]
 
 
-@overload
-def _db(directory: Path, *, write: Literal[True]) -> AbstractContextManager[sqlite3.Connection]: ...
-
-
-@overload
-def _db(directory: Path, *, write: Literal[False] = False) -> AbstractContextManager[sqlite3.Connection | None]: ...
-
-
-@contextmanager
-def _db(directory: Path, *, write: bool = False):
-    path = _member(directory, "publications.sqlite3")
-    if path.exists() and not path.is_file():
-        raise OSError("Publication storage is not a regular file.")
-    if not write and not path.exists():
-        yield None
-        return
-    if write:
-        # Keep unpublished content private even when a worker's default umask is permissive.
-        fd = os.open(path, os.O_CREAT | os.O_WRONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0), 0o600)
-        try:
-            if not stat.S_ISREG(os.fstat(fd).st_mode):
-                raise OSError("Publication storage is not a regular file.")
-        finally:
-            os.close(fd)
-    with closing(sqlite3.connect(path.as_uri() + ("?mode=rw" if write else "?mode=ro"), uri=True)) as conn:
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
-        if write:
-            conn.executescript(_SCHEMA)
-            conn.execute("BEGIN IMMEDIATE")
-        with conn:
-            yield conn
-
-
 def _row(conn: sqlite3.Connection | None, publication_id: str) -> sqlite3.Row:
     if not isinstance(publication_id, str) or not _ID.fullmatch(publication_id):
         raise PublicationError(404, "Publication not found.")
@@ -151,7 +93,7 @@ def list_publications(home: Path, campaign_id: str, *, before: int | None = None
     ):
         raise PublicationError(422, "Invalid publications page.")
     directory, config = _campaign(home, campaign_id)
-    with _db(directory) as conn:
+    with connect_campaign_data(directory) as conn:
         rows = conn.execute(
             _SELECT + " WHERE (? IS NULL OR p.seq < ?) ORDER BY p.seq DESC LIMIT ?", (before, before, limit + 1),
         ).fetchall() if conn else []
@@ -206,7 +148,7 @@ def save_publication(home: Path, campaign_id: str, agent_id: str, draft: dict, *
     payload = _draft_json(draft)
     automatic = publication_id is None and config.get("mode", DEFAULT_CAMPAIGN_MODE) == "yolo"
     at = _now()
-    with _db(directory, write=True) as conn:
+    with connect_campaign_data(directory, write=True) as conn:
         if publication_id is None:
             if revision is not None:
                 raise PublicationError(422, "A new publication has no previous revision.")
@@ -234,9 +176,9 @@ def approve_publication(home: Path, campaign_id: str, publication_id: str, revis
         raise PublicationError(409, "This campaign does not use manual publication approval.")
     if not isinstance(approver, str) or not 0 < len(approver) <= 128 or not approver.isprintable() or not approver.strip():
         raise PublicationError(422, "A valid approver is required.")
-    if not _member(directory, "publications.sqlite3").is_file():
+    if not campaign_data_exists(directory):
         raise PublicationError(404, "Publication not found.")
-    with _db(directory, write=True) as conn:
+    with connect_campaign_data(directory, write=True) as conn:
         row = _row(conn, publication_id)
         _check_revision(row, revision)
         if row["status"] == "pending_approval" or (row["status"] == "approved" and row["approved_by"] is None):
@@ -251,7 +193,7 @@ def approve_publication(home: Path, campaign_id: str, publication_id: str, revis
 
 def _enqueue(home: Path, directory: Path, config: dict, publication_id: str, revision: int) -> dict:
     # Approval commits before a task can run. A retry repairs an interrupted handoff without duplicating it.
-    with _db(directory, write=True) as conn:
+    with connect_campaign_data(directory, write=True) as conn:
         row = _row(conn, publication_id)
         _check_revision(row, revision)
         if row["status"] != "approved" or row["task_id"]:
@@ -279,7 +221,7 @@ def claim_publication(home: Path, campaign_id: str, agent_id: str, publication_i
     directory, config = _campaign(home, campaign_id)
     if agent_id != _publisher(home, config)[0]:
         raise PublicationError(403, "Only the campaign publisher can claim publications.")
-    with _db(directory, write=True) as conn:
+    with connect_campaign_data(directory, write=True) as conn:
         row = _row(conn, publication_id)
         _check_revision(row, revision)
         mode = config.get("mode", DEFAULT_CAMPAIGN_MODE)
@@ -296,7 +238,7 @@ def claim_publication(home: Path, campaign_id: str, agent_id: str, publication_i
 def human_approved_task(directory: Path, task_id: str) -> bool:
     """Control only admits a Kanban task linked to a human-approved publication."""
     try:
-        with _db(directory) as conn:
+        with connect_campaign_data(directory) as conn:
             return bool(conn and conn.execute(
                 "SELECT 1 FROM publications WHERE task_id = ? AND approved_by IS NOT NULL AND status = 'approved'",
                 (task_id,),
@@ -321,7 +263,7 @@ def finish_publication(home: Path, campaign_id: str, agent_id: str, publication_
     if not isinstance(token, str) or not _ID.fullmatch(token):
         raise PublicationError(409, "The publisher does not own this claim.")
     receipt_key = sha256(token.encode("ascii")).hexdigest()
-    with _db(directory, write=True) as conn:
+    with connect_campaign_data(directory, write=True) as conn:
         row = _row(conn, publication_id)
         _check_revision(row, revision)
         if row["status"] in ("published", "failed") and compare_digest(row["claim_token"] or "", receipt_key):
