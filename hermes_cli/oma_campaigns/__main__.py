@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from hermes_cli.oma_campaigns.install import configure, default_home, install, installed
+from hermes_cli.oma_campaigns.install import configure, create, default_home, install, installed
 from hermes_cli.oma_campaigns.integrations import brand_candidates
 from hermes_cli.oma_campaigns.lifecycle import set_lifecycle, set_mode
 from hermes_cli.oma_campaigns.schema import KINDS, validate_record
@@ -18,7 +18,8 @@ def main(argv=None) -> int:
     commands.add_parser("list", help="List installed or incomplete campaigns")
     commands.add_parser("status", help="Inspect a saved campaign and its provisioning status").add_argument("id")
     commands.add_parser("configure", help="Fill missing routing metadata for a verified installed campaign").add_argument("id")
-    commands.add_parser("install", help="Provision a campaign from saved OMA campaign and agent records").add_argument("id")
+    commands.add_parser("create", help="Create a paused campaign with its team and Kanban board").add_argument("path", type=Path)
+    commands.add_parser("install", help="Provision a legacy saved campaign definition without starting it").add_argument("id")
     commands.add_parser("integrations", help="List brand-derived candidate integrations")
     lifecycle = commands.add_parser("lifecycle", help="Pause or resume an installed campaign")
     lifecycle.add_argument("id")
@@ -34,6 +35,7 @@ def main(argv=None) -> int:
         "list": lambda home, args: installed(home),
         "status": lambda home, args: installed(home, args.id)[0],
         "configure": lambda home, args: configure(home, args.id),
+        "create": lambda home, args: create(home, args.path),
         "install": lambda home, args: install(home, args.id),
         "integrations": lambda home, args: brand_candidates(home),
         "lifecycle": lambda home, args: set_lifecycle(home, args.id, args.state),

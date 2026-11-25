@@ -56,6 +56,53 @@ def bundle(tmp_path, monkeypatch):
     return home, source, cli.main
 
 
+def test_create_campaign_provisions_a_paused_team_and_empty_board(bundle, capsys, tmp_path):
+    from hermes_cli import kanban_db
+    from hermes_cli.kanban_db_connect import connect_closing
+    from hermes_cli.oma_campaigns.admission import board_work_paused, profile_work_paused
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, main = bundle
+    record = source / "campaigns/demo/config.yaml"
+    definition = record.rename(tmp_path / "demo.yaml")
+    record.parent.rmdir()
+    record.parent.parent.rmdir()
+    assert main(["create", str(definition)]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["lifecycle_state"] == "paused"
+    assert result["present_profiles"] == list(DEMO_AGENTS)
+    assert read_mapping(record)["installation_state"] == "installed"
+    with connect_closing(board="campaign-demo") as conn:
+        assert kanban_db.list_tasks(conn) == []
+        assert board_work_paused(conn)
+    for name in DEMO_AGENTS:
+        profile = home / "profiles" / name
+        assert (profile / "SOUL.md").is_file()
+        assert profile_work_paused(profile)
+        assert not (profile / "cron/jobs.json").exists()
+
+    assert main(["status", "demo"]) == 0
+    assert json.loads(capsys.readouterr().out) == result
+    before = record.read_bytes()
+    assert main(["create", str(definition)]) == 1
+    assert "already exists" in capsys.readouterr().err
+    assert record.read_bytes() == before
+
+
+def test_create_campaign_rejects_missing_persona_without_saving_campaign(bundle, capsys, tmp_path):
+    from hermes_cli import kanban_db
+
+    home, source, main = bundle
+    record = source / "campaigns/demo/config.yaml"
+    definition = record.rename(tmp_path / "demo.yaml")
+    (source / "agents/demo__publisher/SOUL.md").unlink()
+    assert main(["create", str(definition)]) == 1
+    assert "demo__publisher/SOUL.md" in capsys.readouterr().err
+    assert not record.exists()
+    assert not kanban_db.board_exists("campaign-demo")
+    assert not (home / "profiles/demo__orchestrator").exists()
+
+
 def test_install_requires_campaign_publisher_before_provisioning(bundle, capsys):
     from hermes_cli import kanban_db
     from hermes_cli.config import atomic_config_write
@@ -315,9 +362,8 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     assert main(["list"]) == 0
     assert not (home / "oma-bundle" / "campaigns").exists()
     assert json.loads(capsys.readouterr().out) == []
-    assert main(["status", "demo"]) == 0
-    draft = json.loads(capsys.readouterr().out)
-    assert draft["state"] == "draft" and draft["present_profiles"] == []
+    assert main(["status", "demo"]) == 1
+    assert "not installed; run install demo" in capsys.readouterr().err
     existing = home / "oma" / "agents" / "demo__worker" / "saves" / "handoff.md"
     existing.parent.mkdir(parents=True)
     existing.write_text("Keep this handoff.", encoding="utf-8")
@@ -806,8 +852,8 @@ def test_campaign_helper_uses_installed_runtime(bundle, run_campaign_script):
     _, source, _ = bundle
     helper = Path(project_root_str()) / "skills/oma/oma-campaigns/scripts/campaign.py"
     result = run_campaign_script(helper, "status", "demo")
-    assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout)["state"] == "draft"
+    assert result.returncode == 1, result.stderr
+    assert "not installed; run install demo" in result.stderr
     result = run_campaign_script(helper, "validate", "campaign", str(source / "campaigns" / "demo" / "config.yaml"))
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {"kind": "campaign", "valid": True}

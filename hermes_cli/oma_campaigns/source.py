@@ -144,13 +144,10 @@ def _read_agent(root: Path, campaign_id: str, agent_id: str, index: dict[str, li
     return Agent(agent_id, description, data, soul, skills)
 
 
-def resolve(home: Path, campaign_id: str) -> Campaign:
+def resolve(home: Path, campaign_id: str, config: dict) -> Campaign:
     """Resolve authored campaign and agent records, not shipped templates."""
     oma = _member(home.resolve(), "oma")
-    campaigns_dir = _member(oma, "campaigns")
-    directory = _member(campaigns_dir, checked_id(campaign_id))
-    manifest = _member(directory, "config.yaml")
-    data = campaign_fields(read_mapping(manifest), campaign_id)
+    data = campaign_fields(config, checked_id(campaign_id))
     ids = data.pop("agents")
     index = _skill_index(_member(bundle_dir(home.resolve()), "skills"))
     agents_root = _member(oma, "agents")

@@ -178,7 +178,8 @@ The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) designs t
 
 | Helper verb | Effect |
 | --- | --- |
-| `install <id>` | Provision a team from saved campaign and agent records. Does not start agent turns or replace an existing installation. |
+| `create <definition.yaml>` | Create the campaign, provision the full team and an empty Kanban board, and leave it paused. Use a definition outside `oma/campaigns/` and prepare the referenced agent records first. |
+| `install <id>` | Provision a legacy saved campaign definition as paused without replacing an existing installation. |
 | `list` / `status <id>` | Inspect campaign records and verify the board and profiles locally. |
 | `configure <id>` | Fill missing routing fields in the existing campaign config without reinstalling. |
 | `integrations` | List canonical integration candidates from saved brand evidence. |
@@ -197,7 +198,7 @@ The [Composio category snapshot](hermes_cli/oma_campaigns/schemas/composio-categ
 
 **Standalone agents:** Docker seeds missing `oma/agents/default` and `oma/agents/maintenance` records without applying them or replacing saved edits. Each new record mirrors saved reasoning effort, toolsets, Tool Search, disabled skills, approvals, Kanban routing, config version, and plugin state already written by the native profile. Default-plugin installation runs separately, so its marker is only copied if already present. The default management packages and maintenance-only `omactl` are implicit, not listed in starter records or removed by sync.
 
-**Editable campaign config:** The agent writes the identity, roster, goals and plans before provisioning. Campaign and agent records are unversioned; older `version` fields are ignored and preserved in existing files. Campaigns use the single stored playbook without a `playbook` field.
+**Editable campaign config:** Supply the identity, roster, goals and plans in the creation input; the `create` command writes the campaign record as part of provisioning. Legacy definitions with no installed team are not reported as campaigns by `list`; provision them with `install <id>`. Campaign and agent records are unversioned; older `version` fields are ignored and preserved in existing files. Campaigns use the single stored playbook without a `playbook` field.
 
 The campaign and agent skills verify the proposed `agents` list against the profiles actually provisioned. The brand skill records brand-relative references to logos, fonts, illustrations, icons, backgrounds, and images in the brand’s `config.yaml`.
 
