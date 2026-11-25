@@ -43,7 +43,7 @@ def test_preflight_checks_the_cache_without_launching_a_detector(tmp_path, capsy
     else:
         error = json.loads(captured.err)
         assert error["status"] == "error"
-        assert "Check container startup logs or run wappalyzer_installation.py" in error["error"]
+        assert "Run wappalyzer_installation.py to prepare it" in error["error"]
         assert not upstream.exists()
 
 

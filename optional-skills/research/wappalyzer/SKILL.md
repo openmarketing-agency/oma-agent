@@ -32,21 +32,19 @@ Use `terminal` for the helper and `read_file` for its saved output. The Python
 interpreter must be the Hermes environment; Node must already be available.
 `SKILL_DIR` means the directory containing this file.
 
-Docker startup fetches the pinned Wappalyzer revision from upstream and
-prepares its CLI in `cache/research/wappalyzer/<revision>` under the shared
-Hermes home. The release image ships the installer and the integration.
-Persist the data volume to reuse the completed installation across container
-replacements. A failed install is logged during startup and retried on the
-next start. See `NOTICE` for upstream attribution.
-
-Outside Docker, Git, Node and npm are needed for one-time setup:
+Install the skill with `hermes skills install official/research/wappalyzer`.
+Then run the installer once with Git, Node and npm available. In Docker, run
+it inside the container as the Hermes user with the data volume mounted.
 
 ```bash
 python SKILL_DIR/scripts/wappalyzer_installation.py
 ```
 
-The research helper finds this cache automatically. Use `--upstream PATH`
-only if the operator already has a separate prepared checkout.
+The installer fetches the pinned revision into `cache/research/wappalyzer/<revision>`
+under the shared Hermes home. Persist the Docker data volume to reuse it across
+container replacements. Rerun the setup command if it fails. See `NOTICE` for
+upstream attribution. The research helper finds the cache automatically.
+Use `--upstream PATH` when the operator has a separate prepared checkout.
 
 For CLI fallback, Chromium must already be available through Hermes's existing
 browser executable resolver. Neither the detector nor browsers are installed at
@@ -66,8 +64,7 @@ python SKILL_DIR/scripts/research.py --check
 ```
 
 A successful check returns `status: ready` with the resolved path and version.
-If it errors, report the missing prerequisite. In Docker, point to the startup
-logs and the next restart retry. On a local install, point to the setup command
+If it errors, report the missing prerequisite and point to the setup command
 above. The check only inspects files and finds Node.
 
 1. Open the target through the Camofox plugin's `browser_navigate`. Wait for

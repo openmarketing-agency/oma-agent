@@ -1,0 +1,106 @@
+# Shape reference for research/competitors/index.yaml.
+# Copy the structure, never these values. Paths are relative to oma/brand/.
+version: 1
+brand_id: example-brand
+updated: 2026-01-15
+
+frame:
+  category_terms: ["ai slide generator", "pitch deck maker", "ai presentation maker"]
+  job: "Turn a prompt or document into a finished slide deck"
+  buyer: "Founders and solo consultants at companies under 50 people"
+  price_point: "$15/month"
+  markets: [global]
+  business_type: saas
+  sources:
+    - knowledge-base.md#positioning
+    - config.yaml#website
+
+coverage:
+  - source: brand_site
+    status: checked
+    date: 2026-01-15
+  - source: serp_ads
+    status: blocked
+    date: 2026-01-15
+    note: "CAPTCHA on results page"
+
+competitors:
+  - id: deckly
+    name: Deckly
+    website: https://deckly.example
+    tier: direct
+    status: active
+    depth: full
+    named_by_brand: true
+    scores: {job: 2, buyer: 2, price: 2, market: 2, channel: 1}
+    total: 9
+    score_evidence:
+      job: https://deckly.example/
+      buyer: https://deckly.example/customers
+      price: https://deckly.example/pricing
+      market: https://deckly.example/
+      channel: https://www.reddit.com/r/example/comments/abc
+    unverified: []
+    found_via: [brand_site, serp_alternatives, review_sites]
+    mentions: 3
+    profile: research/competitors/deckly/profile.md
+    gtm: research/competitors/deckly/gtm.md
+    creatives: research/competitors/deckly/creatives.md
+    first_seen: 2026-01-15
+    last_checked: 2026-01-15
+
+  - id: officesuite
+    name: OfficeSuite
+    website: https://officesuite.example
+    tier: indirect
+    status: active
+    depth: light
+    named_by_brand: false
+    incumbent: true
+    scores: {job: 1, buyer: 1, price: 2, market: 2, channel: 2}
+    total: 8
+    score_evidence:
+      job: https://officesuite.example/ai
+      buyer: https://officesuite.example/business
+      price: https://officesuite.example/pricing
+      market: https://officesuite.example/
+      channel: https://officesuite.example/blog
+    unverified: []
+    found_via: [serp_category]
+    mentions: 1
+    profile: research/competitors/officesuite/profile.md
+    gtm: research/competitors/officesuite/gtm.md
+    first_seen: 2026-01-15
+    last_checked: 2026-01-15
+
+  - id: slidepress
+    name: SlidePress
+    website: https://slidepress.example
+    tier: excluded
+    status: inactive
+    depth: index_only
+    scores: {job: 2, buyer: 1, price: 0, market: 2, channel: 0}
+    total: 5
+    score_evidence:
+      job: https://slidepress.example/
+      buyer: https://slidepress.example/
+      market: https://slidepress.example/
+    unverified: [price]
+    exclusion_reason: "No product updates, posts or ads since 2025-03"
+    found_via: [communities]
+    mentions: 1
+    first_seen: 2026-01-15
+    last_checked: 2026-01-15
+
+references:
+  - id: notionish
+    name: Notionish
+    website: https://notionish.example
+    reason: "Same buyer; long-running founder-story video ads"
+    creatives: research/competitors/notionish/creatives.md
+    first_seen: 2026-01-15
+    last_checked: 2026-01-15
+
+status_quo:
+  - name: "Building slides by hand in PowerPoint or Google Slides"
+    evidence: https://www.reddit.com/r/example/comments/def

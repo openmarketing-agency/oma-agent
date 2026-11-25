@@ -20,8 +20,7 @@ def detector_version(upstream: Path) -> str:
     manifest = upstream / DRIVER / "package.json"
     if not manifest.is_file():
         raise ValueError(
-            f"Wappalyzer is missing at {upstream}. Check container startup logs "
-            "or run wappalyzer_installation.py."
+            f"Wappalyzer is missing at {upstream}. Run wappalyzer_installation.py to prepare it."
         )
     package = json.loads(manifest.read_text(encoding="utf-8"))
     version = package.get("version") if isinstance(package, dict) else None
