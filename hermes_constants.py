@@ -10,6 +10,7 @@ import shutil
 import stat
 import sys
 from collections.abc import Callable, Mapping, MutableMapping
+from functools import cache
 from pathlib import Path
 
 _profile_fallback_warned: bool = False
@@ -76,9 +77,22 @@ def _platform_default_hermes_home(environ: Mapping[str, str], user_home: Callabl
     return user_home() / (".hermes" + suffix)
 
 
+@cache
+def _installed_source_home() -> Path | None:
+    """Read the direct installer's checkout-local data binding once per launch."""
+    marker = _INSTALL_ROOT / ".hermes" / "install-home"
+    try:
+        value = marker.read_text(encoding="utf-8").removesuffix("\n")
+        if value.startswith("/") and not any(char in value for char in "\n\r\x00"):
+            return Path(value)
+    except (OSError, UnicodeError):
+        pass
+    return None
+
+
 def _get_platform_default_hermes_home() -> Path:
-    """Return the platform default with the literal data-directory suffix."""
-    return _platform_default_hermes_home(os.environ, Path.home)
+    """Return the installed source home, or the platform default with its suffix."""
+    return _installed_source_home() or _platform_default_hermes_home(os.environ, Path.home)
 
 
 def _account_home() -> Path:
