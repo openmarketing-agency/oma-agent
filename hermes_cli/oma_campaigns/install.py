@@ -67,6 +67,10 @@ def _profile_matches(home: Path, agent_id: str, board: str, orchestrator: str) -
             and routing.get("orchestrator_profile") == orchestrator)
 
 
+def _installation_recorded(config: dict) -> bool:
+    return config.get("installation_state") is not None or "kanban_board" in config
+
+
 def _status(home: Path, campaign_id: str, config: dict) -> dict:
     record = campaign_fields(config, campaign_id)
     board = f"campaign-{campaign_id}"
@@ -75,7 +79,7 @@ def _status(home: Path, campaign_id: str, config: dict) -> dict:
         raise ValueError(f"{campaign_id}: invalid installation_state")
     if "kanban_board" in config and config["kanban_board"] != board:
         raise ValueError(f"{campaign_id}: campaign config kanban_board conflicts with {board!r}")
-    recorded = marker is not None or config.get("kanban_board") == board
+    recorded = _installation_recorded(config)
     present = [agent for agent in record["agents"]
                if recorded and _profile_matches(home, agent, board, record["orchestrator"])]
     metadata = kanban_db.read_board_metadata(board) if recorded and kanban_db.board_exists(board) else None
@@ -83,6 +87,7 @@ def _status(home: Path, campaign_id: str, config: dict) -> dict:
     if marker == "installing" or (marker == "installed" and not ready):
         state = "incomplete"
     else:
+        # The separately released VM reads this private status for legacy definitions.
         state = "installed" if ready else "draft"
     lifecycle = config.get("lifecycle_state", "resumed" if state == "installed" else "paused")
     return {**record, "state": state, "present_profiles": present,
@@ -95,7 +100,13 @@ def _status(home: Path, campaign_id: str, config: dict) -> dict:
 def installed(home: Path, campaign_id: str | None = None) -> list[dict]:
     campaigns = _campaigns_dir(home)
     if campaign_id is not None:
-        return [_status(home, campaign_id, read_mapping(_campaign_config_path(campaigns, campaign_id)))]
+        config = read_mapping(_campaign_config_path(campaigns, campaign_id))
+        if not _installation_recorded(config):
+            raise ValueError(f"Campaign {campaign_id!r} is not installed; run install {campaign_id} to provision the saved definition")
+        record = _status(home, campaign_id, config)
+        if record["state"] == "draft":
+            record["state"] = "incomplete"
+        return [record]
     if not campaigns.is_dir():
         return []
     records = []
@@ -106,11 +117,10 @@ def installed(home: Path, campaign_id: str | None = None) -> list[dict]:
         if not path.is_file():
             continue
         config = read_mapping(path)
-        if config.get("installation_state") is None and "kanban_board" not in config:
-            continue
-        record = _status(home, directory.name, config)
-        if record["state"] != "draft":
-            records.append(record)
+        if _installation_recorded(config):
+            record = _status(home, directory.name, config)
+            if record["state"] != "draft":
+                records.append(record)
     return records
 
 
@@ -317,22 +327,44 @@ def _publish_profiles(campaign: Campaign, configs: dict[str, dict], paths: dict[
                                        description=agent.description, soul=soul)
         provision_profile(request, initialize=partial(_initialize, agent, configs[agent.id], credentials[agent.id]))
 
+def create(home: Path, definition: Path) -> dict:
+    """Create an installed, paused campaign from a definition outside the campaign registry."""
+    config = read_mapping(_real_path(definition))
+    validate_record("campaign", config, definition)
+    managed = {"installation_state", "lifecycle_state", "kanban_board", "kanban_board_name", "all-keys", "available-keys"}
+    if fields := managed & config.keys():
+        raise ValueError(f"Campaign creation manages these fields: {', '.join(sorted(fields))}")
+    return _install(home, config["id"], definition=config)
+
+
 def install(home: Path, campaign_id: str) -> dict:
+    """Provision a legacy saved definition without starting it."""
+    return _install(home, campaign_id)
+
+
+def _install(home: Path, campaign_id: str, *, definition: dict | None = None) -> dict:
     require_file_tooling("OMA campaign installation")
     campaigns = _campaigns_dir(home)
     config_path = _campaign_config_path(campaigns, campaign_id)
+    if definition is not None:
+        campaigns.mkdir(mode=0o700, parents=True, exist_ok=True)
     with _install_lock(config_path):
-        config = read_mapping(config_path)
-        record = _status(home, campaign_id, config)
-        if record["state"] == "installed":
-            return record
-        if record["state"] == "incomplete":
-            raise ValueError(f"Campaign {campaign_id!r} has an incomplete installation; no profiles were changed")
-        validate_record("campaign", config, config_path)
+        if definition is not None:
+            if config_path.exists():  # config-reader: ok — existence check before a create-only write
+                raise ValueError(f"Campaign {campaign_id!r} already exists")
+            config = definition
+        else:
+            config = read_mapping(config_path)
+            record = _status(home, campaign_id, config)
+            if record["state"] == "installed":
+                return record
+            if record["state"] == "incomplete":
+                raise ValueError(f"Campaign {campaign_id!r} has an incomplete installation; no profiles were changed")
+            validate_record("campaign", config, config_path)
         publisher = f"{campaign_id}__publisher"
-        if publisher not in record["agents"]:
+        if publisher not in config["agents"]:
             raise ValueError(f"{campaign_id}: roster must contain the canonical publisher {publisher}")
-        campaign = resolve(home, campaign_id)
+        campaign = resolve(home, campaign_id, config)
         policies = _check_profiles(home, campaign)
         paths = {agent.id: (_agent_data_dir(home, agent.id, "saves"), _agent_data_dir(home, agent.id, "tmp"))
                  for agent in campaign.agents}
@@ -364,6 +396,8 @@ def install(home: Path, campaign_id: str) -> dict:
         if (board_dir := kanban_db.board_dir(board)).exists() or board_dir.is_symlink():
             raise ValueError(f"Kanban board {board!r} already exists; refusing to reuse an unrelated board")
         config.setdefault("integrations", [])
+        config_path.parent.mkdir(mode=0o700, exist_ok=True)
+        # Publish the paused admission latch before creating any runnable resources.
         atomic_config_write(config_path, {**config, "kanban_board": board, "installation_state": "installing",
                                           "lifecycle_state": "paused"})
         try:
@@ -391,5 +425,8 @@ def install(home: Path, campaign_id: str) -> dict:
             current.update({"all-keys": sorted(all_keys), "available-keys": sorted(all_keys - missing_keys)})
         current.setdefault("kanban_board_name", board_metadata["name"])
         current["installation_state"] = "installed"
+        result = _status(home, campaign_id, current)
+        if result["state"] != "installed":
+            raise ValueError(f"Campaign {campaign_id!r} could not verify its installed board and roster")
         atomic_config_write(config_path, current)
-        return _status(home, campaign_id, current)
+        return result
