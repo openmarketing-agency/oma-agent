@@ -13,6 +13,7 @@ import pytest
 
 
 DEMO_AGENTS = ("demo__orchestrator", "demo__worker", "demo__publisher")
+DEMO_ROSTER = (*DEMO_AGENTS, "demo__analyst")
 
 
 @pytest.fixture
@@ -72,7 +73,7 @@ def test_create_campaign_provisions_a_paused_team_and_empty_board(bundle, capsys
     assert main(["create", str(definition)]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["lifecycle_state"] == "paused"
-    assert result["present_profiles"] == list(DEMO_AGENTS)
+    assert result["present_profiles"] == list(DEMO_ROSTER)
     assert read_mapping(record)["installation_state"] == "installed"
     with connect_closing(board="campaign-demo") as conn:
         assert kanban_db.list_tasks(conn) == []
@@ -131,14 +132,15 @@ def test_already_installed_campaign_without_publisher_is_left_unchanged(bundle, 
     assert main(["install", "demo"]) == 0
     capsys.readouterr()
     path = source / "campaigns/demo/config.yaml"
-    atomic_config_write(path, {**read_mapping(path), "agents": list(DEMO_AGENTS[:2])})
+    remaining = [*DEMO_AGENTS[:2], "demo__analyst"]
+    atomic_config_write(path, {**read_mapping(path), "agents": remaining})
     publisher = home / "profiles/demo__publisher"
     publisher.rename(home / "previous-publisher")
     before = path.read_bytes()
 
     assert main(["install", "demo"]) == 0
     result = json.loads(capsys.readouterr().out)
-    assert result["state"] == "installed" and result["present_profiles"] == list(DEMO_AGENTS[:2])
+    assert result["state"] == "installed" and result["present_profiles"] == remaining
     assert path.read_bytes() == before
     assert not publisher.exists()
 
@@ -199,7 +201,9 @@ def test_campaign_resume_requires_saved_model_but_not_connected_integrations(bun
 
 
 def test_campaign_pause_blocks_gateway_cron_and_kanban_without_editing_job_state(bundle, capsys):
-    from cron.jobs import create_job, get_due_jobs, list_jobs, trigger_job, use_cron_store
+    from agent.runtime_scope import bind_profile_scope
+    from cron.executions import create_execution, finish_execution, mark_execution_running
+    from cron.jobs import create_job, get_due_jobs, list_jobs, mark_job_run, use_cron_store
     from hermes_cli import kanban_db, profiles
     from hermes_cli.config import atomic_config_write
     from hermes_cli.kanban_db_connect import connect_closing
@@ -212,9 +216,15 @@ def test_campaign_pause_blocks_gateway_cron_and_kanban_without_editing_job_state
     assert json.loads(capsys.readouterr().out)["lifecycle_state"] == "paused"
     role = home / "profiles" / "demo__orchestrator"
     assert "demo__orchestrator" not in dict(profiles.profiles_to_serve(True))
-    with use_cron_store(role):
+    with bind_profile_scope(role, hydrate_secrets=False), use_cron_store(role):
         recurring = create_job(prompt="Review progress", schedule="every 1d")
         disabled = create_job(prompt="Stay paused", schedule="every 1d", paused=True)
+        previous = create_job(prompt="Already ran", schedule="every 1h")
+        assert mark_job_run(previous["id"], success=True)
+        interrupted = create_job(prompt="Started before an interruption", schedule="every 1h")
+        attempt = create_execution(interrupted["id"], source="test")
+        assert mark_execution_running(attempt["id"])
+        finish_execution(attempt["id"], success=False)
         assert get_due_jobs() == []
     with connect_closing(board="campaign-demo") as conn:
         task_id = kanban_db.create_task(conn, title="Do work", assignee=role.name)
@@ -223,7 +233,6 @@ def test_campaign_pause_blocks_gateway_cron_and_kanban_without_editing_job_state
     assert json.loads(capsys.readouterr().out)["state"] == "resumed"
     assert "demo__orchestrator" in dict(profiles.profiles_to_serve(True))
     with use_cron_store(role):
-        trigger_job(recurring["id"])
         assert [j["id"] for j in get_due_jobs()] == [recurring["id"]]
     with connect_closing(board="campaign-demo") as conn:
         assert kanban_db.claim_task(conn, task_id) is not None
@@ -238,7 +247,7 @@ def test_campaign_pause_blocks_gateway_cron_and_kanban_without_editing_job_state
     with use_cron_store(role):
         assert get_due_jobs() == []
         assert {j["id"]: j["enabled"] for j in list_jobs(include_disabled=True)} == {
-            recurring["id"]: True, disabled["id"]: False,
+            recurring["id"]: True, disabled["id"]: False, previous["id"]: True, interrupted["id"]: True,
         }
 
 
@@ -343,6 +352,101 @@ def test_campaign_publications_handoff(bundle, capsys, mode, legacy):
         ]
 
 
+def test_campaign_analyst_refresh_runs_in_control_and_saves_data(bundle):
+    from agent.runtime_scope import bind_profile_scope
+    from cron import scheduler
+    from cron.jobs import claim_job_for_fire, create_job, get_due_jobs, get_job, list_jobs, update_job, use_cron_store
+    from hermes_cli.config import atomic_config_write
+    from hermes_cli.oma_campaigns.analytics import AnalyticsError, list_analytics
+    from hermes_cli.oma_campaigns.analytics_cron import JOB_ID, analytics_status, refresh_analytics
+    from hermes_cli.oma_campaigns.publications import save_publication
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, main = bundle
+    path = source / "campaigns/demo/config.yaml"
+    atomic_config_write(path, {**read_mapping(path), "model": "provider/test-model"})
+    assert main(["install", "demo"]) == 0
+    profile = home / "profiles/demo__analyst"
+    with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
+        analyst_job = get_job(JOB_ID)
+        assert analyst_job is not None
+        regular_slot = analyst_job["next_run_at"]
+        ordinary = create_job(name="Ordinary analyst job", prompt="Not the collector", schedule="1h")
+    assert main(["mode", "demo", "control"]) == 0
+    with pytest.raises(AnalyticsError, match="Start the campaign"):
+        refresh_analytics(home, "demo")
+    assert main(["lifecycle", "demo", "resumed"]) == 0
+    save_publication(home, "demo", "demo__worker", {
+        "platform": "x", "kind": "post", "account": {"id": "connected"}, "content": {"text": "Draft"},
+    })
+    initial = analytics_status(home, "demo")
+    assert initial["state"] == "queued" and not initial["running"]
+    queued = refresh_analytics(home, "demo")
+    assert queued["state"] == "queued" and not queued["running"]
+    assert queued["run_id"] == initial["run_id"]
+    assert refresh_analytics(home, "demo")["run_id"] == queued["run_id"]
+    assert analytics_status(home, "demo")["state"] == "queued"
+    with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
+        assert [row["id"] for row in list_jobs(include_disabled=True)] == [JOB_ID]
+        assert not claim_job_for_fire(ordinary["id"], force=True)
+        assert [row["id"] for row in get_due_jobs()] == [JOB_ID]
+        assert scheduler.tick(verbose=False, headless=True) == 1
+    [row] = list_analytics(home, "demo", source="oma-publications", metric="drafts_created")["observations"]
+    assert row["value"] == 1
+    status = analytics_status(home, "demo")
+    assert status["state"] == "idle" and not status["running"] and status["last_successful_refresh_at"]
+    assert main(["lifecycle", "demo", "paused"]) == 0
+    assert main(["lifecycle", "demo", "resumed"]) == 0
+    assert analytics_status(home, "demo")["state"] == "idle"
+    with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
+        from hermes_time import now
+        analyst_job = get_job(JOB_ID)
+        assert analyst_job is not None and analyst_job["next_run_at"] == regular_slot
+        update_job(JOB_ID, {"next_run_at": now().isoformat()})
+        assert scheduler.tick(verbose=False, headless=True) == 1
+    assert len(list_analytics(home, "demo")["observations"]) == 1
+
+
+@pytest.mark.parametrize("minutes_since_run, queues_catchup", [(180, True), (30, False)])
+def test_campaign_resume_catches_up_one_overdue_analyst_run(bundle, minutes_since_run, queues_catchup):
+    from datetime import UTC, datetime, timedelta
+
+    from agent.runtime_scope import bind_profile_scope
+    from cron import scheduler
+    from cron.executions import list_executions
+    from cron.jobs import get_job, update_job, use_cron_store
+    from hermes_cli.config import atomic_config_write
+    from hermes_cli.oma_campaigns.analytics_cron import JOB_ID, analytics_status
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, main = bundle
+    config = source / "campaigns/demo/config.yaml"
+    atomic_config_write(config, {**read_mapping(config), "model": "provider/test-model", "mode": "control"})
+    assert main(["install", "demo"]) == 0
+    profile = home / "profiles/demo__analyst"
+    assert main(["lifecycle", "demo", "resumed"]) == 0
+    with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
+        assert scheduler.tick(verbose=False, headless=True) == 1
+    assert main(["lifecycle", "demo", "paused"]) == 0
+    last_run = datetime.now(UTC) - timedelta(minutes=minutes_since_run)
+    next_slot = last_run + timedelta(hours=1)
+    with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
+        update_job(JOB_ID, {"last_run_at": last_run.isoformat(), "next_run_at": next_slot.isoformat()})
+    assert main(["lifecycle", "demo", "resumed"]) == 0
+    assert analytics_status(home, "demo")["state"] == ("queued" if queues_catchup else "idle")
+    assert main(["lifecycle", "demo", "resumed"]) == 0  # Retrying Start must not add a run.
+    with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
+        assert scheduler.tick(verbose=False, headless=True) == int(queues_catchup)
+        assert scheduler.tick(verbose=False, headless=True) == 0
+        assert len(list_executions(job_id=JOB_ID)) == 1 + int(queues_catchup)
+        job = get_job(JOB_ID)
+        assert job is not None
+        if queues_catchup:
+            assert datetime.fromisoformat(job["next_run_at"]) - datetime.fromisoformat(job["last_run_at"]) == timedelta(hours=1)
+        else:
+            assert job["next_run_at"] == next_slot.isoformat()
+
+
 def test_campaign_control_removes_registered_cron_and_restores_operator_pause(bundle):
     from cron.jobs import create_job, list_jobs, use_cron_store
     from hermes_cli.config import atomic_config_write
@@ -396,7 +500,7 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     assert record["description"] == "Test team."
     assert "version" not in record
     assert record["state"] == "installed"
-    assert record["present_profiles"] == list(DEMO_AGENTS)
+    assert record["present_profiles"] == list(DEMO_ROSTER)
     assert not (home / "playbooks").exists()
     assert not (source / "installations").exists()
     config_path = source / "campaigns" / "demo" / "config.yaml"
@@ -406,12 +510,12 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
         "id": "demo", "name": "Demo", "description": "Test team.",
         "goals": ["Measure demand"], "plans": ["Review evidence"],
         "integrations": [],
-        "agents": list(DEMO_AGENTS),
+        "agents": list(DEMO_ROSTER),
         "orchestrator": "demo__orchestrator", "kanban_board": "campaign-demo",
         "kanban_board_name": "Demo", "installation_state": "installed", "lifecycle_state": "paused",
     }
-    assert record["agents"] == list(DEMO_AGENTS)
-    for agent_id in record["agents"]:
+    assert record["agents"] == list(DEMO_ROSTER)
+    for agent_id in DEMO_AGENTS:
         profile = home / "profiles" / agent_id
         scratch = source / "agents" / agent_id / "tmp"
         saves = source / "agents" / agent_id / "saves"
@@ -451,7 +555,7 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     assert main(["install", "demo"]) == 0
     assert json.loads(capsys.readouterr().out) == record
     assert config_path.read_bytes() == saved
-    for agent_id in record["agents"]:
+    for agent_id in DEMO_AGENTS:
         note = home / "oma" / "agents" / agent_id / "saves" / "context.md"
         assert note.read_text(encoding="utf-8") == f"Remember {agent_id}."
     assert main(["status", "demo"]) == 0
@@ -481,7 +585,7 @@ def test_sync_materializes_defaults_and_agent_overrides(bundle, capsys):
     atomic_config_write(worker, {**read_mapping(worker), **override})
 
     assert sync(["demo"]) == 0
-    assert json.loads(capsys.readouterr().out)["updated_agents"] == list(DEMO_AGENTS)
+    assert json.loads(capsys.readouterr().out)["updated_agents"] == list(DEMO_ROSTER)
     for path, expected in (
         (orchestrator, campaign_defaults),
         (worker, {**override, "mcp_servers": {**campaign_defaults["mcp_servers"], **override["mcp_servers"]}}),
@@ -657,7 +761,7 @@ def test_sync_reuses_legacy_oma_schedule_and_preserves_operator_pause(bundle):
     with use_cron_store(profile):
         job, = list_jobs(include_disabled=True)
         assert (job["id"], job["enabled"], job["paused_reason"]) == (legacy["id"], False, "Operator paused this")
-    assert sync_campaign(home, "demo")["updated_agents"] == ["demo__worker", "demo__publisher"]
+    assert sync_campaign(home, "demo")["updated_agents"] == list(DEMO_ROSTER[1:])
 
 
 @pytest.mark.parametrize("paused", [False, True], ids=["scheduled", "operator-paused"])
@@ -965,18 +1069,18 @@ def test_sync_campaign_script_accepts_explicit_env_but_never_imports_ambient_val
         return run_campaign_script("sync-campaign", *args, UNLISTED_OMA_REGRESSION="do-not-copy", **values)
 
     # Provisioning can seed an empty .env; sync without supplied values must not touch it.
-    profiles = [home / "profiles" / role for role in DEMO_AGENTS]
+    profiles = [home / "profiles" / role for role in DEMO_ROSTER]
     env_paths = [profile / ".env" for profile in profiles]
     original = [path.read_bytes() if path.exists() else None for path in env_paths]
     first = run("demo", TEAM_SYNC_TOKEN="ambient-same-name", WORKER_SYNC_TOKEN="ambient-worker")
     assert first.returncode == 0, first.stderr
-    assert json.loads(first.stdout)["updated_agents"] == list(DEMO_AGENTS)
+    assert json.loads(first.stdout)["updated_agents"] == list(DEMO_ROSTER)
     assert [path.read_bytes() if path.exists() else None for path in env_paths] == original
     assert "${env:WORKER_SYNC_TOKEN}" in (worker / "config.yaml").read_text(encoding="utf-8-sig")
 
     result = run("demo", "--env-stdin", stdin=json.dumps({"TEAM_SYNC_TOKEN": team_value, "WORKER_SYNC_TOKEN": worker_value}))
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout)["updated_agents"] == list(DEMO_AGENTS)
+    assert json.loads(result.stdout)["updated_agents"] == list(DEMO_ROSTER)
     assert worker_value not in result.stdout + result.stderr
     for profile in profiles:
         env = load_env_file(profile / ".env")
@@ -1005,7 +1109,7 @@ def test_sync_campaign_saves_explicit_env_without_model_or_mcp_reference(bundle,
     assert main(["install", "demo"]) == 0
     monkeypatch.setenv("OMA_AMBIENT_TOKEN", "never-copy")
     expected = {"EXTRA_TOOL_TOKEN": "fixture-explicit-value"}
-    roles = DEMO_AGENTS
+    roles = DEMO_ROSTER
     assert sync_campaign(home, "demo", env=expected)["updated_agents"] == list(roles)
     assert sync_campaign(home, "demo", env={})["updated_agents"] == []
     for role in roles:
@@ -1181,7 +1285,7 @@ def test_saved_agent_model_persists_and_can_be_edited_independently_of_campaign(
                                      "model": "new-campaign-default"})
     atomic_config_write(agent, {**read_mapping(agent), "model": "edited-worker-model"})
     assert sync(["demo"]) == 0
-    assert json.loads(capsys.readouterr().out)["updated_agents"] == list(DEMO_AGENTS)
+    assert json.loads(capsys.readouterr().out)["updated_agents"] == list(DEMO_ROSTER)
     assert read_user_config_raw(native)["model"] == "edited-worker-model"
     owner_native = home / "profiles" / "demo__orchestrator" / "config.yaml"
     assert read_user_config_raw(owner_native)["model"] == "new-campaign-default"
@@ -1393,7 +1497,11 @@ def test_campaign_agents_share_their_own_kanban_board(bundle, capsys):
         with bind_profile_scope(profile, hydrate_secrets=False):
             tools = get_tool_definitions(enabled_toolsets=raw["agent"]["enabled_toolsets"],
                                          skip_tool_search_assembly=True, quiet_mode=True)
-            assert "kanban_list" in {tool["function"]["name"] for tool in tools}
+            tool_names = {tool["function"]["name"] for tool in tools}
+            if agent_id == "demo__analyst":
+                assert "kanban_list" not in tool_names
+                continue
+            assert "kanban_list" in tool_names
             tasks = json.loads(_handle_list({}))
             assert [row["id"] for row in tasks["tasks"]] == ([task_id] if task_id else [])
             assert "error" in json.loads(_handle_list({"board": "unrelated"}))

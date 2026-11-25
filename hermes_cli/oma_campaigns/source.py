@@ -131,6 +131,7 @@ def _read_agent(root: Path, campaign_id: str, agent_id: str, index: dict[str, li
     del data["id"], data["campaign_id"], data["name"]
     data.pop("version", None)  # Legacy template metadata is not a native setting.
     data.pop("effective", None)  # Materialized OMA view, not an authored override.
+    data.pop("analytics_sources", None)  # OMA collector bindings are not native profile settings.
     # OMA credential metadata stays in the record, not the native profile.
     data.pop("all-keys", None)
     data.pop("available-keys", None)

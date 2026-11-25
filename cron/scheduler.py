@@ -2197,6 +2197,18 @@ def _prepare_job_prompt(
     """Run every pre-agent gate and build the prompt. Returns ``(early_result, prompt)``: an early
     result short-circuits ``run_job`` (no_agent job, empty payload, monitor gate, wake gate,
     injection block, empty prompt); otherwise ``prompt`` is set."""
+    from hermes_cli.oma_campaigns.analytics_cron import COLLECTOR, JOB_ID, run_managed_job
+
+    if job_id == JOB_ID and job.get("script") == COLLECTOR:
+        from hermes_cli.oma_campaigns.analytics import AnalyticsError
+
+        try:
+            count = run_managed_job(_get_hermes_home(), job, cancel_event)
+        except AnalyticsError as exc:
+            return (False, f"# {job_name}\n\n{exc}", SILENT_MARKER, str(exc)), None
+        except (OSError, ValueError):
+            return (False, f"# {job_name}\n\nAnalytics collection failed.", SILENT_MARKER, "Analytics collection failed."), None
+        return (True, f"# {job_name}\n\nSaved {count} observations.", SILENT_MARKER, None), None
     # Fail closed on a corrupt config.yaml: defaults would let auto-detection bill a provider the
     # user never chose. no_agent jobs are exempt. Escape hatch: HERMES_IGNORE_USER_CONFIG=1.
     if not job.get("no_agent"):

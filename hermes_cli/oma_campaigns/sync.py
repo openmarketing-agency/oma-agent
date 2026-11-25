@@ -20,6 +20,7 @@ from hermes_cli.oma_campaigns.credentials import (
 from hermes_cli.oma_campaigns.defaults import snapshot
 from hermes_cli.oma_campaigns.install import (
     _agent_data_dir, _campaign_config_path, _campaigns_dir, _install_lock, _status, campaign_soul, default_home,
+    ensure_analyst,
 )
 from hermes_cli.oma_campaigns.role_jobs import apply_role_jobs, plan_role_jobs
 from hermes_cli.oma_campaigns.role_skills import apply_role_skills, plan_role_skills
@@ -157,7 +158,8 @@ def _plan_agent(home: Path, agent_id: str, env: dict[str, str], *, campaign: _Ca
     return _AgentUpdate(agent_id, record_path, digest, native_path, before, next_record if next_record != record else None,
                         next_native, source_soul, native_soul, rendered, tuple(updated + profile_changes),
                         names, available, credentials, plan_role_skills(home, profile, record.get("oma_skills")),
-                        plan_role_jobs(profile, record.get("jobs")) if defaults.get("mode") != "control" else None)
+                        plan_role_jobs(profile, record.get("jobs"))
+                        if defaults.get("mode") != "control" and agent_id != f"{campaign_id}__analyst" else None)
 
 
 def _verify_record(update: _AgentUpdate) -> None:
@@ -244,6 +246,8 @@ def sync_campaign(home: Path, campaign_id: str, *, env: dict[str, str] | None = 
             if changed or plan.record is not None:
                 updates.append(plan.agent_id)
         _publish_campaign_keys(campaign, [(plan.all_keys, plan.available_keys) for plan in plans])
+        config = ensure_analyst(home, campaign_path, read_mapping(campaign_path))
+        agents = config["agents"]
         message = f"updated {len(updates)} profile(s)" if updates else "no agent changes"
         print(f"OMA sync: {message}", file=sys.stderr)
     return {"id": campaign_id, "agents": agents, "updated_agents": updates}
