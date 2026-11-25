@@ -23,12 +23,12 @@ OMA Agent does not offer, collect, or send Nous Shared Metrics. Legacy
 
 A fresh OMA install or a profile created without cloning starts with a minimal
 `config.yaml`. It enables `file`, `terminal`, `browser`, `camofox`, `web`, `skills`,
-`memory`, and `session_search` under `agent.enabled_toolsets`. `file`, `terminal`, `skills`, and
+`memory`, and `session_search` under `agent.enabled_toolsets`. Only `file`, `skills`, and
 `memory` are eager: their tool schemas are available directly from the first
-turn. `browser`, `camofox`, `web`, and `session_search` are deferred and discoverable
+turn. `terminal`, `browser`, `camofox`, `web`, and `session_search` are deferred and discoverable
 through Tool Search. `session_search` searches past conversations.
 The tool-search bridge stays visible, with its upfront catalog listing off.
-The built-in `default` profile also starts with `clarify` enabled and eager on
+The built-in `default` profile also starts with `clarify` enabled and deferred on
 supported interactive surfaces. Its stock `SOUL.md` tells it to use `clarify`
 for feedback and decisions. It also enables `kanban` through Tool Search, not
 upfront, to queue requests on the installed campaign's board for its orchestrator
@@ -43,7 +43,7 @@ Ordinary new named profiles do not enable either toolset by default. Existing
 
 A fresh file-backed OMA install also creates a `maintenance` profile. It enables
 `file`, `terminal`, `skills`, `memory`, `session_search`, `web`, `browser`, and `camofox`.
-`file`, `terminal`, `skills`, and `memory` are eager; the others are available
+`file`, `skills`, and `memory` are eager; the others are available
 through Tool Search where supported. Use `hermes -p maintenance` to select the
 profile. The installer uses `hermes_cli/data/profiles/maintenance/` for its tool config,
 `SOUL.md`, and `omactl` skill. The live profile is stored under
@@ -121,11 +121,13 @@ Scheduled work is declared in each owning agent's `jobs` list. For social
 reviews, the prompt names the channels and asks the orchestrator to check new
 comments, replies, mentions, and tagged posts. Saving a declaration alone does not schedule a job.
 
-New campaign roles must specify `agent.enabled_toolsets`. Include `kanban`
-for the orchestrator and for any worker that needs it; `[]` selects no tools
-for a worker. Omitted Tool Search settings default to `enabled: "on"` and
-`eager_toolsets: [file, skills, memory]`, without adding those toolsets to a
-role's selection. Explicit overrides are preserved. Agents that select `camofox`
+New campaign roles must specify `agent.enabled_toolsets`. OMA adds any missing
+baseline toolsets (`file`, `terminal`, `web`, `skills`, `memory`, `session_search`,
+and `browser`) and preserves role-specific additions. OMA also adds `kanban` to
+the campaign orchestrator. Installation and sync remove `kanban` and any toolset
+that includes it from the publisher's selection. The publisher still gets the task
+tools when dispatched on an assigned publication. Tool Search stays on, with exactly `file`,
+`skills`, and `memory` eager. Agents that select `camofox`
 get the saved URL and key from `default` only when both are present. Where the
 tool is available, use it as the first browser fallback for public-page
 rendering failures, not to retry a bot challenge or explicit access denial.
@@ -155,12 +157,18 @@ Both apply these settings from the saved OMA records:
 - **MCP:** Campaign and agent `mcp_servers` combine by name. Replace an entire
   named server or set `enabled: false` on that agent; `{}` adds no campaign
   overrides. A standalone agent's explicit map replaces its native MCP map.
-  `effective.mcp_servers` records what sync managed; don't edit it. Select
-  `mcp-<server-name>` explicitly in an agent's toolset allowlist to use its tools.
-- **Tool and skill settings:** Each agent controls `agent.enabled_toolsets`,
-  `agent.disabled_toolsets`, `tools.tool_search.{enabled,listing,eager_toolsets,defer_toolsets}`,
-  and `skills.{enabled,disabled,auto_load}`. An explicit list replaces that list;
-  omission leaves it alone. Campaign orchestrators must keep Kanban enabled.
+  `effective.mcp_servers` records what sync managed; don't edit it. Install and
+  both sync paths add `mcp-<server-name>` to the profile's `agent.enabled_toolsets`
+  for every enabled server, because an explicit allowlist is otherwise
+  authoritative. A server set to `enabled: false` is never admitted, and asking
+  `agent.disabled_toolsets` to exclude an admitted server is refused rather than
+  applied.
+- **Tool and skill settings:** Sync enforces the same baseline, including
+  `kanban` for the campaign orchestrator, and refuses exclusions that conflict
+  with it. An explicitly saved toolset list supplies the role-specific additions;
+  omitting it preserves the native additions. Sync keeps Tool Search on with only
+  `file`, `skills`, and `memory` eager. Other authored disclosure and skill settings
+  are applied when present. Existing sessions can retain their pinned tools.
 - **Persona and skills:** The authored `SOUL.md` becomes the native persona,
   including generated campaign context and board routing for campaign members.
   Older campaign records without an authored `SOUL.md` keep the installed persona.

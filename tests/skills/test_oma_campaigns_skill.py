@@ -14,6 +14,7 @@ import pytest
 
 DEMO_AGENTS = ("demo__orchestrator", "demo__worker", "demo__publisher")
 DEMO_ROSTER = (*DEMO_AGENTS, "demo__analyst")
+BASE_TOOLSETS = {"file", "terminal", "web", "skills", "memory", "session_search", "browser"}
 
 
 @pytest.fixture
@@ -480,9 +481,10 @@ def test_campaign_control_removes_registered_cron_and_restores_operator_pause(bu
 
 def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     from agent.runtime_scope import bind_profile_scope
-    from hermes_cli.config import read_user_config_raw
+    from hermes_cli.config import atomic_config_replace, read_user_config_raw
     from hermes_cli.oma_campaigns.install import default_home
     from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.tools_config import _get_platform_tools
     from tools.file_tools import read_file_tool, write_file_tool
 
     home, source, main = bundle
@@ -494,6 +496,9 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
     existing = home / "oma" / "agents" / "demo__worker" / "saves" / "handoff.md"
     existing.parent.mkdir(parents=True)
     existing.write_text("Keep this handoff.", encoding="utf-8")
+    orch_record = source / "agents/demo__orchestrator/config.yaml"
+    authored = read_mapping(orch_record)
+    atomic_config_replace(orch_record, {**authored, "agent": {"enabled_toolsets": ["file"]}})
     assert main(["install", "demo"]) == 0
     assert existing.read_text(encoding="utf-8") == "Keep this handoff."
     record = json.loads(capsys.readouterr().out)
@@ -515,6 +520,11 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
         "kanban_board_name": "Demo", "installation_state": "installed", "lifecycle_state": "paused",
     }
     assert record["agents"] == list(DEMO_ROSTER)
+    for agent_id in DEMO_ROSTER:
+        config = read_user_config_raw(home / "profiles" / agent_id / "config.yaml")
+        expected = BASE_TOOLSETS | ({"kanban"} if agent_id in ("demo__orchestrator", "demo__worker") else set())
+        assert expected <= _get_platform_tools(config, "cli")
+        assert config["tools"]["tool_search"]["eager_toolsets"] == ["file", "skills", "memory"]
     for agent_id in DEMO_AGENTS:
         profile = home / "profiles" / agent_id
         scratch = source / "agents" / agent_id / "tmp"
@@ -597,11 +607,53 @@ def test_sync_materializes_defaults_and_agent_overrides(bundle, capsys):
         assert authored.get("mcp_servers") == (override["mcp_servers"] if path == worker else None)
         native = read_user_config_raw(home / "profiles" / path.parent.name / "config.yaml")
         assert {key: native[key] for key in expected} == expected
-        assert native["agent"]["enabled_toolsets"] == ["file", "kanban"]
+        extras = set() if path.parent.name == "demo__publisher" else {"kanban"}
+        mcp = {"mcp-reports"} if path.parent.name == "demo__worker" else {"mcp-docs", "mcp-reports"}
+        assert set(native["agent"]["enabled_toolsets"]) == BASE_TOOLSETS | mcp | extras
         assert "effective" not in native and "jobs" not in native
 
     assert sync(["demo"]) == 0
     assert json.loads(capsys.readouterr().out)["updated_agents"] == []
+
+
+def test_campaign_mcp_servers_are_admitted_to_enabled_toolsets(bundle, capsys):
+    """An explicit allowlist must name every enabled campaign MCP server's toolset."""
+    from hermes_cli.config import atomic_config_write, read_user_config_raw
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import sync_campaign
+
+    home, source, main = bundle
+    campaign = source / "campaigns/demo/config.yaml"
+    worker = source / "agents/demo__worker/config.yaml"
+    atomic_config_write(campaign, {**read_mapping(campaign), "mcp_servers": {
+        "composio": {"url": "https://backend.composio.dev/tool_router/v3/fixture/mcp"},
+        "retired": {"url": "https://retired.invalid/mcp", "enabled": False},
+    }})
+    authored = read_mapping(worker)
+    atomic_config_write(worker, {**authored, "mcp_servers": {"composio": {"enabled": False}}})
+
+    def selected(role):
+        return set(read_user_config_raw(home / "profiles" / role / "config.yaml")["agent"]["enabled_toolsets"])
+
+    assert main(["install", "demo"]) == 0
+    capsys.readouterr()
+    for role in ("demo__orchestrator", "demo__publisher", "demo__analyst"):
+        assert "mcp-composio" in selected(role)
+    assert "mcp-composio" not in selected("demo__worker")  # The role disabled it.
+    for role in DEMO_ROSTER:
+        assert "mcp-retired" not in selected(role)  # A globally disabled server is never admitted.
+
+    # The admission is idempotent: the next sync changes nothing.
+    sync_campaign(home, "demo")
+    assert sync_campaign(home, "demo")["updated_agents"] == []
+    assert "mcp-composio" in selected("demo__orchestrator")
+
+    # An explicit exclusion of an admitted server is refused, not silently ignored.
+    owner = source / "agents/demo__orchestrator/config.yaml"
+    spec = read_mapping(owner)
+    atomic_config_write(owner, {**spec, "agent": {**spec["agent"], "disabled_toolsets": ["mcp-composio"]}})
+    with pytest.raises(ValueError, match=r"disabled_toolsets.*mcp-composio"):
+        sync_campaign(home, "demo")
 
 
 def test_agent_and_campaign_sync_share_inheritance_and_keep_campaign_persona_context(bundle, capsys):
@@ -915,22 +967,24 @@ def test_campaign_sync_applies_each_roles_toolsets_without_replacing_native_sect
     atomic_config_replace(worker, authored)
 
     owner = home / "profiles" / "demo__orchestrator" / "config.yaml"
+    owner_record = source / "agents/demo__orchestrator/config.yaml"
+    owner_spec = read_mapping(owner_record)
+    atomic_config_replace(owner_record, {**owner_spec, "agent": {"enabled_toolsets": []}})
     assert sync(["demo"]) == 0
     assert "demo__worker" in json.loads(capsys.readouterr().out)["updated_agents"]
-    assert read_user_config_raw(owner)["agent"]["enabled_toolsets"] == ["file", "kanban"]
+    assert set(read_user_config_raw(owner)["agent"]["enabled_toolsets"]) == BASE_TOOLSETS | {"kanban"}
     applied = read_user_config_raw(native)
-    assert applied["agent"]["enabled_toolsets"] == ["file", "web"]
+    assert set(applied["agent"]["enabled_toolsets"]) == BASE_TOOLSETS
     assert applied["agent"]["disabled_toolsets"] == []
     assert applied["agent"]["max_turns"] == 11
     policy = applied["tools"]["tool_search"]
-    assert (policy["eager_toolsets"], policy["defer_toolsets"], policy["listing"]) == (["file"], ["web"], "off")
+    assert (policy["eager_toolsets"], policy["defer_toolsets"], policy["listing"]) == (["file", "skills", "memory"], ["web"], "off")
     assert sync(["demo"]) == 0
     assert json.loads(capsys.readouterr().out)["updated_agents"] == []
 
 
 @pytest.mark.parametrize(("role", "policy", "error_field"), [
     ("worker", {"enabled_toolsets": "file"}, "agent.enabled_toolsets"),
-    ("orchestrator", {"enabled_toolsets": ["file"]}, "kanban"),
     ("orchestrator", {"disabled_toolsets": ["kanban"]}, "kanban"),
 ])
 def test_campaign_sync_rejects_bad_toolsets_before_applying_other_roles(bundle, capsys, role, policy, error_field):
@@ -1249,7 +1303,7 @@ def test_install_snapshots_saved_defaults_without_overriding_role_settings(
     for path in (worker, home / "profiles/demo__worker/config.yaml"):
         data = read_mapping(path)
         assert data["agent"]["reasoning_effort"] == "low"
-        assert data["tools"]["tool_search"]["eager_toolsets"] == []
+        assert data["tools"]["tool_search"]["eager_toolsets"] == ["file", "skills", "memory"]
     assert read_mapping(home / "profiles/demo__orchestrator/config.yaml")["model"] == expected
     env = load_env_file(home / "profiles/demo__orchestrator/.env")
     assert env["CAMOFOX_API_KEY"] == "fixture-browser-key"
@@ -1343,7 +1397,7 @@ def test_bundle_templates_are_ignored_and_profile_conflicts_do_not_publish(bundl
     ("agents/demo__worker/config.yaml", "campaign_id: demo", "campaign_id: other", "campaign_id"),
     ("agents/demo__worker/config.yaml", "jobs: []", "jobs: [{id: review, schedule: '1d'}]", "invalid OMA agent jobs.0"),
     ("agents/demo__worker/config.yaml", "enabled_toolsets: [file, kanban]", "enabled_toolsets: null", "explicit list"),
-    ("agents/demo__orchestrator/config.yaml", "enabled_toolsets: [file, kanban]", "enabled_toolsets: [file]", "include kanban"),
+    ("agents/demo__orchestrator/config.yaml", "enabled_toolsets: [file, kanban]", "enabled_toolsets: [file], disabled_toolsets: [kanban]", "kanban"),
 ])
 def test_invalid_roster_does_not_publish(bundle, capsys, file, before, after, error):
     home, source, main = bundle
@@ -1401,7 +1455,7 @@ def test_new_campaign_camofox_requires_complete_saved_pair(bundle, capsys, monke
         assert ("camofox" in read_mapping(path)["agent"]["enabled_toolsets"]) == configured
         assert pair["CAMOFOX_API_KEY"] not in path.read_text(encoding="utf-8")
     assert load_env_file(orchestrator / ".env") == (pair if configured else {})
-    assert read_mapping(worker / "config.yaml")["agent"]["enabled_toolsets"] == ["file", "kanban"]
+    assert set(read_mapping(worker / "config.yaml")["agent"]["enabled_toolsets"]) == BASE_TOOLSETS | {"kanban"}
     assert load_env_file(worker / ".env") == {}
     (home / ".env").write_text("", encoding="utf-8")
     assert main(["install", "demo"]) == 0
@@ -1434,11 +1488,11 @@ def test_new_campaign_camofox_respects_opt_out_and_rejects_legacy_selection(bund
     profiles = home / "profiles"
     assert load_env_file(profiles / "demo__orchestrator/.env") == pair
     native = read_mapping(profiles / "demo__orchestrator/config.yaml")
-    assert native["agent"]["enabled_toolsets"] == ["file", "kanban", "camofox"]
+    assert set(native["agent"]["enabled_toolsets"]) == BASE_TOOLSETS | {"kanban", "camofox"}
     assert load_env_file(profiles / "demo__worker/.env") == {}
-    assert read_mapping(profiles / "demo__worker/config.yaml")["agent"] == {
-        "enabled_toolsets": [], "disabled_toolsets": ["camofox"],
-    }
+    worker_policy = read_mapping(profiles / "demo__worker/config.yaml")["agent"]
+    assert set(worker_policy["enabled_toolsets"]) == BASE_TOOLSETS
+    assert worker_policy["disabled_toolsets"] == ["camofox"]
 
 
 def test_generated_cron_belongs_to_the_verified_owner(bundle, capsys):
@@ -1471,6 +1525,58 @@ def test_generated_cron_belongs_to_the_verified_owner(bundle, capsys):
     assert list_jobs(include_disabled=True) == []
 
 
+@pytest.mark.parametrize("action", ["install", "agent-sync", "campaign-sync"])
+def test_publisher_has_kanban_only_on_assigned_tasks(bundle, monkeypatch, action):
+    from agent.runtime_scope import bind_profile_scope
+    from hermes_cli.config import atomic_config_replace, read_user_config_raw
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import sync_agent, sync_campaign
+    from model_tools import get_tool_definitions
+
+    home, source, main = bundle
+    publisher = "demo__publisher"
+    record = source / "agents" / publisher / "config.yaml"
+    profile = home / "profiles" / publisher
+    native = profile / "config.yaml"
+
+    def request_kanban(path, config):
+        atomic_config_replace(path, {**config, "agent": {
+            **config["agent"], "enabled_toolsets": ["kanban", "all", "mcp-example"],
+        }})
+
+    if action == "install":
+        request_kanban(record, read_mapping(record))
+    assert main(["install", "demo"]) == 0
+    if action == "agent-sync":
+        request_kanban(record, read_mapping(record))
+        assert "agent.enabled_toolsets" in sync_agent(home, publisher)["updated"]
+    elif action == "campaign-sync":
+        # A previously installed profile may still have Kanban when its record
+        # omits the selection and ordinary sync would preserve the native list.
+        saved = read_mapping(record)
+        atomic_config_replace(record, {key: value for key, value in saved.items() if key != "agent"})
+        request_kanban(native, read_user_config_raw(native))
+        assert publisher in sync_campaign(home, "demo")["updated_agents"]
+    if action == "install":
+        assert set(read_mapping(record)["agent"]["enabled_toolsets"]) == BASE_TOOLSETS | {"mcp-example"}
+
+    agent = read_user_config_raw(native)["agent"]
+    assert set(agent["enabled_toolsets"]) == BASE_TOOLSETS | {"mcp-example"}
+    assert "kanban" not in agent.get("disabled_toolsets", [])
+
+    def exposed():
+        return {tool["function"]["name"] for tool in get_tool_definitions(
+            enabled_toolsets=agent["enabled_toolsets"], skip_tool_search_assembly=True, quiet_mode=True,
+        )}
+
+    with bind_profile_scope(profile, hydrate_secrets=False):
+        assert not any(name.startswith("kanban_") for name in exposed())
+        monkeypatch.setenv("HERMES_KANBAN_TASK", "t_fixture")
+        task_tools = exposed()
+        assert {"kanban_complete", "kanban_block"} <= task_tools
+        assert not {"kanban_list", "kanban_unblock"} & task_tools
+
+
 def test_campaign_agents_share_their_own_kanban_board(bundle, capsys):
     from contextlib import closing
     from agent.runtime_scope import bind_profile_scope
@@ -1498,8 +1604,8 @@ def test_campaign_agents_share_their_own_kanban_board(bundle, capsys):
             tools = get_tool_definitions(enabled_toolsets=raw["agent"]["enabled_toolsets"],
                                          skip_tool_search_assembly=True, quiet_mode=True)
             tool_names = {tool["function"]["name"] for tool in tools}
-            if agent_id == "demo__analyst":
-                assert "kanban_list" not in tool_names
+            if agent_id in ("demo__analyst", "demo__publisher"):
+                assert not any(name.startswith("kanban_") for name in tool_names)
                 continue
             assert "kanban_list" in tool_names
             tasks = json.loads(_handle_list({}))
