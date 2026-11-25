@@ -541,6 +541,8 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
         assert f"`{oma / 'brand' / 'config.yaml'}`" in soul
         assert "`brand_id`" not in soul and "`playbook`" not in soul
         assert "Do not scan other records" in soul
+        assert "Resolve the account from the campaign's own connection" in soul
+        assert "report the blocker instead of saving a draft" in soul
         agent_record = read_mapping(source / "agents" / agent_id / "config.yaml")
         assert agent_record["campaign_id"] == "demo"
         assert not (profile / "cron" / "jobs.json").exists()
