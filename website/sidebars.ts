@@ -191,6 +191,8 @@ const sidebars: SidebarsConfig = {
                     'user-guide/skills/bundled/oma/oma-oma-agents',
                     'user-guide/skills/bundled/oma/oma-oma-brand',
                     'user-guide/skills/bundled/oma/oma-oma-campaigns',
+                    'user-guide/skills/bundled/oma/oma-oma-competitors',
+                    'user-guide/skills/bundled/oma/oma-oma-creatives',
                     'user-guide/skills/bundled/oma/oma-oma-onboarding',
                     'user-guide/skills/bundled/oma/oma-oma-playbook',
                   ],
@@ -502,6 +504,7 @@ const sidebars: SidebarsConfig = {
                     'user-guide/skills/optional/research/research-research-paper-writing',
                     'user-guide/skills/optional/research/research-rss-feeds',
                     'user-guide/skills/optional/research/research-scrapling',
+                    'user-guide/skills/optional/research/research-wappalyzer',
                   ],
                 },
                 {

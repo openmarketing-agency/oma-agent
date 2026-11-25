@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 # Old bundled copies can remain on disk after sync; never offer the retired workflow.
 OMA_RETIRED_SKILLS = frozenset({"oma-brands", "oma-playbooks"})
 OMA_DEFAULT_STARTER_SKILLS = frozenset({
-    "oma-agents", "oma-brand", "oma-campaigns", "oma-onboarding", "oma-playbook",
+    "oma-agents", "oma-brand", "oma-campaigns", "oma-competitors", "oma-creatives",
+    "oma-onboarding", "oma-playbook",
 })
 OMA_DEFAULT_ONLY_SKILLS = OMA_RETIRED_SKILLS | OMA_DEFAULT_STARTER_SKILLS
 OMA_MAINTENANCE_ONLY_SKILLS = frozenset({"omactl"})

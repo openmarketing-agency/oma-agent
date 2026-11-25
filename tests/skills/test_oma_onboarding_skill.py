@@ -8,22 +8,23 @@ from tools.skills_sync import sync_skills
 from tools.skills_tool import find_all_skills, skill_view
 
 
-OMA_SKILLS = {"oma-agents", "oma-brand", "oma-campaigns", "oma-onboarding", "oma-playbook"}
+ONBOARDING_COMPANIONS = {"oma-agents", "oma-brand", "oma-campaigns", "oma-playbook"}
+OMA_RESEARCH_SKILLS = {"oma-competitors", "oma-creatives"}
+OMA_SKILLS = ONBOARDING_COMPANIONS | OMA_RESEARCH_SKILLS | {"oma-onboarding"}
 OLD_SKILLS = {"oma-brands", "oma-playbooks"}
 
 
 def test_oma_onboarding_loads_with_its_workflow_skills(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 
-    companions = OMA_SKILLS - {"oma-onboarding"}
-    assert companions | {"oma-onboarding"} <= set(sync_skills(quiet=True)["copied"])
+    assert OMA_SKILLS <= set(sync_skills(quiet=True)["copied"])
     onboarding = json.loads(skill_view("oma-onboarding"))
     assert onboarding["success"], onboarding
-    assert set(onboarding["related_skills"]) == companions
+    assert set(onboarding["related_skills"]) == ONBOARDING_COMPANIONS
     oma_dir = (tmp_path / "skills" / "oma").resolve()
     assert Path(onboarding["skill_dir"]).resolve() == oma_dir / "oma-onboarding"
-    for name in companions:
-        loaded = json.loads(skill_view(name))
+    for name in ONBOARDING_COMPANIONS | OMA_RESEARCH_SKILLS:
+        loaded = json.loads(skill_view(f"oma/{name}"))
         assert loaded["success"], loaded
         assert Path(loaded["skill_dir"]).resolve() == oma_dir / name
     assert (oma_dir / "oma-campaigns" / "scripts" / "campaign.py").is_file()

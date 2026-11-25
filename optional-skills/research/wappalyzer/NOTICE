@@ -7,7 +7,7 @@ under the Apache License, Version 2.0:
 https://www.apache.org/licenses/LICENSE-2.0
 
 Wappalyzer is an external dependency fetched from its upstream repository
-at container startup or during explicit setup. Its implementation,
+during explicit setup. Its implementation,
 fingerprints and dependencies belong in the runtime cache outside the
 application build context, container image and release artifacts.
 The tested upstream is https://github.com/tomnomnom/wappalyzer at commit
