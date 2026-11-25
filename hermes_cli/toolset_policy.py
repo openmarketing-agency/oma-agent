@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 
+from agent.delegation_context import owned_kanban_task
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,6 +50,10 @@ def restrict_profile_tool_names(tools: set[str]) -> set[str]:
 
     config = load_config_readonly()
     selected = profile_enabled_toolsets(config)
+    if selected is not None and owned_kanban_task() and "kanban" not in selected:
+        # The dispatcher already selected the task tools. Keep that grant through
+        # the profile filter; registry gates still hide orchestrator-only tools.
+        selected = [*selected, "kanban"]
     return tools if selected is None else tools & _profile_tool_names(config, selected)
 
 

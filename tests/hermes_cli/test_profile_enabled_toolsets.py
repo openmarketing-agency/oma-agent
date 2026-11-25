@@ -79,6 +79,27 @@ def test_empty_profile_allowlist_blocks_even_explicit_caller_toolsets(policy_con
     assert model_tools.get_tool_definitions(quiet_mode=True) == []
 
 
+def test_claimed_worker_gets_kanban_handoff_without_standing_board_access(policy_config, monkeypatch):
+    from agent.delegation_context import non_dispatcher_owned_context
+    from model_tools import get_tool_definitions
+
+    policy_config(["file"])
+
+    def visible():
+        return {tool["function"]["name"] for tool in get_tool_definitions(
+            enabled_toolsets=["file"], quiet_mode=True, skip_tool_search_assembly=True,
+        )}
+
+    assert "kanban_complete" not in visible()
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_fixture")
+    assert {"kanban_complete", "kanban_request_review", "kanban_block"} <= visible()
+    assert not {"kanban_list", "kanban_unblock"} & visible()
+    with non_dispatcher_owned_context():
+        assert not any(name.startswith("kanban_") for name in visible())
+    policy_config(["file"], disabled=["kanban"])
+    assert not any(name.startswith("kanban_") for name in visible())
+
+
 def test_profile_allowlist_is_scoped_to_the_current_home(tmp_path, monkeypatch):
     import model_tools
 
