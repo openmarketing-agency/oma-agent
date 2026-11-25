@@ -15,17 +15,17 @@ plays:
   api_posts_only: []
   path: plays/abandoned-cart-recovery/play.yaml
 - id: buying-intent-listening
-  version: 1
+  version: 2
   name: Buying-Intent Listening
-  summary: Find people asking for what the business sells, draft a genuinely helpful reply for each that
-    a person posts, and turn the questions that keep coming into answer pages people can link to.
+  summary: Find people asking for what the business sells, publish useful replies where permitted,
+    and turn recurring questions into answer pages people can link to.
   product_types: [saas, b2b, devtool, consumer_app, local, creator, ecommerce]
   stages: [early, growth]
   horizon: ongoing
   core_channels: [reddit, x, blog]
   optional_channels: [analytics]
-  human_posted: [reddit]
-  api_posts_only: [x]
+  human_posted: []
+  api_posts_only: []
   path: plays/buying-intent-listening/play.yaml
 - id: comment-to-dm
   version: 1
@@ -76,7 +76,7 @@ plays:
   horizon: ongoing
   core_channels: [email, inbox, podcasts]
   optional_channels: [blog, analytics]
-  human_posted: [podcasts]
+  human_posted: []
   api_posts_only: []
   path: plays/podcast-tour/play.yaml
 - id: review-asks
@@ -128,6 +128,6 @@ plays:
   horizon: 4w
   core_channels: [hacker_news, github]
   optional_channels: [analytics, site]
-  human_posted: [hacker_news]
+  human_posted: []
   api_posts_only: []
   path: plays/show-hn-launch/play.yaml

@@ -3,9 +3,8 @@
 Checked 2026-11-23.
 
 ## Who posts
-- Original posts and threads: the publisher, through the official API, after approval.
-- Replies, quote posts and DMs to people who didn't ask: a person, by hand. X bans automated replies and mentions to people who haven't asked to be contacted, so OMA drafts and the person posts.
-- DMs go only to people who asked, for example by replying to an offer, through the official API.
+- The publisher uses the official API for original posts, threads, and supported replies or messages that satisfy X's automation rules. Follow the campaign mode for OMA approval.
+- Do not send automated replies or mentions to people who didn't ask to be contacted. DMs go only to people who asked, for example by replying to an offer. If an action is not permitted, skip it or hand it off only where permitted.
 
 ## Rules
 - No automated follows, unfollows, likes or reposts.

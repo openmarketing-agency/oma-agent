@@ -19,7 +19,7 @@ from hermes_cli import kanban_db
 from hermes_cli.kanban_db_connect import connect_closing
 from hermes_cli.oma_campaigns.install import _campaign_config_path, _campaigns_dir, _status
 from hermes_cli.oma_campaigns.schema import validate_record
-from hermes_cli.oma_campaigns.source import DEFAULT_CAMPAIGN_MODE, read_mapping
+from hermes_cli.oma_campaigns.source import DEFAULT_CAMPAIGN_MODE, PUBLICATION_APPROVAL_GUIDANCE, read_mapping
 from hermes_cli.oma_campaigns.storage import campaign_data_exists, connect_campaign_data
 from hermes_cli.sqlite_safe_read import connect_tracked
 
@@ -204,11 +204,15 @@ def _enqueue(home: Path, directory: Path, config: dict, publication_id: str, rev
                 board_conn, board=board, assignee=publisher, created_by="oma-publications",
                 title=f"Publish publication {publication_id}",
                 body=(f"Publication ID: {publication_id}; revision: {revision}. "
+                      f"{PUBLICATION_APPROVAL_GUIDANCE} "
                       f"Claim the saved revision with `python -m hermes_cli.oma_campaigns.publications claim {publication_id} {revision}`. "
-                      "Publish the returned content unchanged to its exact account and target. "
+                      "Use the campaign's authorized connector to perform the saved post or reply on any channel "
+                      "that permits the action. Verify write access, then send the returned content unchanged to its "
+                      "exact account and target. Do not substitute an account, target, or browser write. "
                       f"Before completing this task, run `python -m hermes_cli.oma_campaigns.publications finish "
                       f"{publication_id} {revision}`. Pass JSON on stdin with `claim_token` from claim and `result` "
-                      "containing the verified `provider_id` and optional `url`, or `error` only for a definitive rejection. "
+                      "containing the verified `provider_id` and optional `url`, or `error` for a definitive blocker "
+                      "or rejection. "
                       "If receipt recording fails, retry finish with the same receipt, never the send. "
                       "If claim refuses, do not publish. If delivery is uncertain, do not resend; report it for verification."),
                 idempotency_key=f"oma-publication:{publication_id}:{revision}",

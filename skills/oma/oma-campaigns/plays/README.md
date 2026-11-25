@@ -13,7 +13,7 @@ Plays are only examples. Campaigns start by picking ideas from the catalog for t
 | `review-asks` | Riverside Family Dental | Review requests, replies and Business Profile posts |
 | `podcast-tour` | Halden Advisory, B2B consulting | Pitching shows and preparing each appearance |
 | `daily-shorts` | Repwise, a fitness app | Short videos made and published daily |
-| `buying-intent-listening` | Tallybook, accounting for freelancers | Finding people asking, drafting replies a person posts, answer pages |
+| `buying-intent-listening` | Tallybook, accounting for freelancers | Finding people asking, publishing permitted replies, answer pages |
 | `discord-community` | Lantern Forge, an indie game studio | Fast answers, a living FAQ and weekly events in the brand's own server |
 | `search-intent-ads` | Ortega & Lin Immigration Law | Search ads on buying intent with matching landing pages, inside regulated rules |
 

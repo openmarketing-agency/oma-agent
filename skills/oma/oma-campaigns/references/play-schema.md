@@ -38,7 +38,7 @@ Unknown fields fail validation, so typos are caught. `TODO` anywhere in `play.ya
 
 - `mode`: `read` or `write`.
 - `fallback`: what happens when the channel is not connected. `assisted` (writes only): OMA prepares the work, a person publishes it, and the publisher reads it back and records the URL. `research_only` (reads only): the campaign runs on public data and makes no performance claims. `none`: the play is not eligible without this access.
-- A write on a `human_only` channel must use `assisted`. A channel whose write policy is `none` can't be written.
+- Plan writes based on the authorized connector, account permissions, and the platform's rules for the action and destination. `write_policy` labels are planning metadata, not gates. Use `assisted` only as a fallback where a person is both available and permitted to act.
 - `optional: true` means the play uses the channel when it is there. Non-optional entries are the play's core channels.
 
 ## `roster`
@@ -62,7 +62,7 @@ Unknown fields fail validation, so typos are caught. `TODO` anywhere in `play.ya
 
 - `cadence`: `N/day`, `N/week`, `N/month`, `N/quarter`, `daily`, `weekly`, `monthly`, `per_event` or `once`. Cadences are drafting defaults, not campaign keys.
 - `owner`: the role that makes the item. The publisher ships it.
-- `approval`: `none` (internal work), `per_item`, or `batch` (a set approved together).
+- `approval`: `none` (internal work), `per_item`, or `batch` (a set reviewed together). These are play-planning labels, not runtime rules. For each publication record, `yolo` auto-approves without a human; `approve` and `control` require a human to approve the exact revision.
 - `standing_ok: true`: after 10 approvals in a row without edits, the user may switch this deliverable to standing approval. Any edit, complaint or rule change switches it back.
 
 ## `jobs`
@@ -103,7 +103,7 @@ product_types:
   marketplace_seller: Sells mainly through third-party marketplaces.
 ```
 
-Additions can't redefine existing values. Pick the strictest honest write policy: if you can't confirm from the platform's current official rules that automated posting is allowed, use `human_only`.
+Additions can't redefine existing values. For new channels, use `write_policy: api` and note the connector and platform requirements. This doesn't imply that an API or write permission exists. Legacy labels are still accepted for existing custom references.
 
 ## How a play maps to campaign records
 

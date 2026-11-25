@@ -280,7 +280,8 @@ def test_campaign_publications_handoff(bundle, capsys, mode, legacy):
     legacy_path = config_path.parent / "publications.sqlite3"
     assert not data_path.exists() and not legacy_path.exists()
 
-    draft = {"platform": "x", "kind": "reply", "account": {"id": "connected-42", "handle": "demo"},
+    platform = "reddit" if mode == "yolo" else "x"
+    draft = {"platform": platform, "kind": "reply", "account": {"id": "connected-42", "handle": "demo"},
              "content": {"text": "Thanks!\nHere is the detail."}, "target": {"id": "987", "text": "Question?"}}
     saved = save_publication(home, "demo", "demo__worker", draft)
     item = saved["id"]
@@ -311,6 +312,9 @@ def test_campaign_publications_handoff(bundle, capsys, mode, legacy):
         task = kanban_db.claim_task(conn, saved["task_id"])
         assert task is not None and task.assignee == role.name and item in task.body
         assert draft["content"]["text"] not in task.body
+        assert "yolo mode does not require human approval" in task.body
+        assert "approve and control modes require human approval of the exact revision" in task.body
+        assert "authorized connector" in task.body
     if legacy:
         assert not data_path.exists()  # Dispatcher admission is also read-only.
     with pytest.raises(PublicationError, match="Only the campaign publisher"):
@@ -330,7 +334,7 @@ def test_campaign_publications_handoff(bundle, capsys, mode, legacy):
     with pytest.raises(PublicationError, match="not available"):
         claim_publication(home, "demo", role.name, item, saved["revision"])
 
-    receipt = {"provider_id": "external-1", "url": "https://x.com/demo/status/1"}
+    receipt = {"provider_id": "external-1", "url": f"https://{platform}.example/replies/external-1"}
     finish = (home, "demo", role.name, item, saved["revision"])
     result = finish_publication(*finish, claim["claim_token"], receipt)
     assert result["status"] == "published"
@@ -351,6 +355,21 @@ def test_campaign_publications_handoff(bundle, capsys, mode, legacy):
         assert [(revision, json.loads(payload)["content"]["text"]) for revision, payload in revisions] == [
             (1, "Thanks!\nHere is the detail."), (2, draft["content"]["text"]),
         ]
+
+
+def test_publisher_soul_explains_publication_modes(bundle, capsys):
+    from hermes_cli.oma_campaigns.sync import sync_agent
+
+    home, source, main = bundle
+    assert main(["install", "demo"]) == 0, capsys.readouterr().err
+    path = home / "profiles/demo__publisher/SOUL.md"
+    soul = path.read_text(encoding="utf-8")
+    assert "yolo mode does not require human approval" in soul
+    assert "approve and control modes require human approval of the exact revision" in soul
+    assert "posts and replies" in soul
+    (source / "agents/demo__publisher/SOUL.md").write_text("Updated publisher persona.\n", encoding="utf-8")
+    assert "SOUL.md" in sync_agent(home, "demo__publisher")["updated"]
+    assert path.read_text(encoding="utf-8") == soul.replace("I am the publisher.", "Updated publisher persona.", 1)
 
 
 def test_campaign_analyst_refresh_runs_in_control_and_saves_data(bundle):
@@ -1076,6 +1095,28 @@ def test_social_play_drafts_hourly_jobs_without_installing(bundle, run_campaign_
     assert jobs["performance-review"]["job"]["schedule"].split()[-1] != "*"
     assert campaign.read_bytes() == before
     assert not (home / "profiles").exists()
+
+
+def test_play_accepts_connector_writes_without_a_channel_allowlist(bundle, run_campaign_script):
+    import hermes_yaml as yaml
+
+    home, _, _ = bundle
+    root = Path(__file__).resolve().parents[2]
+    script = root / "skills/oma/oma-campaigns/scripts/plays.py"
+
+    def run(*args):
+        return run_campaign_script(script, *args, "--home", str(home), "--json", PYTHONPATH=str(root))
+
+    created = run("new", "connector-writes", "--from", "buying-intent-listening")
+    assert created.returncode == 0, created.stdout + created.stderr
+    path = Path(json.loads(created.stdout)["play_yaml"])
+    play = yaml.safe_load(path.read_text(encoding="utf-8"))
+    next(req for req in play["requires"] if req["channel"] == "reddit" and req["mode"] == "write")["fallback"] = "none"
+    play["requires"].append({"channel": "analytics", "mode": "write", "fallback": "none"})
+    next(role for role in play["roster"] if role["role"] == "publisher")["writes"].append("analytics")
+    path.write_text(yaml.safe_dump(play, sort_keys=False), encoding="utf-8")
+    result = run("validate", "connector-writes")
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_bundled_plays_show_valid_existing_campaign_records():

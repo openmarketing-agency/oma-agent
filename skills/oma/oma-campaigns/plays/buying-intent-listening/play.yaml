@@ -1,7 +1,7 @@
 id: buying-intent-listening
-version: 1
+version: 2
 name: Buying-Intent Listening
-summary: Find people asking for what the business sells, draft a genuinely helpful reply for each that a person posts, and turn the questions that keep coming into answer pages people can link to.
+summary: Find people asking for what the business sells, publish useful replies where permitted, and turn recurring questions into answer pages people can link to.
 ideas: [2, 99, 16, 44]
 example: example.md
 
@@ -10,9 +10,9 @@ fits:
   stages: [early, growth]
   best_when:
     - People ask for recommendations in communities and on social media.
-    - Someone on the team can post replies from their own account a few times a week.
+    - The team has an authorized connector that can reply where permitted, or a person who can post where allowed.
   avoid_when:
-    - Nobody can post replies personally.
+    - No relevant venue allows the planned replies through a verified connector or by a person.
 
 outcome: "{audience} asking for help find a useful answer from {business} and {conversion}."
 horizon: ongoing
@@ -20,9 +20,9 @@ time_to_signal: Replies posted within the first week; referral visits and leads 
 
 requires:
   - {channel: reddit, mode: read, fallback: research_only}
-  - {channel: reddit, mode: write, fallback: assisted}
+  - {channel: reddit, mode: write, fallback: assisted, note: "Use an authorized app account where Reddit and the subreddit allow the reply."}
   - {channel: x, mode: read, fallback: research_only}
-  - {channel: x, mode: write, fallback: assisted, note: "Replies to people who didn't ask the brand are posted by a person."}
+  - {channel: x, mode: write, fallback: assisted, note: "Use the official connector for replies that comply with X's automation rules."}
   - {channel: blog, mode: write, fallback: assisted}
   - {channel: analytics, mode: read, fallback: research_only, optional: true}
 
@@ -54,8 +54,8 @@ roster:
     untrusted_input: true
     skills: [educational-content-and-how-to, copywriting, writing-style-and-tone]
   - role: publisher
-    does: Hands approved reply drafts to the person who posts them, records each posted URL, and publishes approved answer pages.
-    per_run: Every approved reply handed over with its thread link and its posted URL recorded, and every approved answer page published with its URL.
+    does: Publishes replies and answer pages through authorized connectors under the campaign mode. If a reply cannot go through the connector, hands off where permitted.
+    per_run: Published replies and answer pages with verified URLs, plus a reason or permitted handoff for each blocked reply.
     toolsets: [file, web, skills, memory, kanban, integrations]
     writes: [reddit, x, blog]
     untrusted_input: false
@@ -91,14 +91,13 @@ kpis:
 limits:
   max_replies_per_community_per_day: 2
   product_mention_share_percent: 20
-  automated_replies_to_strangers: 0
 
 slots:
   - {id: business, required: true, source: brand, ask: "What the business sells, in one sentence."}
   - {id: audience, required: true, source: playbook, ask: "Who asks for it."}
   - {id: conversion, required: true, source: playbook, ask: "What a helped person should do next."}
   - {id: queries, required: true, source: research, ask: "Phrases people use when they need this, such as 'need an accountant for'."}
-  - {id: poster, required: true, source: brand, ask: "Who posts replies from their own account."}
+  - {id: poster, required: false, source: brand, ask: "Who can post manually if the connector cannot send a reply."}
 
 kickoff:
   - {owner: scout, task: "Run the first search across the mapped communities and record 15 threads."}
