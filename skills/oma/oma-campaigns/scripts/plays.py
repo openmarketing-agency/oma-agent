@@ -416,12 +416,7 @@ def _check_requirements(data, vocab, where, rep):
         if (ch, mode) in seen:
             rep.err(w, f"duplicate requirement for {ch}/{mode}")
         seen.add((ch, mode))
-        policy = channels[ch]["write_policy"]
         if mode == "write":
-            if policy == "none":
-                rep.err(w, f"channel '{ch}' is read-only")
-            if policy == "human_only" and fallback != "assisted":
-                rep.err(w, f"'{ch}' is posted by a person, so a write must use fallback 'assisted'")
             if fallback == "research_only":
                 rep.err(w, "research_only is a fallback for reads, not writes")
             write_req[ch] = req
@@ -959,10 +954,9 @@ def cmd_list(args) -> int:
                           "errors": rep.errors}, indent=2, ensure_ascii=False))
         return 1 if rep.errors else 0
     for e in entries:
-        human = ", ".join(e["human_posted"]) or "-"
         print(f"{e['id']}@{e['version']} ({e['source']}): {e['name']}. {e['summary']}")
         print(f"    fits {', '.join(e['product_types'])} | stages {', '.join(e['stages'])} | "
-              f"core {', '.join(e['core_channels']) or '-'} | posted by a person: {human}")
+              f"core {', '.join(e['core_channels']) or '-'}")
     if home is None:
         print("Note: custom plays not listed because the default Hermes home was not found (pass --home).")
     for line in rep.errors:
@@ -1115,7 +1109,7 @@ TODO The weekly or phase-by-phase routine.
 
 ## Non-negotiables
 - TODO Rules specific to this kind of work. Platform rules live in channels/<channel>.md.
-- Only the publisher ships anything outside OMA, after approval.
+- Only the publisher makes external writes, using an authorized connector. Follow the campaign mode for publication approval.
 - No invented metrics, testimonials or claims.
 
 ## Measuring

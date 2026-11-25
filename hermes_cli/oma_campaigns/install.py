@@ -26,7 +26,8 @@ from hermes_cli.oma_campaigns.settings import (
     credential_keys, enforce_toolset_baseline, materialize_agent_settings, read_agent_record, resolve_settings, settings_from,
 )
 from hermes_cli.oma_campaigns.source import (
-    DEFAULT_CAMPAIGN_MODE, Agent, Campaign, campaign_fields, checked_id, read_mapping, resolve,
+    DEFAULT_CAMPAIGN_MODE, PUBLICATION_APPROVAL_GUIDANCE,
+    Agent, Campaign, campaign_fields, checked_id, read_mapping, resolve,
 )
 from hermes_cli.profile_provision import ProfileCreateRequest, provision_profile
 from hermes_cli.profiles import get_profile_dir, profile_exists
@@ -307,10 +308,11 @@ def campaign_soul(soul: str, agent_id: str, orchestrator: str, agents: tuple[str
         "the campaign has connected, and use the account that connection is authenticated as, confirmed with a "
         "read-only profile or identity call. Do not copy a public handle or invent an id; if the platform is not "
         "connected, or the connection cannot confirm the account, report the blocker instead of saving a draft "
-        "for it. The runtime handles automatic or human approval according to the campaign mode and queues the "
-        "campaign publisher. Only the publisher posts, after claiming the saved revision, then records the "
-        "provider receipt. If the required tool or approved claim is unavailable, report the blocker without "
-        "posting.\n\n"
+        f"for it. {PUBLICATION_APPROVAL_GUIDANCE} The runtime queues the campaign publisher. "
+        "Only the publisher sends posts and replies, after claiming the exact saved revision, and records the "
+        "provider receipt. Use the campaign's authorized connector on any channel for actions it supports and "
+        "the platform and venue permit. If the required tool, permission, or claim is unavailable, report "
+        "the blocker without sending.\n\n"
         "## Campaign scratch directory\n\n"
         f"Use `{scratch}` for this profile's temporary campaign files.\n\n"
         "## Saved context\n\n"

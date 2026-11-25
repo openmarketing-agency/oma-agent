@@ -67,7 +67,7 @@ Use `skills_search` and `skill_view` to read the bundled skills before you rely 
 - What good looks like, in concrete terms.
 - The rhythm: weekly routine or phases.
 - Definition of done for each deliverable.
-- Non-negotiables: the legal and craft limits for this kind of campaign, plus a line pointing to the channel rules it works under (`channels/<channel>.md`). For a channel with no rules file, look up the platform's current official policies with web tools and save them to `oma/plays/channels/<channel>.md` with links and the date checked; prefer `human_only` or `assisted` when automation is unclear.
+- Non-negotiables: the legal and craft limits for this kind of work, plus a line pointing to its `channels/<channel>.md` rules. For a new channel, look up the platform's current official rules and save them to `oma/plays/channels/<channel>.md` with links and the date checked. If the exact action is not permitted or its support cannot be verified, leave it unpublished or hand it off where permitted.
 - How to measure, and when it is too early to judge.
 - Common failure modes.
 - Sources to re-check.
@@ -78,4 +78,4 @@ Run `scripts/plays.py validate <play-id>` and fix every error. Then read it as t
 
 ## What never changes
 
-Whatever you design keeps one orchestrator and one publisher, approval before anything leaves OMA, publishing only through official integrations or by a person, platform rules and the non-negotiables of any play you drew from, no invented metrics, testimonials or claims, no terminal for roles that read untrusted content, and verified rather than assumed access.
+Keep one orchestrator and one publisher. Route supported writes through authorized official integrations and respect platform and venue rules. For OMA publications, `yolo` auto-approves; `approve` and `control` require human approval of the exact revision. Keep verified rather than assumed access, no invented metrics, testimonials or claims, and no terminal for roles that read untrusted content.

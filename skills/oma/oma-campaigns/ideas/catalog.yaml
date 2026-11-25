@@ -442,7 +442,7 @@ ideas:
   - All
   section: X
   example: buying-intent-listening
-  note: X bans automated replies to people who didn't ask. Drafts go to a person who replies by hand.
+  note: Use the official connector for permitted replies. Do not automate replies to people who didn't ask to be contacted.
 - id: 45
   name: Daily teaching thread
   what: One educational thread a day.
