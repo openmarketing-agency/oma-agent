@@ -91,7 +91,7 @@ def test_full_uninstall_sweeps_macos_caches_and_dashboard_launchd(monkeypatch, t
     monkeypatch.setattr(uninstall, "_refuse_if_steward_owned", lambda: None)
     monkeypatch.setattr(uninstall, "uninstall_gateway_service", lambda: True)
     monkeypatch.setattr(uninstall, "remove_path_from_shell_configs", list)
-    monkeypatch.setattr(uninstall, "remove_wrapper_script", list)
+    monkeypatch.setattr(uninstall, "remove_wrapper_script", lambda _root: [])
     monkeypatch.setattr(uninstall, "remove_node_symlinks", lambda home: [])
     monkeypatch.setattr(uninstall, "remove_legacy_runtime_trees", lambda home: [])
     monkeypatch.setattr(uninstall, "_rmtree_step",

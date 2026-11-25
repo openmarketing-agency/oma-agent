@@ -150,6 +150,7 @@ def _complete_locked(
             record_followup(name, reason)
             owed.append((name, reason))
 
+    step("oma-starters", lambda: _seed_direct_install_oma(root))
     step("launchers", lambda: publish_launchers(root))
     step("build", lambda: build_update_products(root, desktop=desktop, after_dependencies=after_dependencies))
     if announce:
@@ -178,6 +179,20 @@ def _complete_locked(
     # The SQLite verdict is not tail work (re-running the tail cannot fix the interpreter); it
     # is reported by the maintenance step itself and only withholds an install's success.
     return tail_done and all(verdict)
+
+
+def _seed_direct_install_oma(root: Path) -> None:
+    from hermes_constants import get_default_hermes_root, read_source_install_home
+
+    home = read_source_install_home(root)
+    if home is None or get_default_hermes_root().resolve() != home.resolve():
+        return  # Other distributions and homes borrowing this checkout keep their own setup.
+
+    from agent.runtime_scope import bind_profile_scope
+    from hermes_cli.oma_campaigns.standalone import seed_standalone_agents
+
+    with bind_profile_scope(home, hydrate_secrets=False):
+        seed_standalone_agents(home, install_dir=root)
 
 
 def _bootstrap_command(root: Path, argv: list[str]) -> list[str]:

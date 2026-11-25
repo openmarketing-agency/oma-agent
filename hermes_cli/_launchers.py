@@ -127,6 +127,7 @@ def publishes_service_launcher(repo_root: Path) -> bool:
 #: Launcher command names — keep in lockstep with scripts/install.ps1
 #: Publish-UserCommand and hermes_cli/_install_repair.py.
 WINDOWS_BIN_LAUNCHERS = ("hermes", "hermes-acp")
+POSIX_USER_LAUNCHERS = (*WINDOWS_BIN_LAUNCHERS, "hermes-agent", "oma-agent")
 
 #: command name -> (entry module, callable) — mirrors pyproject.toml
 #: [project.scripts].
@@ -943,7 +944,7 @@ def expose_cli(project_root: Path | None = None, *, create: bool = True) -> dict
                 dirs.append(directory)
         written = []
         for directory in dirs:
-            published = _publish_conveniences(root, directory, (*WINDOWS_BIN_LAUNCHERS, "hermes-agent", "oma-agent"), create=create)
+            published = _publish_conveniences(root, directory, POSIX_USER_LAUNCHERS, create=create)
             written.extend(path.name for path, changed in published.items() if changed)
         return {"ok": True, "written": written}
     except OSError as exc:

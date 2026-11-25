@@ -231,7 +231,6 @@ import {
   resolveDesktopWindowLaunch
 } from './desktop-profile'
 import { registryPrimaryBootRoute, resolveDesktopRemoteRoute, v1SshTerminalPoolKey } from './desktop-remote-route'
-
 import { type DesktopSshBudgets, readDesktopSshBudgets } from './desktop-ssh-budgets'
 import {
   buildPosixCleanupScript,
@@ -361,7 +360,7 @@ import { resolveDesktopClientVersion } from './local-runtime-version'
 import { localSkinProfileKey, registerLocalSkinIpc } from './local-skin'
 import { ACTIVE_LOG_POLL_MS, planLogRotation, reclaimActiveLogIfOversized } from './log-rotation'
 import { registerMachineProfile } from './machine-profile'
-import { resolveMainHermesHome } from './main-hermes-home'
+import { initializeMainHermesHome } from './main-hermes-home'
 import { createMainProcessLagWatchdog } from './main-process-lag-watchdog'
 import { activateWindow, ensureMainWindow, shouldQuitOnLastChatClosed } from './main-window-lifecycle'
 import {
@@ -1259,7 +1258,9 @@ if (INSTALL_STAMP) {
 
 const DESKTOP_PROFILE_CONFIG_PATH: string = path.join(app.getPath('userData'), 'active-profile.json')
 
-const HERMES_HOME: string = resolveMainHermesHome(app.getPath('home'))
+const { home: HERMES_HOME, activeRoot: ACTIVE_HERMES_ROOT } = initializeMainHermesHome(
+  app.getPath('home'), INSTALL_STAMP?.payload !== 'bundled'
+)
 
 // #77311: `desktop.electron_flags` and the renderer heap ceiling
 // (`desktop.renderer_max_old_space_mb`) used to reach Chromium only through
@@ -1306,10 +1307,6 @@ if (isPrimaryInstance) {
   })
 }
 
-// ACTIVE_HERMES_ROOT — the canonical mutable Hermes install. Same path
-// install.ps1 / install.sh use, so a desktop-only user and a CLI-only user end
-// up with identical layouts and can share one install.
-const ACTIVE_HERMES_ROOT = path.join(HERMES_HOME, 'hermes-agent')
 setNoConsoleGitRoots([!IS_PACKAGED ? SOURCE_REPO_ROOT : null, ACTIVE_HERMES_ROOT])
 // VENV_ROOT — venv lives inside the repo, exactly like install.ps1 does it.
 const VENV_ROOT = path.join(ACTIVE_HERMES_ROOT, 'venv')

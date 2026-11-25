@@ -8,7 +8,7 @@
 
 The shared coordination skill is `campaign-orchestration` in OMA Agent.
 
-Docker seeds this skills bundle at `$HERMES_HOME/oma-bundle` (`/opt/data/oma-bundle` by default) when missing. Existing copies are preserved; campaign templates left on older volumes are ignored. For a native checkout, copy the bundle to the default Hermes home to make the shared skills available.
+Docker and the OMA POSIX source installer seed this skills bundle at `$HERMES_HOME/oma-bundle` when missing (`/opt/data/oma-bundle` in Docker and `./oma-agent-data/oma-bundle` for a fresh direct install). Existing copies are preserved; campaign templates left on older volumes are ignored. For a manual checkout not managed by the installer, copy the bundle to the default Hermes home to make the shared skills available.
 
 To add either collection to an existing bundle, copy `skills/marketingskills/` or `skills/social-media-skills/` as a new directory under `$HERMES_HOME/oma-bundle/skills/`. Leave the rest of the existing bundle intact.
 

@@ -399,7 +399,7 @@ def persist_running_receipt() -> None:
 
 #: Follow-up steps whose failure leaves the source-update tail owed (``source-completion-pending``).
 TAIL_FOLLOWUPS = frozenset({"dependencies", "launchers", "build", "maintenance", "profile_sync",
-                            "config_migration", "completion"})
+                            "config_migration", "oma-starters", "completion"})
 
 #: Follow-ups that mean the BUILD stage did not succeed (C3: the receipt names what actually failed):
 #: the products or the launchers the build publishes failed, or the tail raised before proving them.
