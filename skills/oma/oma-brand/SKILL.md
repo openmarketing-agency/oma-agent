@@ -1,14 +1,14 @@
 ---
 name: oma-brand
 description: Manage the brand's identity, assets, and knowledge.
-version: 0.4.2
+version: 0.4.3
 author: Open Marketing Agency (OMA)
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
   hermes:
     tags: [oma, brands, logos, knowledge]
-    related_skills: [oma-campaigns]
+    related_skills: [oma-campaigns, wappalyzer]
 ---
 
 # OMA Brand Skill
@@ -67,6 +67,7 @@ Use the saved OMA brand and its knowledge base as the context for these skills. 
 | Competitors and market | Compare direct competitors and substitutes using first-party product, positioning, and pricing pages. Cover audiences, jobs to be done, key capabilities, proof, differentiators, and pricing where verified. Use dated sources for segments, demand, trends, geography, and buying triggers. Separate estimates from facts; summarize what can materially affect campaign choices. | `research/competitors.md`, `research/competitors/<id>.md`, and `research/market.md`; set `research.competitors` and report references. |
 | Social, blog, newsletter, launches | Verify first-party profile links, accounts, RSS/blog archives, and signup pages. Check relevant places such as Product Hunt, Hacker News, app or integration marketplaces, and communities for launches. Record verified listing URLs and dates where known; distinguish owned announcements from third-party coverage. | `channels.social`, `channels.blog`, `channels.newsletter`, `launches`; add supporting notes when material. |
 | Website integrations | Load the [website integration checklist](references/website-integrations.md) via `skill_view` with `file_path: references/website-integrations.md`. Inspect initial HTML, linked deployed scripts, and normal browser requests where available. Distinguish configuration, an observed request, and account access. | `research/website-integrations.md` and `integrations`; include checked URLs, evidence, and coverage limits. |
+| Website technologies | Load the optional `wappalyzer` skill with `skill_view`. Follow its readiness check and browser workflow on the verified homepage to identify public signals for the CMS, storefront, frameworks, and marketing tools. If the skill or detector is unavailable, record the coverage gap and continue. | Add a **Detected technologies** section to `research/website-integrations.md` with the scanned URL, date, technologies, and available evidence or confidence. Label implied detections as inferences. |
 | Public documentation | Verify the official docs URL, follow the relevant navigation, and make a searchable internal reference with an index, original links, and summaries by topic. Mirror verbatim only when copying is permitted; keep attribution and license. | `docs/public/index.md` and its linked pages, referenced by `documentation.internal_reference`; set `documentation.public` from the verified source. |
 | Brand assets and design | Follow the visual reference procedure below. Observe the real site and brand kit rather than inventing assets or guidelines. | `screenshots/`, `logos/`, `fonts/`, `icons/`, `illustrations/`, `backgrounds/`, `images/`, `design/DESIGN.md`, `design/assets.md`. |
 | GitHub code | Clone and inspect using the procedure below; do not substitute a README summary for code analysis. | `docs/repository/<repo-id>/` and `repositories`. |
