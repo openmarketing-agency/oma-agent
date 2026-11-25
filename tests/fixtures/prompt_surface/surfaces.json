@@ -2,10 +2,10 @@
   "cli-code.claude": {
     "prompt_tokens": {
       "context": 134,
-      "stable": 1829,
-      "volatile": 699
+      "stable": 2244,
+      "volatile": 717
     },
-    "tool_tokens": 9547,
+    "tool_tokens": 9548,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -34,10 +34,10 @@
   "cli.claude": {
     "prompt_tokens": {
       "context": 0,
-      "stable": 1225,
-      "volatile": 699
+      "stable": 1639,
+      "volatile": 718
     },
-    "tool_tokens": 9547,
+    "tool_tokens": 9548,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -66,10 +66,10 @@
   "cli.gemini": {
     "prompt_tokens": {
       "context": 0,
-      "stable": 1646,
-      "volatile": 697
+      "stable": 2061,
+      "volatile": 716
     },
-    "tool_tokens": 9547,
+    "tool_tokens": 9548,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -98,8 +98,8 @@
   "cli.gpt": {
     "prompt_tokens": {
       "context": 0,
-      "stable": 2420,
-      "volatile": 695
+      "stable": 2834,
+      "volatile": 714
     },
     "tool_tokens": 9703,
     "tools": [
@@ -130,10 +130,10 @@
   "cli.hermes": {
     "prompt_tokens": {
       "context": 0,
-      "stable": 1225,
-      "volatile": 699
+      "stable": 1639,
+      "volatile": 717
     },
-    "tool_tokens": 9547,
+    "tool_tokens": 9548,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -162,10 +162,10 @@
   "cron.claude": {
     "prompt_tokens": {
       "context": 0,
-      "stable": 1211,
-      "volatile": 699
+      "stable": 1626,
+      "volatile": 718
     },
-    "tool_tokens": 9547,
+    "tool_tokens": 9548,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -194,8 +194,8 @@
   "desktop.claude": {
     "prompt_tokens": {
       "context": 0,
-      "stable": 1495,
-      "volatile": 700
+      "stable": 1909,
+      "volatile": 719
     },
     "tool_tokens": 10203,
     "tools": [
@@ -227,10 +227,10 @@
   "discord.claude": {
     "prompt_tokens": {
       "context": 0,
-      "stable": 1244,
-      "volatile": 700
+      "stable": 1658,
+      "volatile": 719
     },
-    "tool_tokens": 9547,
+    "tool_tokens": 9548,
     "tools": [
       "browser_cdp",
       "browser_dialog",
@@ -259,10 +259,10 @@
   "telegram.claude": {
     "prompt_tokens": {
       "context": 0,
-      "stable": 1330,
-      "volatile": 700
+      "stable": 1745,
+      "volatile": 719
     },
-    "tool_tokens": 9547,
+    "tool_tokens": 9548,
     "tools": [
       "browser_cdp",
       "browser_dialog",

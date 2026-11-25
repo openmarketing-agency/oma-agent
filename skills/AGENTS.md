@@ -25,10 +25,10 @@ stored under `skills.config.<key>`, prompted during setup, injected at load). To
 
 Every new or modernised skill — bundled, optional, or contributed — meets all of these before merge:
 
-1. **`description` ≤ 60 chars, one sentence, ends with a period.** Long descriptions bloat listings
+1. **`description` ≤ 220 chars, one sentence, ends with a period.** Long descriptions bloat listings
    and dilute attention when many skills load. State the capability, not the implementation; no
    marketing words ("powerful", "comprehensive", "seamless", "advanced"); don't repeat the name or
-   the category name (the skill index already prints the category above the skill). 60 is the width
+   the category name (the skill index already prints the category above the skill). 220 is the width
    the index shows (`SKILL_PROMPT_DESC_LIMIT`); `skill_manage` rejects a new or changed description
    over it.
 2. **Prose references native Hermes tools or the MCP servers the skill expects, in backticks**

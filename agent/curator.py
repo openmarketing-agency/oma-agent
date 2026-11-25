@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Set
 
 from hermes_constants import get_hermes_home
-from agent.skill_utils import get_disabled_skill_names
+from agent.skill_utils import SKILL_PROMPT_DESC_LIMIT, get_disabled_skill_names
 from tools import skill_usage
 from utils import atomic_json_write
 
@@ -287,7 +287,7 @@ CURATOR_REVIEW_PROMPT = (
     "narrow skills where each one captures one session's specific bug is "
     "a FAILURE of the library — not a feature. An agent searching skills "
     "matches on descriptions, not on exact names (note: the system prompt "
-    "skill index shows 60 chars of a description — keep the trigger class "
+    f"skill index shows {SKILL_PROMPT_DESC_LIMIT} chars of a description — keep the trigger class "
     "in that window). One broad umbrella "
     "skill with labeled subsections beats five narrow siblings for "
     "discoverability, not the other way around.\n\n"
