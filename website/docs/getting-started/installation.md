@@ -50,8 +50,11 @@ The macOS installer is **Apple Silicon only**. macOS on x86 (Intel) processors i
 For a command-line only install without Hermes Desktop, run:
 
 #### Linux / macOS / WSL2
+
+Run the OMA installer from the directory that should contain the application and data folders:
+
 ```bash
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/openmarketing-agency/oma-agent/main/scripts/install.sh | bash
 ```
 
 #### Windows (native)
@@ -87,10 +90,10 @@ app included, already has it. Where PM has no Chromium build (Android/Termux,
 musl Linux), Hermes uses a system `chromium` on `PATH` instead.
 Other optional tools use their feature-specific installation paths.
 
-A new install lands on the latest stable release, the channel `hermes update`
-follows from then on (see [Updating](./updating.md)). To install the tip of
-`main` instead, pass `--channel main` on POSIX or `-Channel main` on Windows
-(or set `HERMES_INSTALL_CHANNEL=main` first, for the one-liners).
+The OMA POSIX installer follows the OMA fork's `main` branch by default. The
+upstream Windows installer defaults to its latest stable release. You can
+choose explicitly with `--channel` on POSIX, `-Channel` on Windows, or the
+`HERMES_INSTALL_CHANNEL` environment variable (see [Updating](./updating.md)).
 
 To leave the browser tools out, pass `--skip-browser` on POSIX or `-SkipBrowser`
 on Windows; for the computer-use driver, `--skip-computer-use` /
@@ -113,16 +116,19 @@ directory; a failed step prints its last lines and the log path. CI (`CI` or
 
 | Method | Code | CLI entry point | Default user data |
 |---|---|---|---|
-| POSIX source script | `~/.hermes/hermes-agent/` | `~/.local/bin/hermes` wrapper | `~/.hermes/` |
+| OMA POSIX source script (new install) | `./oma-agent/` | `oma-agent` and `hermes` in `~/.local/bin/` | `./oma-agent-data/` |
 | Windows source script | `%LOCALAPPDATA%\hermes\hermes-agent\` | `%LOCALAPPDATA%\hermes\bin\` | `%LOCALAPPDATA%\hermes\` |
 | Desktop bundle | Inside the installed app package | Packaged launchers; Windows execution aliases | Platform default Hermes data directory |
 | Docker | `/opt/hermes/` | Image entrypoint and `hermes` shim | Mounted `/opt/data/` |
 | Termux APT | `$PREFIX/lib/hermes-agent/` | Symlinks in `$PREFIX/bin/` | `~/.hermes/` |
 
-`HERMES_HOME` selects user data. The POSIX script's `--dir` selects its source
-checkout independently. Windows provides `-HermesHome` and `-InstallDir`.
-Running the POSIX script as root does not select an automatic FHS layout:
-it uses root's home unless you provide an explicit source path.
+The POSIX paths are relative to the directory where you run the installer. The
+installer records the absolute data path, so both commands find it from any
+working directory. Rerun from the same parent directory, or pass `--dir` to
+select an installed checkout. A recognized `~/.hermes` installation keeps its
+existing layout; the installer does not move data. `--dir` / `HERMES_INSTALL_DIR`
+and `--hermes-home` / `HERMES_HOME` override the POSIX paths. For a custom pair,
+pass both. Windows provides `-HermesHome` and `-InstallDir`.
 
 PM's tool store and per-install Python generations have separate lifetimes.
 See [Package management](../reference/package-management.md) for their locations.

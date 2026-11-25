@@ -20,14 +20,14 @@ set -u
 # hygiene can't break the locked sync the way it used to before pm owned it.
 export UV_NO_CONFIG=1
 
-REPO_URL="${HERMES_REPO_URL:-https://github.com/NousResearch/hermes-agent.git}"
+REPO_URL="${HERMES_REPO_URL:-https://github.com/openmarketing-agency/oma-agent.git}"
 BRANCH="main"
 INSTALL_COMMIT=""
 # The update channel to install: stable (the latest published release, the default for the
 # official repository's main line) or main (every commit). An explicit choice is persisted.
 CHANNEL="${HERMES_INSTALL_CHANNEL:-}"
 INSTALL_DIR="${HERMES_INSTALL_DIR:-}"
-HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
+HERMES_HOME="${HERMES_HOME:-}"
 STAGE=""
 WANT_MANIFEST=false
 JSON=false
@@ -72,9 +72,11 @@ while [ $# -gt 0 ]; do
             echo "                  [--non-interactive] [--include-desktop] [--verbose]"
             echo "                  [--skip-browser] [--skip-computer-use]"
             echo
-            echo "  --channel       stable (default): the latest published release, then release"
-            echo "                  to release. main: every commit. Also HERMES_INSTALL_CHANNEL;"
+            echo "  --channel       main (default for OMA): follow main. stable: use source releases."
+            echo "                  Also HERMES_INSTALL_CHANNEL;"
             echo "                  an explicit choice is saved like 'hermes update --set-channel'."
+            echo "  Fresh installs use ./oma-agent and ./oma-agent-data from the current directory."
+            echo "  Override with --dir / HERMES_INSTALL_DIR and --hermes-home / HERMES_HOME."
             echo "  --skip-browser  Do not install the browser (Chromium). Alias: --no-playwright."
             echo "                  Remembered by later installs and 'hermes update';"
             echo "                  undo with 'hermes pm install chromium'."
@@ -91,7 +93,33 @@ case "$CHANNEL" in
     *) printf -- '--channel must be stable or main, not %s\n' "$CHANNEL" >&2; exit 2 ;;
 esac
 
-INSTALL_DIR="${INSTALL_DIR:-$HERMES_HOME/hermes-agent}"
+resolve_install_layout() {
+    local base legacy candidate recorded=""
+    base="$(pwd -P)" || return 1
+    legacy="$HOME/.hermes"
+    candidate="${INSTALL_DIR:-$base/oma-agent}"
+    case "$candidate" in /*) ;; *) candidate="$base/$candidate" ;; esac
+    if [ -z "$HERMES_HOME" ] && [ -f "$candidate/.hermes/install-home" ]; then
+        IFS= read -r recorded < "$candidate/.hermes/install-home" || return 1
+        case "$recorded" in /*) HERMES_HOME="$recorded"; INSTALL_DIR="$candidate" ;; *) return 1 ;; esac
+    fi
+    if [ -z "$HERMES_HOME" ]; then
+        if [ -d "$legacy/hermes-agent" ] || [ -f "$legacy/config.yaml" ] || [ -f "$legacy/.env" ] || [ -f "$legacy/state.db" ]; then
+            HERMES_HOME="$legacy"
+        else
+            HERMES_HOME="$base/oma-agent-data"
+            INSTALL_DIR="$candidate"
+        fi
+    fi
+    case "$HERMES_HOME" in /*) ;; *) HERMES_HOME="$base/$HERMES_HOME" ;; esac
+    INSTALL_DIR="${INSTALL_DIR:-$HERMES_HOME/hermes-agent}"
+    case "$INSTALL_DIR" in /*) ;; *) INSTALL_DIR="$base/$INSTALL_DIR" ;; esac
+}
+
+if ! resolve_install_layout; then
+    printf 'Could not resolve the install paths. Check the current directory and saved install home, or use --dir and --hermes-home.\n' >&2
+    exit 1
+fi
 export HERMES_HOME
 
 INSTALL_LOG="$HERMES_HOME/logs/install.log"
@@ -1088,6 +1116,24 @@ wire_shell_path() {
     esac
 }
 
+remember_install_home() {
+    local home marker="$INSTALL_DIR/.hermes/install-home" staged
+    [ -d "$INSTALL_DIR" ] || return 1
+    mkdir -p "$HERMES_HOME" || return 1
+    home="$(CDPATH="" cd -- "$HERMES_HOME" && pwd -P)" || return 1
+    # Keep this outside version control. The launcher must find it even when
+    # called from another directory or without a shell startup file.
+    [[ "$home" != *$'\n'* && "$home" != *$'\r'* ]] || return 1
+    [ ! -L "$INSTALL_DIR/.hermes" ] && [ ! -L "$marker" ] || return 1
+    mkdir -p "${marker%/*}" || return 1
+    [ ! -e "$marker" ] || [ -f "$marker" ] || return 1
+    staged="$(mktemp "${marker%/*}/.install-home-XXXXXX")" || return 1
+    if ! printf '%s\n' "$home" > "$staged" || ! mv -f -- "$staged" "$marker"; then
+        rm -f -- "$staged"
+        return 1
+    fi
+}
+
 stage_products() {
     # The whole tail in one place, by calling the completion an update calls:
     # publish the commands, build the products (tui/web, plus the desktop app),
@@ -1097,6 +1143,7 @@ stage_products() {
     # the tree on PM's selected Python.
     local boot_py
     local args=(--source "$INSTALL_DIR")
+    remember_install_home || fail "could not save the data directory for $INSTALL_DIR" filesystem_error
     bootstrap_python
     if [ "$INCLUDE_DESKTOP" = true ] || desktop_product_present; then
         args+=(--desktop)
@@ -1173,7 +1220,7 @@ stage_complete() {
         "$INSTALL_DIR/.hermes/bin/hermes" update --set-channel "$CHANNEL" \
             || fail "could not save the $CHANNEL update channel" other
     fi
-    log_success "Hermes Agent install complete. Run: hermes"
+    log_success "OMA Agent install complete. Run: oma-agent (or hermes)"
 }
 
 print_path_reload_hint() {

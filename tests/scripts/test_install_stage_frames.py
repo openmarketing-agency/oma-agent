@@ -40,6 +40,10 @@ def test_stage_result_matches_the_actual_exit(tmp_path, case):
                        check=True, capture_output=True)
     elif case == "write-failure":
         (tmp_path / "install").write_text("not a directory", encoding="utf-8")
+    elif case == "success":
+        home = tmp_path / "home"
+        home.mkdir()
+        (home / "config.yaml").write_text("{}\n", encoding="utf-8")
     script = '''source "$1" --manifest
 JSON=true
 STAGE="$PROBE_STAGE"
