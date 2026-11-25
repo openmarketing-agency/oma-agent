@@ -2706,10 +2706,10 @@ def claim_job_for_fire(
     ``claim_ttl_seconds`` exists (the TTL lets another fire reclaim after a crash; mark_job_run
     clears the claim). Otherwise stamp ``fire_claim`` and, for recurring jobs, advance
     ``next_run_at`` so a stale re-delivery cannot re-fire."""
-    from hermes_cli.oma_campaigns.admission import profile_work_paused
+    from hermes_cli.oma_campaigns.admission import campaign_cron_paused
 
     def apply(jobs, _i, job):
-        if profile_work_paused(_current_cron_store().jobs_file.parent.parent, cron=True):
+        if campaign_cron_paused(_current_cron_store().jobs_file.parent.parent, job):
             return False
         if is_terminal_job(job) and not _is_recoverable_error_job(job):
             return False
@@ -2851,12 +2851,13 @@ def get_due_jobs() -> list[dict[str, Any]]:
     This prevents the perpetual-defer loop (#33315) where a job whose runtime exceeds ``interval + grace``
     would be skipped forever.
     """
-    from hermes_cli.oma_campaigns.admission import profile_work_paused
+    from hermes_cli.oma_campaigns.admission import campaign_cron_paused
 
-    if profile_work_paused(_current_cron_store().jobs_file.parent.parent, cron=True):
+    home = _current_cron_store().jobs_file.parent.parent
+    if campaign_cron_paused(home):
         return []
     with _jobs_lock():
-        return _get_due_jobs_locked()
+        return _get_due_jobs_locked(home)
 
 
 @dataclass
@@ -3247,8 +3248,10 @@ def _evaluate_due_job(job: dict[str, Any], scan: _DueScan, run_claim_ttl: float)
     return True
 
 
-def _get_due_jobs_locked() -> list[dict[str, Any]]:
+def _get_due_jobs_locked(home: Path) -> list[dict[str, Any]]:
     """Inner implementation of get_due_jobs(); must be called with _jobs_lock held."""
+    from hermes_cli.oma_campaigns.admission import campaign_cron_paused, profile_cron_disabled
+
     raw_jobs = load_jobs()
     scan = _DueScan(raw_jobs, _hermes_now())
     scan.needs_save = _normalize_due_scan_records(raw_jobs)
@@ -3262,11 +3265,14 @@ def _get_due_jobs_locked() -> list[dict[str, Any]]:
         jobs = [j for j in jobs if scan.find(j.get("id")) is not None]
 
     due = []
+    restricted = profile_cron_disabled(home)
     for job in jobs:
         # Per-job containment: one malformed record must never abort the whole scan. Normalization
         # above repairs known shapes; this catches FUTURE variants so healthy siblings still
         # run/persist.
         try:
+            if restricted and campaign_cron_paused(home, job):
+                continue
             if is_terminal_job(job) and not _is_recoverable_error_job(job):
                 continue
             if not job.get("enabled", True):

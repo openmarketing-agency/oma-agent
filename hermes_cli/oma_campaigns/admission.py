@@ -65,6 +65,16 @@ def profile_cron_disabled(home: Path) -> bool:
     return home.name in config.get("agents", []) and config.get("mode") == "control"
 
 
+def campaign_cron_paused(home: Path, job: dict | None = None) -> bool:
+    if not profile_work_paused(home, cron=True):
+        return False
+    if profile_work_paused(home) or not profile_cron_disabled(home):
+        return True
+    from hermes_cli.oma_campaigns.analytics_cron import analyst_profile, is_managed_job
+
+    return not (analyst_profile(home) if job is None else is_managed_job(home, job))
+
+
 def board_work_paused(conn: sqlite3.Connection, *, task_id: str | None = None) -> bool:
     # Claim paths can be called without a board slug; use the DB the caller actually opened.
     for _, name, filename in conn.execute("PRAGMA database_list"):

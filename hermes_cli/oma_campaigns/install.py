@@ -33,6 +33,7 @@ from hermes_cli.profiles import get_profile_dir, profile_exists
 from hermes_constants import get_hermes_home
 from toolsets import resolve_toolset
 from tools.skills_sync import bundled_skill_names, sync_skills
+from utils.files import atomic_write_text
 
 def default_home() -> Path:
     home = get_hermes_home().resolve()
@@ -327,6 +328,54 @@ def _publish_profiles(campaign: Campaign, configs: dict[str, dict], paths: dict[
                                        description=agent.description, soul=soul)
         provision_profile(request, initialize=partial(_initialize, agent, configs[agent.id], credentials[agent.id]))
 
+def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
+    """Add a missing analyst without reinstalling the roster; caller owns the install lock."""
+    from hermes_cli.oma_campaigns.analytics_cron import ensure_job
+    from hermes_cli.oma_campaigns.analytics_sources import validate_bindings
+
+    campaign_id = config["id"]
+    agent_id = f"{campaign_id}__analyst"
+    roster = config["agents"]
+    board, orchestrator = f"campaign-{campaign_id}", config["orchestrator"]
+    profile = _real_path(_real_path(home / "profiles") / agent_id)
+    root = _real_path(_real_path(_real_path(home / "oma") / "agents") / agent_id)
+    record_path, soul_path = _real_path(root / "config.yaml"), _real_path(root / "SOUL.md")
+    if profile.exists() and not _profile_matches(home, agent_id, board, orchestrator):
+        raise ValueError(f"{agent_id}: refusing to reuse an unrelated profile")
+    root.mkdir(parents=True, mode=0o700, exist_ok=True)
+    if not record_path.is_file():  # config-reader: ok — authored OMA record existence only
+        atomic_config_replace(record_path, {
+            "id": agent_id, "name": "Analyst", "description": "Collect and report campaign analytics.",
+            "campaign_id": campaign_id, "agent": {"enabled_toolsets": []}, "analytics_sources": [],
+        })
+    if not soul_path.is_file():
+        atomic_write_text(soul_path, f"You are the analyst for {config['name']}. Report measured observations. "
+                          "Do not publish, message accounts, or guess missing metrics. OMA manages your collector.\n",
+                          create_mode=0o600)
+    _, authored = read_agent_record(home, campaign_id, agent_id)
+    validate_bindings(authored.get("analytics_sources", []))
+    if not profile.exists():
+        saved, credentials = snapshot(home, config)
+        effective = resolve_settings(settings_from(saved, campaign_id), settings_from(authored, agent_id))
+        native = _with_kanban({**effective, "agent": {"enabled_toolsets": []}, "skills": {},
+                               "_config_version": DEFAULT_CONFIG["_config_version"]}, board, orchestrator, agent_id)
+        saves, scratch = (_agent_data_dir(home, agent_id, part) for part in ("saves", "tmp"))
+        saves.mkdir(exist_ok=True)
+        scratch.mkdir(exist_ok=True)
+        members = tuple(dict.fromkeys([*roster, agent_id]))
+        soul = campaign_soul(soul_path.read_text(encoding="utf-8-sig"), agent_id, orchestrator, members, board,
+                             config_path, saves, scratch)
+        agent = Agent(agent_id, authored["description"], {}, soul, {})
+        provision_profile(ProfileCreateRequest(name=agent_id, alias=False, mirror_credentials=False,
+                                               description=agent.description, soul=soul),
+                          initialize=partial(_initialize, agent, native, credentials if "model" not in authored else {}))
+    ensure_job(profile)
+    if agent_id not in roster:
+        config = {**config, "agents": [*roster, agent_id]}
+        atomic_config_write(config_path, config)
+    return config
+
+
 def create(home: Path, definition: Path) -> dict:
     """Create an installed, paused campaign from a definition outside the campaign registry."""
     config = read_mapping(_real_path(definition))
@@ -357,7 +406,7 @@ def _install(home: Path, campaign_id: str, *, definition: dict | None = None) ->
             config = read_mapping(config_path)
             record = _status(home, campaign_id, config)
             if record["state"] == "installed":
-                return record
+                return _status(home, campaign_id, ensure_analyst(home, config_path, config))
             if record["state"] == "incomplete":
                 raise ValueError(f"Campaign {campaign_id!r} has an incomplete installation; no profiles were changed")
             validate_record("campaign", config, config_path)
@@ -424,6 +473,7 @@ def _install(home: Path, campaign_id: str, *, definition: dict | None = None) ->
         if inherited:
             current.update({"all-keys": sorted(all_keys), "available-keys": sorted(all_keys - missing_keys)})
         current.setdefault("kanban_board_name", board_metadata["name"])
+        current = ensure_analyst(home, config_path, current)
         current["installation_state"] = "installed"
         result = _status(home, campaign_id, current)
         if result["state"] != "installed":

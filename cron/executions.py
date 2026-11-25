@@ -738,8 +738,8 @@ def live_executions(job_ids: list[str]) -> dict[str, dict[str, Any]]:
     return live
 
 
-def latest_executions(job_ids: list[str]) -> dict[str, dict[str, Any]]:
-    """Load latest execution for many jobs in one query."""
+def latest_executions(job_ids: list[str], *, started_only: bool = False) -> dict[str, dict[str, Any]]:
+    """Load latest execution for many jobs, optionally excluding attempts that never started."""
     clean = [str(job_id) for job_id in dict.fromkeys(job_ids) if job_id]
     if not clean:
         return {}
@@ -754,8 +754,8 @@ def latest_executions(job_ids: list[str]) -> dict[str, dict[str, Any]]:
                              PARTITION BY job_id
                              ORDER BY julianday(claimed_at) DESC, claimed_at DESC, id DESC
                            ) AS rn
-                    FROM executions WHERE job_id IN ({placeholders}))
+                    FROM executions WHERE (? OR started_at IS NOT NULL) AND job_id IN ({placeholders}))
                   WHERE rn=1)""",
-            clean,
+            [not started_only, *clean],
         ).fetchall()
     return {row["job_id"]: dict(row) for row in rows}
