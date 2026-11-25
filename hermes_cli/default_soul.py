@@ -1,5 +1,6 @@
 """Default SOUL.md template seeded into HERMES_HOME on first run."""
 
+from hashlib import sha256
 from pathlib import Path
 
 from hermes_cli._startup_fast import project_root_str
@@ -8,8 +9,12 @@ from hermes_constants import get_default_hermes_root
 DEFAULT_SOUL_MD = "You are OMA Agent built by Open Marketing Agency powered by Hermes Agent."
 
 
+def _is_default_home(home: Path) -> bool:
+    return home.resolve() == get_default_hermes_root(home=home).resolve()
+
+
 def starter_soul(home: Path) -> str:
-    if home.resolve() != get_default_hermes_root(home=home).resolve():
+    if not _is_default_home(home):
         return DEFAULT_SOUL_MD
     return (Path(project_root_str()) / "SOUL.md").read_text(encoding="utf-8-sig")
 
@@ -36,6 +41,10 @@ _SCAFFOLD_TAIL = (
     "This file is loaded fresh each message -- no restart needed.\n"
     "Delete the contents (or this file) to use the default personality.\n-->"
 )
+
+# Fingerprint of the normalized root starter before it gained paused campaign creation.
+# Match exactly so a user-edited persona is never replaced.
+_PRE_PAUSED_CREATE_OMA_SOUL_SHA256 = "3c1ad6dfa54bd14191da512a3741103be4b0c92699d17a1a8b2a850a6b7ea14d"
 
 # Auto-seeded SOUL.md content that carries zero user intent, so a matching file is safe to upgrade
 # to the current starter: comment-only scaffolds older installers wrote, plus earlier generations
@@ -82,11 +91,17 @@ def _normalize_soul(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n").lstrip("\ufeff").strip()
 
 
-def is_legacy_template_soul(text: str) -> bool:
-    """True if ``text`` is a non-customized, auto-seeded SOUL.md (see ``_LEGACY_TEMPLATE_SOULS``).
+def is_legacy_template_soul(text: str, *, home: Path | None = None) -> bool:
+    """True if ``text`` is a non-customized, auto-seeded SOUL.md.
 
     Only known historical installer templates count; any edit outside those exact
     strings is treated as user intent and preserved.
     """
     normalized = _normalize_soul(text)
+    if (
+        home is not None
+        and sha256(normalized.encode("utf-8")).hexdigest() == _PRE_PAUSED_CREATE_OMA_SOUL_SHA256
+        and _is_default_home(home)
+    ):
+        return True
     return any(normalized == _normalize_soul(t) for t in _LEGACY_TEMPLATE_SOULS)

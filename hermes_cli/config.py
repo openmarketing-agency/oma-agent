@@ -518,7 +518,7 @@ def _ensure_default_soul_md(home: Path) -> None:
             existing = soul_path.read_text(encoding="utf-8-sig")
         except (OSError, UnicodeDecodeError):
             return
-        if not is_legacy_template_soul(existing):
+        if not is_legacy_template_soul(existing, home=home):
             return
     text = starter_soul(home)
     try:
