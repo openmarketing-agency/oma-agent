@@ -1,9 +1,12 @@
 # Hermes Agent - Development Guide
 
-This root file is a hub: what applies everywhere, then a routing table. Each area's `AGENTS.md`
-loads automatically when you work in that directory; read it before editing there.
-`python scripts/check` caps this file at 12k chars and every root-to-area chain at 30k: long form
-goes in `website/docs/developer-guide/`.
+Read the area's `AGENTS.md` before editing. `python scripts/check` enforces project-context size
+limits; put long-form guidance in `website/docs/developer-guide/`.
+
+**Write boundary:** Verify the Git root and resolved targets before edits or commands that write.
+Only `oma-agent` is in scope. Treat `../openmarketing.agency` and other repos as read-only unless
+the user explicitly names the repo and authorizes the change. This includes scripts, tests, builds,
+and delegated work. Report needed changes outside this repo without making them.
 
 **Never give up on the right solution.**
 
@@ -113,7 +116,6 @@ per variant and a name → variant table (`tools/environments/`, its table still
 
 ## Rules that apply everywhere
 
-- **Edit scope:** Edit only `oma-agent`. Do not edit `openmarketing.agency` or other repos unless explicitly asked.
 - **No defensive clutter:** no wrappers or `try/except: pass` around code that cannot fail, no flags
   nobody sets, no dead code wired in without E2E proof. Comments keep the WHY, cut the WHAT.
 - **Never infer process identity from argv substrings;** use
