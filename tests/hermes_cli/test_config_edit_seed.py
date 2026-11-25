@@ -115,7 +115,9 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     import json
     import hermes_yaml as yaml
     from agent.runtime_scope import bind_profile_scope
-    from agent.skill_selection import OMA_DEFAULT_ONLY_SKILLS, OMA_MAINTENANCE_ONLY_SKILLS, OMA_RETIRED_SKILLS
+    from agent.skill_selection import (
+        DEFAULT_ONLY_BUNDLED_SKILLS, OMA_DEFAULT_ONLY_SKILLS, OMA_MAINTENANCE_ONLY_SKILLS, OMA_RETIRED_SKILLS,
+    )
     from agent.skill_utils import get_disabled_skill_names
     from agent.skill_commands import build_auto_load_prompt
     from hermes_cli.config_defaults import DEFAULT_CONFIG
@@ -151,7 +153,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
         assert _get_platform_tools(maintenance_config, "cli") == {
             "file", "terminal", "skills", "memory", "session_search", "web", "browser", "camofox",
         }
-        assert maintenance_config["tools"]["tool_search"]["eager_toolsets"] == ["file", "terminal", "skills", "memory"]
+        assert maintenance_config["tools"]["tool_search"]["eager_toolsets"] == ["file", "skills", "memory"]
         assert maintenance_config["tools"]["tool_search"]["listing"] == "off"
         assert maintenance_config["approvals"]["cron_mode"] == "approve"
         assert not (maintenance / "skills" / "oma").exists()
@@ -166,7 +168,7 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
             disclosed = assemble_tool_defs(maintenance_tools)
             assert disclosed.activated
             assert {tool["function"]["name"] for tool in disclosed.tool_defs} == {
-                "read_file", "write_file", "search_files", "patch", "terminal", "process_manage",
+                "read_file", "write_file", "search_files", "patch",
                 "skills_list", "skills_search", "skill_view", "skill_manage", "memory",
             } | BRIDGE_TOOL_NAMES
     else:
@@ -176,11 +178,11 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     assert not (home / "skills" / "omactl").exists()
     path = home / "config.yaml"
     content = path.read_text(encoding="utf-8")
-    enabled = ["file", "terminal", "browser", "camofox", "web", "skills", "memory", "session_search"]
-    eager = ["file", "terminal", "skills", "memory"]
+    enabled = ["file", "terminal", "web", "skills", "memory", "session_search", "browser", "camofox"]
+    eager = ["file", "skills", "memory"]
     if entry == "install":
         enabled.extend(["clarify", "kanban"])
-        eager.append("clarify")
+
     assert "#" not in content
     assert yaml.safe_load(content) == {
         "agent": {"enabled_toolsets": enabled},
@@ -223,17 +225,17 @@ def test_starter_config_applies_oma_policy(tmp_path, monkeypatch, entry):
     disclosed = assemble_tool_defs(tools)
     assert disclosed.activated
     direct_names = {tool["function"]["name"] for tool in disclosed.tool_defs}
-    assert ("clarify" in direct_names) == (entry == "install")
+    assert "clarify" not in direct_names
     assert not any(name.startswith("kanban_") for name in direct_names)
-    expected = OMA_RETIRED_SKILLS if entry == "install" else OMA_DEFAULT_ONLY_SKILLS
+    expected = OMA_RETIRED_SKILLS if entry == "install" else OMA_DEFAULT_ONLY_SKILLS | DEFAULT_ONLY_BUNDLED_SKILLS
     assert get_disabled_skill_names() == expected | OMA_MAINTENANCE_ONLY_SKILLS
     assert approval_context._get_approval_mode() == "off"
     assert approval_context._get_approval_timeout() == 300
     assert approval_context._get_cron_approval_mode() == "approve"
     assert approval_context._get_single_query_approval_mode() == "approve"
     assert approval_context._get_unattended_approval_mode() == "approve"
-    direct = {"read_file", "terminal", "process_manage", "skills_list", "skill_view", "skill_manage", "memory"}
-    deferred = {"browser_navigate", "web_search", "session_search"}
+    direct = {"read_file", "skills_list", "skill_view", "skill_manage", "memory"}
+    deferred = {"terminal", "process_manage", "browser_navigate", "web_search", "session_search"}
     available = [{"type": "function", "function": {"name": name}} for name in sorted(direct | deferred)]
     result = assemble_tool_defs(available)
     assert result.activated and result.deferred_count == len(deferred)

@@ -2,17 +2,17 @@
 
 This guide covers **OMA Agent v0.1.9**, compared with the upstream Hermes Agent commit it last incorporated (`fe8b920cae09`). It covers the fork’s behavior and settings, not every inherited Hermes option or every change on newer upstream `main`.[7][11]
 
-**In short:** OMA starts with four eager and three deferred toolsets, plus eager `clarify` and deferred `kanban` in the built-in `default` profile. It ships a smaller skill catalog, opens the compact `mono` TUI for interactive chat, installs campaigns from local runtime content, and does not collect or send Nous Shared Metrics. An upgrade does **not** replace an existing profile’s saved tool list or recreate an installed team.[1][2][8]
+**In short:** OMA exposes `file`, `skills`, and `memory` upfront and defers the other starter toolsets, including `clarify` and `kanban` in built-in `default`. It ships a smaller skill catalog, opens the compact `mono` TUI for interactive chat, installs campaigns from local runtime content, and does not collect or send Nous Shared Metrics. An upgrade does **not** replace an existing profile’s saved tool list or recreate an installed team.[1][2][8]
 
 ## 1. What a profile starts with
 
 | Profile | Configuration and identity | Skills and credentials |
 | --- | --- | --- |
 | Fresh built-in `default` | Minimal OMA starter `config.yaml`. The stock `SOUL.md` identifies it as OMA Agent. It is the team setup agent, not the orchestrator of any team. | Bundled skills are available on demand where supported; none preloaded. The fresh `.env` starts empty; Docker may write a real gateway key. |
-| Starter `maintenance` | Created alongside `default` on a fresh file-backed install from [`hermes_cli/data/profiles/maintenance/`](hermes_cli/data/profiles/maintenance/). Enables `file`, `terminal`, `skills`, `memory`, `session_search`, `web`, `browser`, and `camofox`; `file`, `terminal`, `skills`, and `memory` are eager. | Seeds a maintenance-specific `SOUL.md` and the supplied `omactl` skill for this profile only; does not install or run the CLI. The five OMA management skills are not available. No launch credentials are copied, and an existing `maintenance` profile is not overwritten. |
+| Starter `maintenance` | Created alongside `default` on a fresh file-backed install from [`hermes_cli/data/profiles/maintenance/`](hermes_cli/data/profiles/maintenance/). Inherits the named-profile toolset baseline and exposes `file`, `skills`, and `memory` upfront. | Seeds a maintenance-specific `SOUL.md` and the supplied `omactl` skill for this profile only; does not install or run the CLI. The five OMA management skills are not available. No launch credentials are copied, and an existing `maintenance` profile is not overwritten. |
 | New named profile, no clone | Same minimal starter policy. Stock `SOUL.md` identifies it as OMA Agent without the root’s OMA management instructions. | Bundled skills are seeded unless opted out. No skill preload or example `.env` entries. Normal creation can mirror real launch credentials and model settings; an empty seed is not a guarantee of credential isolation. |
 | Explicit clone | Uses the source configuration and persona rather than the OMA starter policy. Copy scope and isolation rules still depend on the clone flags. Unset global defaults are still resolved by the installed runtime. | Keeps the clone’s copied skills and `.env` where the clone mode supplies them. A clone does not register a second copy of the source profile’s cron jobs. |
-| New campaign agent | Created under its canonical `<campaign-id>__<role-id>` name. Preserves the authored allowlist and persona; fills omitted tool-search and reasoning settings at installation. | Seeds eligible bundled skills and copies the role’s declared `oma_skills`. Does not mirror launch credentials or register jobs. Conditional model and Camofox setup use saved settings as described below. |
+| New campaign agent | Created under its canonical `<campaign-id>__<role-id>` name. Enforces the OMA toolset baseline and preserves authored additions and the persona. Fills omitted reasoning settings at installation. | Seeds eligible bundled skills and copies the role’s declared `oma_skills`. Does not mirror launch credentials or register ordinary jobs. Conditional model and Camofox setup use saved settings as described below. |
 | Existing profile after upgrade | Saved toolsets, skills settings, display choices, and customized `SOUL.md` are not replaced by the starter. A changed **runtime default** can affect omitted keys; a saved override still wins, except old Shared Metrics opt-ins are inert. | Existing `.env` files are not reinitialized from an example. Missing dotenv files can be seeded empty by profile maintenance. Existing skill packages are not an inventory of what the new release seeds on a clean home. |
 
 The starter is written only for a missing file-backed config. It is shared by source and Docker setup, normal non-clone profile creation, and local config creation through `hermes config edit` or the appropriate doctor repair. Remote config setup does not seed a local shadow config. The annotated [`cli-config.yaml.example`](cli-config.yaml.example) is a reference, not the live file the installer copies.[3][6][8]
@@ -23,11 +23,11 @@ This is the policy portion of a freshly seeded `default` config. Ordinary new na
 
 ```yaml
 agent:
-  enabled_toolsets: [file, terminal, browser, camofox, web, skills, memory, session_search, clarify, kanban]
+  enabled_toolsets: [file, terminal, web, skills, memory, session_search, browser, camofox, clarify, kanban]
 tools:
   tool_search:
     enabled: "on"
-    eager_toolsets: [file, terminal, skills, memory, clarify]
+    eager_toolsets: [file, skills, memory]
     listing: "off"
 kanban:
   orchestrator_profile: default
@@ -68,20 +68,20 @@ Names are literal and case-sensitive. Bundles expand to their member tools. The 
 | `skills` | The callable `skills_list`, `skill_view`, and `skill_manage` tools. It does not install or preload skills. |
 | `memory` | The callable `memory` tool and eligible memory-provider tools. This is separate from the inherited settings `memory.memory_enabled` and `memory.user_profile_enabled`, which control the built-in stores; enabling storage does not select the toolset. |
 | `session_search` | Search and recall past conversations. Enabled in fresh profiles starting with v0.1.6, but not eager. |
-| `clarify` | Ask for feedback, preferences, or decisions on supported interactive surfaces. Enabled and eager in the fresh `default` profile only. |
+| `clarify` | Ask for feedback, preferences, or decisions on supported interactive surfaces. Enabled and deferred in the fresh `default` profile only. |
 | `kanban` | Queue and check work on a named board. Deferred in the `default` starter so the intake agent can route work without becoming the campaign planner. |
 
 See [profile toolset resolution](hermes_cli/toolset_policy.py), [toolset definitions](toolsets.py), and the [configuration reference](website/docs/user-guide/configuration.md#global-toolset-allowlist).
 
 ## 3. Tool Search: when schemas are visible
 
-Once tools are selected, Tool Search can keep their full schemas out of the initial model request. **Eager** means the model gets a schema directly. **Deferred** means the model can find the tool with `tool_search`, inspect it with `tool_describe`, and invoke it with `tool_call`. The starter has exposed `file`, `terminal`, `skills`, and `memory` directly since v0.1.5. In v0.1.6, `browser`, `web`, and `session_search` are deferred. The bridge stays visible with its upfront catalog hidden. Making the `skills` tools eager does not preload any skills.[1][3]
+Once tools are selected, Tool Search can keep their full schemas out of the initial model request. **Eager** means the model gets a schema directly. **Deferred** means the model can find the tool with `tool_search`, inspect it with `tool_describe`, and invoke it with `tool_call`. The current starter exposes only `file`, `skills`, and `memory` upfront; `terminal`, `web`, `browser`, and `session_search` are deferred. The bridge stays visible with its upfront catalog hidden. Making the `skills` tools eager does not preload any skills.[1][3]
 
 All keys in this table live under `tools.tool_search`.
 
 | Key | Runtime default | Fresh starter | Behavior |
 | --- | --- | --- | --- |
-| `eager_toolsets` **(fork-added)** | `null` | `[file, terminal, skills, memory]`, plus `clarify` in `default` | A list keeps members of those selected toolsets eager and defers other selected tools. `[]` defers all selected task tools; the search bridge remains direct when active. Omitted, `null`, or a blank YAML value retains the legacy deferral policy, including `defer_toolsets`. An explicit list takes precedence over both deferral settings. |
+| `eager_toolsets` **(fork-added)** | `null` | `[file, skills, memory]` | A list keeps members of those selected toolsets eager and defers other selected tools. `[]` defers all selected task tools; the search bridge remains direct when active. Omitted, `null`, or a blank YAML value retains the legacy deferral policy, including `defer_toolsets`. An explicit list takes precedence over both deferral settings. |
 | `defer_toolsets` **(fork-added)** | `[]` | Not written | Adds whole toolsets to legacy deferrals, including new members they gain. `[]` or `null` adds none. Ignored when an explicit `eager_toolsets` list is set. |
 | `defer` (inherited) | Curated list | Not written | Legacy list of individual tool names. An explicit list replaces the curated one. `[]` clears the built-in per-tool list, not inherent deferral of MCP/non-core plugin tools under legacy policy. |
 | `enabled` (inherited) | `"auto"` | `"on"` | `"auto"` and `"on"` activate the bridge when there is anything to defer. `"off"` bypasses the disclosure policy and makes selected local tool schemas direct; it does not disable tools. |
@@ -192,7 +192,9 @@ The [OMA integration catalog](hermes_cli/oma_campaigns/schemas/integrations.json
 
 The [Composio category snapshot](hermes_cli/oma_campaigns/schemas/composio-categories.json) groups toolkit slugs by the exact category labels in Composio's public documentation catalog. Join on the `composio` slug, not the OMA ID. Campaigns can save those labels in the optional `integration_categories` list as suggestions. Categories do not replace `integrations`, change which IDs OMA accepts, or connect toolkits.
 
-**Campaign defaults:** Install and sync resolve omitted model and reasoning settings from the saved `default` profile, not the current chat. Inherited values are written to the native profiles, not pinned in authored campaign or agent YAML. Only profiles inheriting that model can receive its matching saved API key, and sync does not overwrite an existing profile key unless one is explicitly supplied. Values already saved in campaign or agent records remain overrides until explicitly removed. Tool Search defaults to `enabled: "on"` and `eager_toolsets: [file, skills, memory]` for new campaign profiles. Each role must supply `agent.enabled_toolsets`; the orchestrator must include `kanban`, while a worker can omit Kanban or explicitly select `[]`. Installed campaigns are not migrated.
+**Campaign defaults:** Install and sync resolve omitted model and reasoning settings from the saved `default` profile, not the current chat. Inherited values are written to the native profiles, not pinned in authored campaign or agent YAML. Only profiles inheriting that model can receive its matching saved API key, and sync does not overwrite an existing profile key unless one is explicitly supplied. Values already saved in campaign or agent records remain overrides until explicitly removed.
+
+**OMA toolset floor:** Setup, campaign installation, and explicit OMA sync keep `file`, `terminal`, `web`, `skills`, `memory`, `session_search`, and `browser` enabled, with Tool Search on and only `file`, `skills`, and `memory` eager. OMA adds `kanban` for the campaign orchestrator, and `mcp-<server>` for every MCP server the profile resolves as enabled — an explicit allowlist is otherwise authoritative, so a configured server’s tools would stay unreachable. A server set to `enabled: false` is never admitted. Workers can complete claimed tasks without standing board access. An authored `[]` at campaign install or OMA sync means no extra toolsets, not zero tools. Explicit exclusions that conflict with the floor are rejected, not removed. Existing profiles are not silently rewritten on upgrade; sync the saved OMA records to apply the policy.
 
 **Shared skills only:** The [repository bundle](oma-bundle/README.md) ships reusable skills, not campaign or agent templates. Docker seeds it at `$HERMES_HOME/oma-bundle` only if absent. Existing volumes are preserved and any old templates are ignored.[3][5]
 
@@ -210,7 +212,7 @@ The campaign and agent skills verify the proposed `agents` list against the prof
 
 **Camofox setup:** Hermes installs the official plugin by default, subject to its automatic-install policy. New campaign agents that select `camofox` receive `CAMOFOX_URL` and `CAMOFOX_API_KEY` from the default profile's saved `.env`. If either is missing or blank, campaign provisioning succeeds without Camofox or either value. Existing profiles and explicit opt-outs are not reconfigured. In a new session where the tool is available, Camofox is the first browser fallback for extraction or rendering failures on authorized public pages. An explicit denial or bot challenge is a stop condition. The Camofox server runs separately.
 
-**Campaign Kanban:** A new install creates an empty `campaign-<id>` board without changing the shared current board. The campaign config contains the `orchestrator`, `kanban_board` slug, and `kanban_board_name` display name. The team profiles' native Kanban tools use that board; the orchestrator's SOUL names its own roster. `configure` fills missing routing fields from the verified board and profiles but does not create boards or rewire older profiles.
+**Campaign Kanban:** A new install creates an empty `campaign-<id>` board without changing the shared current board. The campaign config contains the `orchestrator`, `kanban_board` slug, and `kanban_board_name` display name. The team profiles' native Kanban tools use that board; the orchestrator's SOUL names its own roster. Install and sync strip standing Kanban access from the publisher, including toolsets that expose Kanban indirectly. Dispatcher-assigned publication tasks still grant the publisher the task-scoped handoff tools. `configure` fills missing routing fields from the verified board and profiles but does not create boards or rewire older profiles.
 
 The `default` starter uses this routing to queue one task for the installed orchestrator on its recorded board. The orchestrator plans the work. Diagnostics go to the installed `maintenance` profile on an explicitly named operations board if configured, otherwise the `default` board. Neither onboarding nor enabling the toolset creates a task or starts a dispatcher. For an existing `default` with an explicit allowlist, add `kanban` to `agent.enabled_toolsets` and keep it out of the starter eager list; the upgrade preserves saved settings.
 
@@ -260,7 +262,7 @@ The breakdowns are fresh previews for the chosen profile/platform, not measureme
 
 1. Check `hermes --version` in the runtime you actually use. For Docker, pull and recreate from the OMA tag without replacing the data volume.
 2. Inspect `agent.enabled_toolsets`, `tools.tool_search`, `skills`, `display.skin`, and `security.protected_instruction_files` on each target profile. Use `config path` to compare saved keys with the merged values from `config get`.
-3. If an older profile’s explicit toolset list lacks `skills`, `memory`, or `session_search`, add the missing names as needed rather than replacing role-specific tools with the starter. To match starter disclosure, set `tools.tool_search.eager_toolsets` to `[file, terminal, skills, memory]`, leaving `session_search` deferred. The upgrade does not rewrite a saved `[]` or custom list. Eager settings never enable toolsets on their own.
+3. Apply Agent Sync or Campaign Sync to bring existing OMA records up to the toolset floor without losing authored role-specific additions. An upgrade by itself does not rewrite a saved `[]` or custom list.
 4. Start a new session to pick up changed tool/skill policy. Use `tools breakdown` and `skills breakdown` to see what the fresh session can access; do not treat the absence of a full schema upfront as the tool being disabled.
 5. Treat content updates and cron setup separately. Check the installed campaign’s `status` before changing its team; a declared job in an agent record is not a registered cron job.
 

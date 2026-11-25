@@ -8,6 +8,8 @@ from hermes_constants import get_default_hermes_root
 from hermes_dir_acl import make_user_dir
 
 OMA_CAMPAIGN_SKILL = "oma-campaigns"
+OMA_BASE_TOOLSETS = ("file", "terminal", "web", "skills", "memory", "session_search", "browser")
+OMA_EAGER_TOOLSETS = ("file", "skills", "memory")
 MAINTENANCE_TEMPLATE = Path(__file__).parent / "data" / "profiles" / "maintenance"
 
 
@@ -106,17 +108,15 @@ def seed_config_file(config_path: Path, *, model_seed: dict | None = None) -> bo
     if config_exists(config_path) or config_path.is_symlink():
         return False
 
-    enabled_toolsets = ["file", "terminal", "browser", "camofox", "web", "skills", "memory", "session_search"]
-    eager_toolsets = ["file", "terminal", "skills", "memory"]
+    enabled_toolsets = [*OMA_BASE_TOOLSETS, "camofox"]
     home = config_path.parent
     is_default = home.resolve() == get_default_hermes_root(home=home).resolve()
     if is_default:
         enabled_toolsets.extend(["clarify", "kanban"])
-        eager_toolsets.append("clarify")
     config = {
         "agent": {"enabled_toolsets": enabled_toolsets},
         "tools": {"tool_search": {
-            "enabled": "on", "eager_toolsets": eager_toolsets, "listing": "off",
+            "enabled": "on", "eager_toolsets": list(OMA_EAGER_TOOLSETS), "listing": "off",
         }},
         "skills": {"disabled": []},
         "approvals": {

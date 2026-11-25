@@ -4,11 +4,13 @@ import re
 from pathlib import Path
 
 from agent.secret_scope import _is_global_env
+from agent.skill_utils import parse_config_string_list
 from hermes_cli.config import cfg_get, validate_env_var_name_for_write
-from hermes_cli.config_home import OMA_CAMPAIGN_SKILL
+from hermes_cli.config_home import OMA_BASE_TOOLSETS, OMA_CAMPAIGN_SKILL, OMA_EAGER_TOOLSETS
 from hermes_cli.oma_campaigns.schema import validate_record
 from hermes_cli.oma_campaigns.source import _member, read_mapping
 from hermes_constants import VALID_REASONING_EFFORTS
+from toolsets import resolve_toolset
 
 
 SETTINGS = ("model", "mcp_servers")
@@ -19,6 +21,7 @@ _TOOLSET_LISTS = (
     ("tools", "tool_search", "eager_toolsets"), ("tools", "tool_search", "defer_toolsets"),
 )
 _TOOL_SEARCH_SWITCHES = (("tools", "tool_search", "enabled"), ("tools", "tool_search", "listing"))
+_TOOLSET_SETTINGS = (*_TOOLSET_LISTS, *_TOOL_SEARCH_SWITCHES)
 
 
 def credential_keys(effective: dict) -> set[str]:
@@ -73,7 +76,7 @@ def _is_toolset_list(value: object) -> bool:
     return isinstance(value, list) and all(isinstance(name, str) and bool(name.strip()) for name in value)
 
 
-def _validate_toolset_setting(path: tuple[str, ...], value: object, context: str, *, orchestrator: bool) -> None:
+def _validate_toolset_setting(path: tuple[str, ...], value: object, context: str) -> None:
     key = ".".join(path)
     if path in _TOOL_SEARCH_SWITCHES:
         if not (isinstance(value, bool) or value in ("auto", "on", "off")):
@@ -82,9 +85,7 @@ def _validate_toolset_setting(path: tuple[str, ...], value: object, context: str
     nullable = path[-1] == "eager_toolsets"
     if not (_is_toolset_list(value) or (nullable and value is None)):
         raise ValueError(f"{context}: {key} must be a list of toolset names" + (" or null" if nullable else ""))
-    if orchestrator and path[0] == "agent" and isinstance(value, list):
-        if (path[-1] == "enabled_toolsets") != ("kanban" in value):
-            raise ValueError(f"{context}: {key} must leave kanban enabled for the campaign orchestrator")
+
 
 
 def _write_toolset_leaf(config: dict, path: tuple[str, ...], value: object, context: str) -> dict:
@@ -99,17 +100,69 @@ def _write_toolset_leaf(config: dict, path: tuple[str, ...], value: object, cont
     return {**config, key: _write_toolset_leaf(section, tuple(tail), value, context)}
 
 
-def apply_toolset_settings(native: dict, record: dict, context: str, *, orchestrator: bool = False) -> tuple[dict, list[str]]:
-    """Apply only the authored role's explicit selection and disclosure settings."""
-    updated = []
-    for path in (*_TOOLSET_LISTS, *_TOOL_SEARCH_SWITCHES):
+def mcp_toolset_names(config: dict) -> list[str]:
+    """``mcp-<server>`` for every enabled server in the resolved MCP map.
+
+    An explicit profile allowlist is authoritative, so a server it does not name is
+    unreachable even when its definition is configured and enabled.
+    """
+    servers = config.get("mcp_servers")
+    if not isinstance(servers, dict):
+        return []
+    return [f"mcp-{name}" for name, server in servers.items()
+            if isinstance(name, str) and name.strip() and isinstance(server, dict)
+            and server.get("enabled") is not False]
+
+
+def enforce_toolset_baseline(
+    config: dict, context: str, *, orchestrator: bool = False, campaign_id: str | None = None,
+) -> dict:
+    """Keep the OMA floor without broadening an explicit tool exclusion."""
+    enabled = cfg_get(config, "agent", "enabled_toolsets", default=[])
+    if enabled is None:
+        enabled = []
+    _validate_toolset_setting(("agent", "enabled_toolsets"), enabled, context)
+    floor = (*OMA_BASE_TOOLSETS, "kanban") if orchestrator else OMA_BASE_TOOLSETS
+    required = (*floor, *mcp_toolset_names(config))
+    if campaign_id is not None and context == f"{campaign_id}__publisher":
+        # Remove standing selection, including bundles, without disabling the
+        # task tools granted by the dispatcher on a claimed publication.
+        kanban_tools = set(resolve_toolset("kanban"))
+        enabled = [name for name in enabled if not kanban_tools.intersection(resolve_toolset(name))]
+    # Append only what is missing, in a fixed order: a list that already satisfies the
+    # floor keeps its authored order, so an unchanged profile reports no change.
+    missing = [name for name in required if name not in enabled]
+    disabled = parse_config_string_list(cfg_get(config, "agent", "disabled_toolsets", default=[]))
+    if disabled:
+        required_tools = {tool for name in required for tool in resolve_toolset(name)}
+        conflicts = [name for name in disabled if name in required or required_tools.intersection(resolve_toolset(name))]
+        if conflicts:
+            raise ValueError(f"{context}: agent.disabled_toolsets excludes required OMA tools: {', '.join(conflicts)}")
+    policy = {
+        ("agent", "enabled_toolsets"): [*enabled, *missing],
+        ("tools", "tool_search", "enabled"): "on",
+        ("tools", "tool_search", "eager_toolsets"): list(OMA_EAGER_TOOLSETS),
+    }
+    for path, value in policy.items():
+        config = _write_toolset_leaf(config, path, value, context)
+    return config
+
+
+def apply_toolset_settings(
+    native: dict, record: dict, context: str, *, orchestrator: bool = False, campaign_id: str | None = None,
+) -> tuple[dict, list[str]]:
+    """Apply authored role settings above the required OMA baseline."""
+    before = native
+    for path in _TOOLSET_SETTINGS:
         value = cfg_get(record, *path, default=_OMITTED)
         if value is _OMITTED:
             continue
-        _validate_toolset_setting(path, value, context, orchestrator=orchestrator)
+        _validate_toolset_setting(path, value, context)
         if value != cfg_get(native, *path, default=_OMITTED):
             native = _write_toolset_leaf(native, path, value, context)
-            updated.append(".".join(path))
+    native = enforce_toolset_baseline(native, context, orchestrator=orchestrator, campaign_id=campaign_id)
+    updated = [".".join(path) for path in _TOOLSET_SETTINGS
+               if cfg_get(native, *path, default=_OMITTED) != cfg_get(before, *path, default=_OMITTED)]
     return native, updated
 
 
@@ -140,7 +193,9 @@ def apply_profile_settings(native: dict, record: dict, defaults: dict, context: 
         if value is not _OMITTED and value != cfg_get(native, *path, default=_OMITTED):
             native = _write_toolset_leaf(native, path, value, context)
             changed.append(".".join(path))
-    native, toolsets = apply_toolset_settings(native, record, context, orchestrator=orchestrator)
+    native, toolsets = apply_toolset_settings(
+        native, record, context, orchestrator=orchestrator, campaign_id=record.get("campaign_id") if campaign else None,
+    )
     return native, changed + toolsets
 
 

@@ -23,7 +23,7 @@ from hermes_cli.oma_campaigns.schema import validate_record
 from hermes_cli.oma_campaigns.role_skills import write_skill_inventory
 from hermes_cli.oma_campaigns.settings import (
     apply_profile_settings,
-    credential_keys, materialize_agent_settings, read_agent_record, resolve_settings, settings_from,
+    credential_keys, enforce_toolset_baseline, materialize_agent_settings, read_agent_record, resolve_settings, settings_from,
 )
 from hermes_cli.oma_campaigns.source import (
     DEFAULT_CAMPAIGN_MODE, Agent, Campaign, campaign_fields, checked_id, read_mapping, resolve,
@@ -343,22 +343,30 @@ def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
     if profile.exists() and not _profile_matches(home, agent_id, board, orchestrator):
         raise ValueError(f"{agent_id}: refusing to reuse an unrelated profile")
     root.mkdir(parents=True, mode=0o700, exist_ok=True)
-    if not record_path.is_file():  # config-reader: ok — authored OMA record existence only
-        atomic_config_replace(record_path, {
+    new_record = not record_path.is_file()  # config-reader: ok — authored OMA record existence only
+    if new_record:
+        authored = agent_defaults({
             "id": agent_id, "name": "Analyst", "description": "Collect and report campaign analytics.",
-            "campaign_id": campaign_id, "agent": {"enabled_toolsets": []}, "analytics_sources": [],
-        })
+            "campaign_id": campaign_id, "agent": {"enabled_toolsets": ["camofox"]}, "analytics_sources": [],
+        }, agent_id, orchestrator=False, campaign_id=campaign_id)
+    else:
+        _, authored = read_agent_record(home, campaign_id, agent_id)
     if not soul_path.is_file():
         atomic_write_text(soul_path, f"You are the analyst for {config['name']}. Report measured observations. "
                           "Do not publish, message accounts, or guess missing metrics. OMA manages your collector.\n",
                           create_mode=0o600)
-    _, authored = read_agent_record(home, campaign_id, agent_id)
     validate_bindings(authored.get("analytics_sources", []))
     if not profile.exists():
         saved, credentials = snapshot(home, config)
         effective = resolve_settings(settings_from(saved, campaign_id), settings_from(authored, agent_id))
-        native = _with_kanban({**effective, "agent": {"enabled_toolsets": []}, "skills": {},
+        policy = enforce_toolset_baseline({**authored, **effective}, agent_id)
+        native = _with_kanban({**effective, "agent": policy["agent"], "tools": policy["tools"], "skills": {},
                                "_config_version": DEFAULT_CONFIG["_config_version"]}, board, orchestrator, agent_id)
+        configs = {agent_id: native}
+        camofox, skipped = _configure_camofox(home, configs)
+        if new_record and agent_id in skipped:
+            authored = _without_camofox(authored)
+        credentials = {**(credentials if "model" not in authored else {}), **camofox.get(agent_id, {})}
         saves, scratch = (_agent_data_dir(home, agent_id, part) for part in ("saves", "tmp"))
         saves.mkdir(exist_ok=True)
         scratch.mkdir(exist_ok=True)
@@ -368,7 +376,9 @@ def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
         agent = Agent(agent_id, authored["description"], {}, soul, {})
         provision_profile(ProfileCreateRequest(name=agent_id, alias=False, mirror_credentials=False,
                                                description=agent.description, soul=soul),
-                          initialize=partial(_initialize, agent, native, credentials if "model" not in authored else {}))
+                          initialize=partial(_initialize, agent, configs[agent_id], credentials))
+    if new_record:
+        atomic_config_replace(record_path, authored)
     ensure_job(profile)
     if agent_id not in roster:
         config = {**config, "agents": [*roster, agent_id]}
@@ -426,8 +436,11 @@ def _install(home: Path, campaign_id: str, *, definition: dict | None = None) ->
         effective = {agent.id: resolve_settings(defaults, settings_from(agent.config, agent.id))
                      for agent in campaign.agents}
         board = f"campaign-{campaign.id}"
-        authored = {agent.id: agent_defaults(agent.config, agent.id, orchestrator=agent.id == campaign.orchestrator)
-                    for agent in campaign.agents}
+        authored = {
+            agent.id: agent_defaults(agent.config, agent.id, orchestrator=agent.id == campaign.orchestrator,
+                                     campaign_id=campaign.id)
+            for agent in campaign.agents
+        }
         configs = {
             agent.id: _with_kanban({**authored[agent.id], **effective[agent.id], "skills": policies[agent.id],
                                    "_config_version": DEFAULT_CONFIG["_config_version"]},

@@ -8,11 +8,14 @@ import pytest
 from hermes_cli.config import atomic_config_replace, read_user_config_raw
 from hermes_cli.oma_campaigns.source import read_mapping
 
+BASE_TOOLSETS = ["file", "terminal", "web", "skills", "memory", "session_search", "browser"]
+
 
 def _profile(path: Path, model, soul: str) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     atomic_config_replace(path / "config.yaml", {
-        "model": model, "agent": {"enabled_toolsets": ["file"]},
+        "model": model, "agent": {"enabled_toolsets": BASE_TOOLSETS},
+        "tools": {"tool_search": {"enabled": "on", "eager_toolsets": ["file", "skills", "memory"]}},
         "mcp_servers": {"legacy": {"headers": {"Authorization": "fixture-private-value"}}},
     })
     (path / "SOUL.md").write_text(soul, encoding="utf-8")
@@ -123,7 +126,7 @@ def test_sync_applies_only_saved_settings_to_the_owning_profile(tmp_path, monkey
     settings = {"model": {"default": "new-model", "api_key": "${MODEL_KEY}"},
                 "mcp_servers": {"example": {"url": "https://example.invalid/mcp"}}}
     atomic_config_replace(record, {**read_mapping(record), **settings,
-                                   "agent": {"enabled_toolsets": [], "disabled_toolsets": ["terminal"],
+                                   "agent": {"enabled_toolsets": ["mcp-example"], "disabled_toolsets": ["tts"],
                                              "reasoning_effort": "high", "max_turns": 99},
                                    "tools": {"tool_search": {"enabled": "off", "eager_toolsets": None}}})
     (source / "SOUL.md").write_text("Updated persona.\n", encoding="utf-8")
@@ -133,15 +136,34 @@ def test_sync_applies_only_saved_settings_to_the_owning_profile(tmp_path, monkey
 
     assert set(sync_standalone_agent(tmp_path, role)["updated"]) == {
         "model", "mcp_servers", "agent.enabled_toolsets", "agent.disabled_toolsets",
-        "tools.tool_search.eager_toolsets", "tools.tool_search.enabled", "agent.reasoning_effort", "SOUL.md",
+        "agent.reasoning_effort", "SOUL.md",
     }
     applied = read_user_config_raw(native / "config.yaml")
     assert {key: applied[key] for key in settings} == settings
-    assert applied["agent"] == {"enabled_toolsets": [], "disabled_toolsets": ["terminal"], "reasoning_effort": "high"}
-    assert applied["tools"]["tool_search"] == {"enabled": "off", "eager_toolsets": None}
+    # The record's explicit MCP map replaces the profile's, and its tools stay admitted.
+    assert set(applied["agent"]["enabled_toolsets"]) == {*BASE_TOOLSETS, "mcp-example"}
+    assert applied["agent"]["disabled_toolsets"] == ["tts"]
+    assert applied["agent"]["reasoning_effort"] == "high"
+    assert applied["tools"]["tool_search"] == {"enabled": "on", "eager_toolsets": ["file", "skills", "memory"]}
     assert (native / "SOUL.md").read_bytes() == b"Updated persona.\n"
     assert (untouched / "config.yaml").read_bytes() == untouched_bytes
     assert sync_standalone_agent(tmp_path, role)["updated"] == []
+
+
+def test_sync_refuses_to_override_an_explicit_exclusion_of_required_tools(tmp_path, monkeypatch):
+    from hermes_cli.oma_campaigns.standalone import seed_standalone_agents, sync_standalone_agent
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    _profile(tmp_path, "existing-model", "Default persona")
+    seed_standalone_agents(tmp_path)
+    record = tmp_path / "oma/agents/default/config.yaml"
+    saved = read_mapping(record)
+    atomic_config_replace(record, {**saved, "model": "must-not-apply", "agent": {
+        **saved["agent"], "disabled_toolsets": ["debugging"],
+    }})
+    with pytest.raises(ValueError, match=r"agent\.disabled_toolsets.*debugging"):
+        sync_standalone_agent(tmp_path, "default")
+    assert read_user_config_raw(tmp_path / "config.yaml")["model"] == "existing-model"
 
 
 def test_standalone_sync_saves_explicit_env_and_tracks_names(tmp_path, monkeypatch):
@@ -154,7 +176,7 @@ def test_standalone_sync_saves_explicit_env_and_tracks_names(tmp_path, monkeypat
     seed_standalone_agents(tmp_path)
     target = tmp_path / "oma" / "agents" / "maintenance" / "config.yaml"
     values = {"EXTRA_TOOL_TOKEN": "fixture-explicit-value"}
-    assert sync_standalone_agent(tmp_path, "maintenance", env=values)["updated"] == ["env"]
+    assert sync_standalone_agent(tmp_path, "maintenance", env=values)["updated"] == ["agent.enabled_toolsets", "env"]
     assert sync_standalone_agent(tmp_path, "maintenance", env={})["updated"] == []
     assert load_env_file(ops / ".env") == values
     assert not (tmp_path / ".env").exists()
@@ -185,7 +207,7 @@ def test_sync_updates_and_prunes_managed_packages_without_touching_unrelated_ski
     local.mkdir(parents=True)
     (local / "SKILL.md").write_text("---\nname: personal\n---\nKeep me", encoding="utf-8")
     atomic_config_replace(record, {**config, "oma_skills": ["social-strategy"]})
-    assert sync_standalone_agent(tmp_path, "default")["updated"] == ["oma_skills"]
+    assert sync_standalone_agent(tmp_path, "default")["updated"] == ["agent.enabled_toolsets", "oma_skills"]
     installed = tmp_path / "skills" / "social-strategy"
     assert (starter / "SKILL.md").read_bytes() == starter_bytes
     assert (installed / "SKILL.md").read_bytes() == (bundle / "SKILL.md").read_bytes()
@@ -231,7 +253,7 @@ def test_legacy_inventory_does_not_own_or_hide_starters(tmp_path, monkeypatch):
     inventory.write_text(json.dumps({"owned": {"oma-brand": "oma-brand"}, "pruned": ["oma-agents"]}), encoding="utf-8")
 
     assert json.loads(skills_tool.skill_view("oma-agents", preprocess=False))["success"]
-    assert sync_standalone_agent(tmp_path, "default")["updated"] == ["oma_skills"]
+    assert sync_standalone_agent(tmp_path, "default")["updated"] == ["agent.enabled_toolsets", "oma_skills"]
     assert json.loads(inventory.read_text(encoding="utf-8")) == {"owned": {}, "pruned": []}
     assert starter.read_text(encoding="utf-8").endswith("Keep my edits")
 

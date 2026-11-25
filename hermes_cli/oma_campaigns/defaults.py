@@ -8,9 +8,7 @@ from hermes_cli.auth import PROVIDER_REGISTRY, _IMPLICIT_ENV_VARS, _usable_decla
 from hermes_cli.config import read_user_config_raw, validate_env_var_name_for_write
 from hermes_cli.config_credential_values import refuse_redacted_env_value
 from hermes_cli.models import normalize_provider
-from hermes_cli.oma_campaigns.settings import ENV_REFERENCE
-
-_EAGER = ("file", "skills", "memory")
+from hermes_cli.oma_campaigns.settings import ENV_REFERENCE, enforce_toolset_baseline
 
 
 def _provider_keys(provider: str) -> tuple[str, ...]:
@@ -76,18 +74,13 @@ def snapshot(home: Path, campaign: dict) -> tuple[dict, dict[str, str]]:
     return ({**campaign, "model": model} if model is not None else campaign), credential
 
 
-def agent_defaults(config: dict, agent_id: str, *, orchestrator: bool) -> dict:
-    raw_agent = config.get("agent")
-    agent = dict(raw_agent) if isinstance(raw_agent, dict) else {}
-    enabled = agent.get("enabled_toolsets")
+def agent_defaults(config: dict, agent_id: str, *, orchestrator: bool, campaign_id: str) -> dict:
+    agent = config.get("agent")
+    enabled = agent.get("enabled_toolsets") if isinstance(agent, dict) else None
     if not isinstance(enabled, list) or any(not isinstance(name, str) or not name.strip() for name in enabled):
         raise ValueError(f"{agent_id}: agent.enabled_toolsets must be an explicit list of toolset names")
-    if orchestrator and "kanban" not in enabled:
-        raise ValueError(f"{agent_id}: include kanban in the orchestrator's agent.enabled_toolsets")
 
     tools = config.get("tools", {})
     if not isinstance(tools, dict) or not isinstance(tools.get("tool_search", {}), dict):
         raise ValueError(f"{agent_id}: tools and tools.tool_search must be mappings")
-    return {**config, "agent": agent, "tools": {**tools, "tool_search": {
-        "enabled": "on", "eager_toolsets": list(_EAGER), **tools.get("tool_search", {}),
-    }}}
+    return enforce_toolset_baseline(config, agent_id, orchestrator=orchestrator, campaign_id=campaign_id)
