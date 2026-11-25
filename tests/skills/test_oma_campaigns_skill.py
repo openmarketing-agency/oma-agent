@@ -1,7 +1,9 @@
 """Exercise local OMA campaign provisioning with native profile operations."""
 
+from contextlib import closing
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 from importlib.resources import files
@@ -240,8 +242,10 @@ def test_campaign_pause_blocks_gateway_cron_and_kanban_without_editing_job_state
         }
 
 
-@pytest.mark.parametrize("mode", [None, "yolo", "approve", "control"])
-def test_campaign_publications_handoff(bundle, capsys, mode):
+@pytest.mark.parametrize("mode, legacy", [
+    (None, False), ("yolo", False), ("approve", False), ("control", False), ("control", True),
+])
+def test_campaign_publications_handoff(bundle, capsys, mode, legacy):
     from hermes_cli import kanban_db
     from hermes_cli.config import atomic_config_write
     from hermes_cli.kanban_db_connect import connect_closing
@@ -262,7 +266,9 @@ def test_campaign_publications_handoff(bundle, capsys, mode):
     assert main(["lifecycle", "demo", "resumed"]) == 0
     assert list_publications(home, "demo")["mode"] == (mode or "approve")
     assert list_publications(home, "demo")["publications"] == []
-    assert not (config_path.parent / "publications.sqlite3").exists()
+    data_path = config_path.parent / "data.sqlite3"
+    legacy_path = config_path.parent / "publications.sqlite3"
+    assert not data_path.exists() and not legacy_path.exists()
 
     draft = {"platform": "x", "kind": "reply", "account": {"id": "connected-42", "handle": "demo"},
              "content": {"text": "Thanks!\nHere is the detail."}, "target": {"id": "987", "text": "Question?"}}
@@ -282,6 +288,12 @@ def test_campaign_publications_handoff(bundle, capsys, mode):
         saved = approve_publication(home, "demo", item, 2, "owner")
         assert saved["approval"]["source"] == "human" and saved["approval"]["by"] == "owner"
         assert approve_publication(home, "demo", item, 2, "owner")["task_id"] == saved["task_id"]
+    if legacy:
+        data_path.rename(legacy_path)
+        assert list_publications(home, "demo")["publications"] == [saved]
+        assert not data_path.exists()
+    else:
+        assert data_path.is_file() and not legacy_path.exists()
     with connect_closing(board="campaign-demo") as conn:
         assert len(kanban_db.list_tasks(conn)) == 1
         ordinary = kanban_db.create_task(conn, title="Ordinary work", assignee="demo__worker")
@@ -289,6 +301,8 @@ def test_campaign_publications_handoff(bundle, capsys, mode):
         task = kanban_db.claim_task(conn, saved["task_id"])
         assert task is not None and task.assignee == role.name and item in task.body
         assert draft["content"]["text"] not in task.body
+    if legacy:
+        assert not data_path.exists()  # Dispatcher admission is also read-only.
     with pytest.raises(PublicationError, match="Only the campaign publisher"):
         claim_publication(home, "demo", "demo__worker", item, saved["revision"])
     claim = claim_publication(home, "demo", role.name, item, saved["revision"])
@@ -318,6 +332,15 @@ def test_campaign_publications_handoff(bundle, capsys, mode):
         finish_publication(*finish, claim["claim_token"], {"error": "Definitively rejected"})
     listed = list_publications(home, "demo")["publications"]
     assert listed == [result] and "claim_token" not in listed[0]
+    if legacy:
+        assert legacy_path.is_file()
+        with closing(sqlite3.connect(data_path.as_uri() + "?mode=ro", uri=True)) as conn:
+            revisions = conn.execute(
+                "SELECT revision, draft FROM publication_revisions WHERE publication_id = ? ORDER BY revision", (item,),
+            ).fetchall()
+        assert [(revision, json.loads(payload)["content"]["text"]) for revision, payload in revisions] == [
+            (1, "Thanks!\nHere is the detail."), (2, draft["content"]["text"]),
+        ]
 
 
 def test_campaign_control_removes_registered_cron_and_restores_operator_pause(bundle):
