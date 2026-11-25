@@ -787,4 +787,9 @@ if [ -f /etc/hermes/chromium-executable-path ]; then
     fi
 fi
 
+# --- Prepare the optional Wappalyzer detector in the runtime data volume ---
+as_hermes env HERMES_HOME="$HERMES_HOME" "$INSTALL_DIR/.venv/bin/python" \
+    "$INSTALL_DIR/optional-skills/research/wappalyzer/scripts/wappalyzer_installation.py" \
+    || echo "[stage2] Warning: Wappalyzer setup failed; continuing" >&2
+
 echo "[stage2] Setup complete; starting user services"
