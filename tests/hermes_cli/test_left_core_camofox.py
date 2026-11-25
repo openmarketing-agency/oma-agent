@@ -1,6 +1,4 @@
-"""Camofox left core for the ``camofox`` catalog plugin: a home that ran core's Camofox backend gets the
-plugin once, and its core-era ``browser`` toolset (Camofox's browser_* tools then; browser_exec now) becomes
-the plugin's ``camofox`` toolset, a one-time conversion a later run never undoes.
+"""Legacy Camofox homes gain the catalog plugin without losing the built-in browser.
 
 Real config/.env files under temp homes, a fixture catalog dir; the network install is a stand-in.
 """
@@ -122,7 +120,7 @@ def _resolved(home: Path, platform: str, monkeypatch) -> set[str]:
     return tools_config._get_platform_tools(_config(home), platform, include_default_mcp_servers=False)
 
 
-def test_browser_becomes_camofox_where_core_carried_it(tmp_path, monkeypatch):
+def test_camofox_joins_browser_where_core_carried_it(tmp_path, monkeypatch):
     home = _home(tmp_path, env="CAMOFOX_URL=http://localhost:9377\n", config={
         "_config_version": 51,
         "platform_toolsets": {
@@ -139,18 +137,38 @@ def test_browser_becomes_camofox_where_core_carried_it(tmp_path, monkeypatch):
     assert "Camofox browser backend moved out of core" in said[0]
 
     config = _config(home)
-    assert config["platform_toolsets"]["cli"] == ["terminal", "file", "camofox"]
-    assert config["agent"]["disabled_toolsets"] == ["memory", "browser"]
+    assert config["platform_toolsets"]["cli"] == ["terminal", "browser", "file", "camofox"]
+    assert config["agent"]["disabled_toolsets"] == ["memory"]
     known = config["known_plugin_toolsets"]
     assert "camofox" in known["discord"] and "camofox" in known["webhook"]
     assert "cli" not in known and "telegram" not in known
-    # The end state per platform: the camofox surface where core had browser on, never browser_exec.
+    # The Camofox surface follows its old scope without changing the built-in browser selection.
     for platform in ("cli", "telegram", "slack"):  # slack: no saved list, default composite
         enabled = _resolved(home, platform, monkeypatch)
-        assert "camofox" in enabled and "browser" not in enabled, platform
-    for platform in ("discord", "webhook"):
-        enabled = _resolved(home, platform, monkeypatch)
-        assert "camofox" not in enabled and "browser" not in enabled, platform
+        assert {"camofox", "browser"} <= enabled, platform
+    assert not {"camofox", "browser"}.intersection(_resolved(home, "discord", monkeypatch))
+    assert "camofox" not in _resolved(home, "webhook", monkeypatch)
+
+
+@pytest.mark.parametrize("allowlist", [None, ["file", "browser"], ["file"]])
+def test_oma_default_can_sync_after_camofox_migration(tmp_path, monkeypatch, allowlist):
+    from hermes_cli.oma_campaigns.standalone import seed_standalone_agents, sync_standalone_agent
+
+    config = {"_config_version": 51, "agent": {"disabled_toolsets": ["tts"]}}
+    if allowlist is not None:
+        config["agent"]["enabled_toolsets"] = allowlist
+    home = _home(tmp_path, env="CAMOFOX_URL=http://localhost:9377\n", config=config)
+    assert _boot(home, monkeypatch) == ["camofox"]
+    migrated = _config(home)["agent"]
+    if allowlist is not None:
+        assert migrated["enabled_toolsets"] == allowlist + (["camofox"] if "browser" in allowlist else [])
+
+    seed_standalone_agents(home)
+    assert sync_standalone_agent(home, "default")["id"] == "default"
+    agent = _config(home)["agent"]
+    assert "browser" in agent["enabled_toolsets"]
+    assert agent["disabled_toolsets"] == ["tts"]
+    assert sync_standalone_agent(home, "default")["updated"] == []
 
 
 def _boot(home: Path, monkeypatch, said: list | None = None) -> list[str]:
@@ -163,9 +181,7 @@ def _boot(home: Path, monkeypatch, said: list | None = None) -> list[str]:
 
 @pytest.mark.parametrize("saved", [{"cli": ["terminal", "browser", "file"]}, None], ids=["saved-list", "no-saved-list"])
 def test_globally_disabled_browsing_stays_off_after_the_conversion(tmp_path, monkeypatch, saved):
-    """A Camofox home that had turned browsing off everywhere (``agent.disabled_toolsets: [browser]``): a
-    saved list still becomes ``camofox``, but the plugin's toolset is disabled too, so browsing stays off
-    on every platform, with or without a saved list."""
+    """An explicit browser exclusion continues to cover the legacy Camofox tools."""
     config = {"_config_version": 51, "agent": {"disabled_toolsets": ["browser"]}}
     if saved is not None:
         config["platform_toolsets"] = saved
@@ -173,7 +189,7 @@ def test_globally_disabled_browsing_stays_off_after_the_conversion(tmp_path, mon
     assert _boot(home, monkeypatch) == ["camofox"]
     config = _config(home)
     if saved is not None:
-        assert config["platform_toolsets"]["cli"] == ["terminal", "file", "camofox"]
+        assert config["platform_toolsets"]["cli"] == ["terminal", "browser", "file", "camofox"]
     assert set(config["agent"]["disabled_toolsets"]) == {"browser", "camofox"}
     for platform in ("cli", "telegram"):
         enabled = _resolved(home, platform, monkeypatch)
@@ -186,17 +202,17 @@ def test_conversion_is_never_undone(tmp_path):
     lcm._record_migration(home, next(f for f in lcm.LEFT_CORE if f.plugin == "camofox"))
     config = _config(home)
     assert config["_left_core_scoped"] == ["camofox"]
-    # The user turns core's browser (browser_exec) back on for the CLI afterwards.
-    config["platform_toolsets"]["cli"] = ["terminal", "camofox", "browser"]
-    config["agent"]["disabled_toolsets"] = []
+    # The user opts out of the built-in browser without opting out of Camofox.
+    config["platform_toolsets"]["cli"] = ["terminal", "camofox"]
+    config["agent"] = {"disabled_toolsets": ["browser"]}
     (home / "config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
     before = (home / "config.yaml").read_bytes()
     calls = []
     install = _installer(home, calls)
     lcm.migrate_home(home, install=install, say=lambda _m: None)
     after = _config(home)
-    assert after["platform_toolsets"]["cli"] == ["terminal", "camofox", "browser"]
-    assert after["agent"]["disabled_toolsets"] == []
+    assert after["platform_toolsets"]["cli"] == ["terminal", "camofox"]
+    assert after["agent"]["disabled_toolsets"] == ["browser"]
     assert calls == ["camofox"]
     lcm.migrate_home(home, install=install, say=lambda _m: None)
     assert calls == ["camofox"]
@@ -226,8 +242,8 @@ def test_homes_are_islands_a_b_c_a(tmp_path):
     assert calls == [("a", "camofox"), ("c", "camofox")]
     assert (b / "config.yaml").read_bytes() == b_before
     assert not (b / "plugins").exists()
-    assert _config(a)["platform_toolsets"]["cli"] == ["camofox"]
-    assert _config(c)["agent"]["disabled_toolsets"] == ["browser"]
+    assert _config(a)["platform_toolsets"]["cli"] == ["browser", "camofox"]
+    assert "browser" not in _config(c).get("agent", {}).get("disabled_toolsets", [])
 
 
 def _migrate_config(home: Path) -> None:
@@ -254,8 +270,8 @@ def test_upgrade_converts_after_the_config_step(tmp_path, monkeypatch):
     calls = []
     assert lcm.migrate_home(home, install=_installer(home, calls), say=lambda _m: None) == ["camofox"]
     config = _config(home)
-    assert config["platform_toolsets"]["cli"] == ["terminal", "file", "camofox"]
-    assert config["agent"]["disabled_toolsets"] == ["browser"]
+    assert config["platform_toolsets"]["cli"] == ["terminal", "browser", "file", "camofox"]
+    assert "browser" not in config.get("agent", {}).get("disabled_toolsets", [])
 
 
 @pytest.mark.parametrize("stamp", [51, 52])
@@ -280,7 +296,7 @@ def test_an_unversioned_camofox_home_is_converted(tmp_path, monkeypatch, config)
     home = _home(tmp_path, env=_SPLIT_ENV, config=config)
     calls = []
     assert lcm.migrate_home(home, install=_installer(home, calls), say=lambda _m: None) == ["camofox"]
-    assert _config(home)["agent"]["disabled_toolsets"] == ["browser"]
+    assert "browser" not in _config(home).get("agent", {}).get("disabled_toolsets", [])
 
 
 def test_the_config_yaml_an_env_only_conversion_creates_is_stamped(tmp_path, monkeypatch, caplog):
@@ -321,7 +337,7 @@ def test_a_plain_save_stamping_an_unversioned_camofox_home_keeps_its_conversion(
     assert _config(home)["_config_version"] == DEFAULT_CONFIG["_config_version"]
     calls = []
     assert lcm.migrate_home(home, install=_installer(home, calls), say=lambda _m: None) == ["camofox"]
-    assert _config(home)["platform_toolsets"]["cli"] == ["terminal", "file", "camofox"]
+    assert _config(home)["platform_toolsets"]["cli"] == ["terminal", "browser", "file", "camofox"]
 
 
 def test_a_stamped_camofox_home_without_the_plugin_is_told_where_it_went(tmp_path, monkeypatch):

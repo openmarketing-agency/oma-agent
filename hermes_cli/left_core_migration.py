@@ -498,16 +498,13 @@ class LeftCoreFeature:
     toolsets: tuple[str, ...] = ()
     # Platforms whose core default composite (``hermes-<platform>``) never carried those toolsets.
     off_platforms: tuple[str, ...] = ()
-    # Core-era toolsets the plugin's toolsets replace while core keeps the name for something else
-    # (core's ``browser`` is browser_exec now; Camofox's tools live in the plugin's ``camofox``). The
-    # one-time scope conversion treats them as the plugin's toolsets for "did core carry it" and turns
-    # them off in the home: a saved platform list naming one names the plugin's toolsets instead, and
-    # ``agent.disabled_toolsets`` takes them for platforms on a default composite.
-    replaces_toolsets: tuple[str, ...] = ()
+    # Core-era toolsets that carried the plugin's tools and still exist in core. Preserve their
+    # selection and add the plugin alongside them (``browser`` for core, ``camofox`` for the plugin).
+    shared_toolsets: tuple[str, ...] = ()
     # Core-era toolset names that resolved to the plugin's tools (core's ``hermes-yuanbao`` bundle: the
     # core tools plus the yb_* tools; ``hermes-gateway``, which included it). ``agent.disabled_toolsets``
     # naming one disabled those tools; neither name reaches them now, so the one-time scope conversion disables
-    # the plugin's toolsets there too. Unlike *replaces_toolsets*, nothing else is turned off.
+    # the plugin's toolsets there too.
     legacy_toolsets: tuple[str, ...] = ()
     # Gateway platform the plugin ships: a running gateway serves it only after a restart.
     platform: str = ""
@@ -537,10 +534,8 @@ class LeftCoreFeature:
     plugin_names: tuple[str, ...] = ()
     # ``terminal.backend`` value the plugin registers: unknown-backend errors name the install command.
     terminal_backend: str = ""
-    # Config schema version that shipped without the feature, for a row whose conversion changes what a
-    # home runs (``replaces_toolsets``): only a home from before it ran the core feature, so the row fires
-    # only while the home's config is below it or when that version's config step found the feature in
-    # use (:func:`record_core_use`). A newer home that sets the plugin up itself keeps core's toolsets.
+    # Config schema version that shipped without the feature. Migrate only homes that predate the
+    # split or that the config step recorded as using the core feature (:func:`record_core_use`).
     left_at: int = 0
     # Provider ids and aliases the plugin's model-provider profiles register. A name nothing resolves to
     # gets :func:`provider_install_hint` appended to its "unknown provider" error, runtime resolution
@@ -601,10 +596,10 @@ LEFT_CORE: tuple[LeftCoreFeature, ...] = (
         # bearer token is a credential.
         plugin="camofox", label="Camofox browser backend", in_use=camofox_in_use,
         unchanged="CAMOFOX_URL, the browser.camofox settings and the browser_navigate/browser_click/... tool "
-                  "names are unchanged; they are the `camofox` toolset now, and core's `browser` toolset "
-                  "(browser_exec) is turned off in this profile",
+                  "names are unchanged; they are the `camofox` toolset now. The built-in `browser` "
+                  "toolset keeps its existing selection",
         secret_env=("CAMOFOX_API_KEY",), private_env=("CAMOFOX_URL",),
-        toolsets=("camofox",), off_platforms=("webhook",), replaces_toolsets=("browser",), left_at=52,
+        toolsets=("camofox",), off_platforms=("webhook",), shared_toolsets=("browser",), left_at=52,
     ),
     LeftCoreFeature(
         plugin="singularity", label="Singularity/Apptainer terminal backend", in_use=singularity_in_use,
@@ -926,7 +921,7 @@ def _core_carried(feature: LeftCoreFeature, selection: list) -> bool:
     """Whether core resolved *feature*'s toolsets on for a platform selecting *selection*: named
     directly, or through a ``hermes`` / ``hermes-<platform>`` composite that included them."""
     def carries(name: str) -> bool:
-        if name in feature.toolsets or name in feature.replaces_toolsets:
+        if name in feature.toolsets or name in feature.shared_toolsets:
             return True
         if name == "hermes":  # the legacy composite: tools_config resolves it as hermes-cli + hermes-api-server
             return carries("hermes-cli") or carries("hermes-api-server")
@@ -986,33 +981,34 @@ def _mark(config: dict, key: str, feature: LeftCoreFeature) -> None:
     config[key] = sorted({*(map(str, done) if isinstance(done, list) else ()), feature.plugin})
 
 
-def _turn_off_replaced(config: dict, feature: LeftCoreFeature) -> None:
-    """Turn *feature*'s ``replaces_toolsets`` off in *config*: every saved platform list naming one names
-    the plugin's toolsets instead (so turning core's toolset back on later stays that platform's choice),
-    and ``agent.disabled_toolsets`` takes them, which also covers platforms on a default composite. One the
-    user had already disabled there disables the plugin's toolsets too (they are on by default)."""
-    from agent.skill_utils import parse_config_string_list
+def _add_companion_toolsets(config: dict, feature: LeftCoreFeature) -> None:
+    """Keep the moved tools reachable from explicit selections without removing core toolsets."""
     from hermes_cli.toolset_validation import parse_platform_toolsets_value
-    replaced = set(feature.replaces_toolsets)
+
+    shared = set(feature.shared_toolsets)
+
+    def extend(selection: list) -> list:
+        names = set(map(str, selection))
+        return [*selection, *(ts for ts in feature.toolsets if ts not in names)] if shared & names else selection
+
     saved = config.get("platform_toolsets")
-    for platform, value in (saved.items() if isinstance(saved, dict) else ()):
-        selection = parse_platform_toolsets_value(value)
-        if selection is not None and replaced & set(map(str, selection)):
-            kept = [item for item in selection if str(item) not in replaced]
-            saved[platform] = kept + [ts for ts in feature.toolsets if ts not in map(str, kept)]
-    agent = config.get("agent") if isinstance(config.get("agent"), dict) else {}
-    disabled = parse_config_string_list(agent.get("disabled_toolsets")) if agent.get("disabled_toolsets") else []
-    turned_off = replaced if replaced.isdisjoint(disabled) else replaced | set(feature.toolsets)
-    agent["disabled_toolsets"] = [*disabled, *sorted(turned_off - set(disabled))]
-    config["agent"] = agent
+    if isinstance(saved, dict):
+        for platform, value in saved.items():
+            selection = parse_platform_toolsets_value(value)
+            if selection is not None and (expanded := extend(selection)) != selection:
+                saved[platform] = expanded
+    agent = config.get("agent")
+    if isinstance(agent, dict) and isinstance(selection := agent.get("enabled_toolsets"), list):
+        if all(isinstance(toolset, str) and toolset.strip() for toolset in selection):
+            agent["enabled_toolsets"] = extend(selection)
 
 
 def _keep_legacy_disable(config: dict, feature: LeftCoreFeature) -> None:
-    """``agent.disabled_toolsets`` naming one of *feature*'s ``legacy_toolsets`` also names its toolsets."""
+    """Carry explicit exclusions of old toolsets forward to the plugin's toolsets."""
     from agent.skill_utils import parse_config_string_list
     agent = config.get("agent") if isinstance(config.get("agent"), dict) else {}
     disabled = parse_config_string_list(agent.get("disabled_toolsets")) if agent.get("disabled_toolsets") else []
-    if set(feature.legacy_toolsets).isdisjoint(disabled):
+    if {*feature.legacy_toolsets, *feature.shared_toolsets}.isdisjoint(disabled):
         return
     agent["disabled_toolsets"] = [*disabled, *(ts for ts in feature.toolsets if ts not in disabled)]
     config["agent"] = agent
@@ -1024,9 +1020,9 @@ def _record_migration(home: Path, feature: LeftCoreFeature) -> None:
 
     Scope: record the toolsets in ``known_plugin_toolsets[platform]`` (= off) for every platform
     where core had them off: a saved ``platform_toolsets`` list that does not carry them, or no list
-    on an ``off_platforms`` platform. Platforms core resolved them on for are left alone, except that
-    a row's ``replaces_toolsets`` go off everywhere (:func:`_turn_off_replaced`). A one-time
-    conversion per home and row, independent of installation: a plugin installed before the update
+    on an ``off_platforms`` platform. Explicit selections of a shared toolset gain the plugin's toolsets
+    alongside it (:func:`_add_companion_toolsets`). A one-time conversion per home and row, independent
+    of installation: a plugin installed before the update
     (it stays inert on a core that still ships the feature) still needs it. Completion is marked
     under ``_left_core_scoped`` so a later run never undoes a choice the user made since
     (``hermes tools``). Raises when config.yaml cannot be read or written."""
@@ -1059,8 +1055,8 @@ def _record_migration(home: Path, feature: LeftCoreFeature) -> None:
                 known[platform] = sorted({*map(str, current), *missing})
         if known:
             config["known_plugin_toolsets"] = known
-        if feature.replaces_toolsets:
-            _turn_off_replaced(config, feature)
+        if feature.shared_toolsets:
+            _add_companion_toolsets(config, feature)
         _keep_legacy_disable(config, feature)
         _mark(config, _SCOPED_KEY, feature)
     if created:
