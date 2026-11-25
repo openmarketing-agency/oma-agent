@@ -73,6 +73,8 @@ Names are literal and case-sensitive. Bundles expand to their member tools. The 
 
 See [profile toolset resolution](hermes_cli/toolset_policy.py), [toolset definitions](toolsets.py), and the [configuration reference](website/docs/user-guide/configuration.md#global-toolset-allowlist).
 
+The Camofox migration preserves the built-in `browser` toolset and adds the `camofox` plugin alongside it where the legacy backend was selected. If an older migration added `browser` to the native profile's `agent.disabled_toolsets`, OMA sync rejects that exclusion because `browser` is required. If browser access is intended, remove just that entry from the native profile and retry sync. The migration does not remove existing exclusions automatically because it cannot distinguish them from deliberate profile settings.
+
 ## 3. Tool Search: when schemas are visible
 
 Once tools are selected, Tool Search can keep their full schemas out of the initial model request. **Eager** means the model gets a schema directly. **Deferred** means the model can find the tool with `tool_search`, inspect it with `tool_describe`, and invoke it with `tool_call`. The current starter exposes only `file`, `skills`, and `memory` upfront; `terminal`, `web`, `browser`, and `session_search` are deferred. The bridge stays visible with its upfront catalog hidden. Making the `skills` tools eager does not preload any skills.[1][3]
