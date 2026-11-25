@@ -13,11 +13,11 @@ metadata:
 
 # OMA Campaigns Skill
 
-Design campaigns from the saved brand and marketing playbook. Use the ideas catalog and worked plays as drafting references; the installer still reads the existing campaign and agent records, never the reference plays. One orchestrator plans and assigns work and one publisher applies authorized changes.
+Design campaigns from the saved brand and marketing playbook. Creating a campaign provisions its team and an empty Kanban board and leaves it paused. Use the ideas catalog and worked plays as references, not as installer inputs. One orchestrator plans and assigns work and one publisher applies authorized changes.
 
 ## When to Use
 
-- Draft campaigns during onboarding, add a campaign, or revise its goals and plans.
+- Create campaigns during onboarding, add a campaign, or revise its goals and plans.
 - Inspect, provision, or start a saved campaign when requested.
 - Find an idea, worked play, or channel rule to guide campaign design.
 
@@ -31,10 +31,11 @@ Use `terminal` from the installed skill directory reported by `skill_view`. Run 
 
 | `scripts/campaign.py` arguments | Purpose |
 | --- | --- |
-| `list`, `status <id>` | Inspect installed or incomplete campaigns, or inspect one saved campaign and its verified roster. |
+| `list`, `status <id>` | Inspect installed or incomplete campaigns and verify the board and roster. |
 | `validate <kind> <path>` | Validate a `brand`, `playbook`, `campaign`, or `agent` record without applying it. |
 | `integrations` | Suggest canonical IDs from brand evidence. Does not verify account access. |
-| `install <id>` | Provision saved records, the campaign board, and declared shared skills. Does not start the campaign. |
+| `create <definition.yaml>` | Provision a new campaign, its team, and an empty Kanban board. Leaves it paused. |
+| `install <id>` | Provision a legacy saved definition as a paused campaign. |
 | `configure <id>` | Fill missing routing on a verified installation; does not change its roster. |
 | `lifecycle <id> resumed` | Resume an installed campaign using its saved model. Does not verify connection access. |
 
@@ -48,7 +49,7 @@ Use `terminal` from the installed skill directory reported by `skill_view`. Run 
 
 ## Campaign Format
 
-Save `oma/campaigns/<campaign_id>/config.yaml` using the campaign schema. Use `id`, `name`, `description`, `orchestrator`, `agents`, `integrations`, `goals`, and `plans`, plus optional `integration_categories` for tool suggestions. See the [record examples](references/records.md) for a complete sample.
+Write new definitions outside `oma/campaigns/`, for example `oma/staging/<campaign_id>.yaml`. The `create` command writes the canonical `oma/campaigns/<campaign_id>/config.yaml`; do not write it directly for a new campaign. Use `id`, `name`, `description`, `orchestrator`, `agents`, `integrations`, `goals`, and `plans`, plus optional `integration_categories` for tool suggestions. See the [record examples](references/records.md) for a complete sample.
 
 - `goals` and `plans` are inline YAML lists of text. Goals describe the audience, outcome and measurement; ordered plans describe what ships, prerequisites, channel sequence and how results inform later work. Put business-specific limits in plans and relevant personas.
 - Use canonical IDs `<campaign_id>__<role>` for the ordered roster, with one `__orchestrator` and one `__publisher`. Put recurring job declarations in each owning agent's config, not in campaign YAML.
@@ -61,9 +62,9 @@ Save `oma/campaigns/<campaign_id>/config.yaml` using the campaign schema. Use `i
 1. **Read the strategy and existing work.** Match campaigns to the saved strategy and brand evidence. Read existing campaign records and use `status` to verify installed ones. Reuse suitable teams and preserve manual pauses.
 2. **Choose ideas and adapt a play.** Pick catalog ideas for this business, not one campaign per idea. Use the [worked plays](plays/README.md) for choices about roles, deliverables, and cadence; adapt the example rather than copying its facts. For a first run, consider launch (`show-hn-launch`), Reddit replies (`buying-intent-listening`), SEO (`seo-blog-engine`), and social (`daily-shorts` or `comment-to-dm`); choose what fits the brand and explain omitted or deferred options. If you need a reusable custom play, follow [Designing plays](references/designing-plays.md) and the [play schema](references/play-schema.md). Business decisions go in the existing campaign and agent fields, not in a new manifest.
 3. **Plan work that ships.** Research the topics, audience, accounts, and applicable rules now. State the first concrete output and any steps that must come before it in `plans`. Share prerequisites instead of duplicating work. For missing website, blog, or docs infrastructure, route authorized hosting work via the `oma-agents` maintenance handoff; keep `maintenance` outside the roster. When posting access is missing, prepare drafts for an authorized person where the channel permits it.
-4. **Save records and personas.** Write the campaign, each `oma/agents/<agent-id>/config.yaml`, and its role-specific `SOUL.md`. Give everyone distinct outputs, an absolute `saves/` path, and only needed tools and skills. Give standing `kanban` access to the orchestrator only. Roles reading untrusted content do not get `terminal`. Use approved channel tools for writes, never browser-driven publication. Publishers follow the [channel rules](channels/README.md), verify the destination and approval, and record the resulting URL or receipt. For human-only channels, hand off approved material rather than posting automatically.
+4. **Prepare the definition and team.** Write the staging definition, each `oma/agents/<agent-id>/config.yaml`, and its role-specific `SOUL.md`. Give everyone distinct outputs, an absolute `saves/` path, and only needed tools and skills. Give standing `kanban` access to the orchestrator only. Roles reading untrusted content do not get `terminal`. Use approved channel tools for writes, never browser-driven publication. Publishers follow the [channel rules](channels/README.md), verify the destination and approval, and record the resulting URL or receipt. For human-only channels, hand off approved material rather than posting automatically.
 5. **Declare recurring work.** Follow [review signals](references/review-signals.md). For active social and community accounts, start with **one lightweight activity check per hour** for new comments, replies, mentions, or tagged posts. Keep performance reporting weekly. Use the requested cadence and prefer reliable events when available. Scope checks to verified sources, act only on new items since the last successful checkpoint, cap work, and don't queue duplicates. The Comment-to-DM publisher can scan eligible keyword replies hourly; polling is not permission to send. Save existing `jobs` fields (`id`, `schedule`, `prompt`, plus `timezone` or `repeat` only as needed); otherwise `jobs: []`.
-6. **Verify the draft.** Run `campaign.py validate campaign <path>` and `validate agent <path>` in `terminal`. Read each persona back; verify the roster, saves paths, integration IDs, suggested category labels, and declared prompts. If a role is incomplete, leave the campaign a draft. Saving records alone does not activate or schedule them.
+6. **Validate and provision.** Run `campaign.py validate campaign <path>` and `validate agent <path>` in `terminal`. Read each persona back and check the roster, saves paths, integration IDs, suggested categories, and declared prompts. Complete missing role records before provisioning. Run `campaign.py create <definition.yaml>` for a new campaign. If the canonical config already exists and `status <id>` says to run `install`, use `install <id>` for that legacy definition instead. Reuse an already-installed campaign; report an incomplete installation as blocked rather than overwriting it. Read back `status <id>`: for a new installation, require `state: installed`, `lifecycle_state: paused`, the expected `campaign-<id>` board, and `present_profiles` matching the installed roster, including the managed analyst. Missing connections are start prerequisites, not reasons to stop at an uninstalled definition. If provisioning fails, report the error and don't claim the campaign was created.
 
 ## Write Kanban Cards People Can Read
 
@@ -71,7 +72,7 @@ Put this guidance in each campaign orchestrator's `SOUL.md`, following the orche
 
 ## Activate a Campaign
 
-Only when requested. Use `install <id>`, then read back `status <id>` and verify its expected board, orchestrator, publisher and complete `present_profiles`. Do not reinstall to extend an installed roster. Verify actual access to the intended accounts and work prerequisites before resuming or enabling anything; a missing required connection leaves the campaign paused. Use the console's start flow when available, or the campaign lifecycle command. A resume requires a saved model. `control` mode does not run ordinary agent work or cron.
+Only when requested. Read back `status <id>` and verify the campaign is installed with its board and full team. Do not reinstall to extend an installed roster. Verify actual access to the intended accounts and work prerequisites before resuming or enabling anything; a missing required connection leaves the campaign paused. Use the console's start flow when available, or the campaign lifecycle command. A resume requires a saved model. `control` mode does not run ordinary agent work or cron.
 
 For an authorized kickoff, queue one task for the orchestrator on the campaign's recorded board via Tool Search, with idempotency key `kickoff:<campaign_id>`. Reuse jobs registered by the console or sync. For an eligible missing job, list the owning profile's jobs with `hermes -p <agent-id> cron list --all`; only create if no matching managed job exists. Use `cron create --name 'oma:<declared-id>' --deliver local -- <schedule> <prompt>` in that profile, placing applicable timezone or repeat flags before `--`. Pass schedule and prompt separately. Preserve operator pauses, don't force an immediate run, and never register a job that writes externally without verified authority.
 
@@ -83,4 +84,4 @@ For an authorized kickoff, queue one task for the orchestrator on the campaign's
 
 ## Verification
 
-Report which campaigns were drafted, their playbook priorities and first deliverables, and any blocked prerequisites. If activation was requested, verify the reported installed roster and lifecycle state, queued kickoff, and scheduled jobs in their owning profile. Distinguish an authored schedule, a registered job, and an observed run.
+Report which campaigns were installed with their teams and boards, their first deliverables, and any blocked prerequisites. Verify that new campaigns are paused with no kickoff queued. If activation was requested, verify the resulting lifecycle state, queued kickoff, and scheduled jobs in their owning profiles. Distinguish an authored schedule, a registered job, and an observed run.

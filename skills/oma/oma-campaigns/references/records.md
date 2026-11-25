@@ -4,7 +4,7 @@ Illustrations of records built from a play, for a made-up brand. Load `oma-agent
 
 ## Campaign config
 
-`oma/campaigns/seo/config.yaml`:
+Example creation input, `oma/staging/seo.yaml`:
 
 ```yaml
 id: seo
@@ -31,7 +31,7 @@ plans:
   - "Benchmarks come only from the published benchmark report."
 ```
 
-This campaign uses `seo-blog-engine` as a drafting reference. The installer adds lifecycle and routing metadata; the reference, prerequisite and publication rules do not become separate campaign keys.
+This campaign uses `seo-blog-engine` as a drafting reference. Prepare the roster's agent records first, then use `campaign.py create <definition.yaml>`. It writes `oma/campaigns/seo/config.yaml` with lifecycle and routing metadata, provisions the team and an empty Kanban board, and leaves the campaign paused. The reference, prerequisite and publication rules do not become separate campaign keys.
 
 `integration_categories` suggests where to look for tools. `integrations` names the actual connectors. If the campaign needs analytics but has not selected a provider, `integration_categories: [analytics]` can be saved with `integrations: []`.
 
