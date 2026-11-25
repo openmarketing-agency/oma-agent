@@ -53,6 +53,69 @@ def test_successful_source_completion_writes_checkout_identity(tmp_path, monkeyp
     assert (root / "install-stamp.json").is_file()
 
 
+@pytest.mark.platforms("posix")
+def test_direct_source_completion_seeds_oma_at_the_bound_home(tmp_path, monkeypatch):
+    from hermes_cli.config_home import seed_install_config
+
+    root = _repo(tmp_path)
+    home = tmp_path / "oma-agent-data"
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    checkout = Path(__file__).resolve().parents[2]
+    for name in ("oma-bundle", "skills", "hermes_cli"):
+        (root / name).symlink_to(checkout / name, target_is_directory=True)
+    marker = root / ".hermes" / "install-home"
+    marker.parent.mkdir()
+    marker.write_text(f"{home.resolve()}\n", encoding="utf-8")
+    seed_install_config()
+    _completion_dependencies(monkeypatch, lambda **_kwargs: True)
+    assert complete_source_checkout(root, desktop=False, assume_yes=True)
+
+    for role in ("default", "maintenance"):
+        assert (home / "oma" / "agents" / role / "config.yaml").is_file()
+    _create_paused_oma_campaign(home, tmp_path, monkeypatch)
+    persona = home / "oma" / "agents" / "default" / "SOUL.md"
+    persona.write_text("Operator persona\n", encoding="utf-8")
+    assert complete_source_checkout(root, desktop=False, assume_yes=True)
+    assert persona.read_text(encoding="utf-8") == "Operator persona\n"
+
+    borrower = tmp_path / "borrower"
+    monkeypatch.setenv("HERMES_HOME", str(borrower))
+    assert complete_source_checkout(root, desktop=False, assume_yes=True)
+    assert not (borrower / "oma-bundle").exists()
+
+
+def _create_paused_oma_campaign(home, tmp_path, monkeypatch):
+    from hermes_cli import kanban_db
+    from hermes_cli.kanban_db_connect import connect_closing
+    from hermes_cli.oma_campaigns.install import create
+
+    monkeypatch.setattr("hermes_cli.default_plugins.spawn_install", lambda _path: True)
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_DB", raising=False)
+    monkeypatch.delenv("HERMES_KANBAN_BOARD", raising=False)
+    definition = tmp_path / "audit.yaml"
+    definition.write_text(
+        "id: audit\nname: Audit\ndescription: Test team.\norchestrator: audit__orchestrator\n"
+        "agents: [audit__orchestrator, audit__publisher]\ngoals: [Measure demand]\nplans: [Review evidence]\n",
+        encoding="utf-8",
+    )
+    for role in ("orchestrator", "publisher"):
+        record = home / "oma" / "agents" / f"audit__{role}"
+        record.mkdir()
+        (record / "config.yaml").write_text(
+            f"id: audit__{role}\nname: {role}\ndescription: Test role.\ncampaign_id: audit\n"
+            "oma_skills: [copywriting]\nagent: {enabled_toolsets: [file, kanban]}\njobs: []\n",
+            encoding="utf-8",
+        )
+        (record / "SOUL.md").write_text(f"I am the {role}.\n", encoding="utf-8")
+    result = create(home.resolve(), definition.resolve())
+    assert result["lifecycle_state"] == "paused"
+    assert result["present_profiles"] == ["audit__orchestrator", "audit__publisher", "audit__analyst"]
+    assert (home / "profiles" / "audit__publisher" / "skills" / "copywriting" / "SKILL.md").is_file()
+    with connect_closing(board="campaign-audit") as conn:
+        assert kanban_db.list_tasks(conn) == []
+
+
 def test_failed_source_completion_does_not_publish_identity(tmp_path, monkeypatch):
     root = _repo(tmp_path)
     _completion_dependencies(monkeypatch, lambda **_kwargs: True)

@@ -80,8 +80,15 @@ def _platform_default_hermes_home(environ: Mapping[str, str], user_home: Callabl
 @cache
 def _installed_source_home() -> Path | None:
     """Read the direct installer's checkout-local data binding once per launch."""
-    marker = _INSTALL_ROOT / ".hermes" / "install-home"
+    return read_source_install_home(_INSTALL_ROOT)
+
+
+def read_source_install_home(root: Path) -> Path | None:
+    """Read a POSIX source checkout's installer-owned home marker."""
+    marker = root / ".hermes" / "install-home"
     try:
+        if marker.parent.is_symlink() or marker.is_symlink() or not marker.is_file():
+            return None
         value = marker.read_text(encoding="utf-8").removesuffix("\n")
         if value.startswith("/") and not any(char in value for char in "\n\r\x00"):
             return Path(value)

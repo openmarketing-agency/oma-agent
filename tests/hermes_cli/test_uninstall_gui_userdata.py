@@ -70,3 +70,16 @@ def test_uninstall_desktop_userdata_kept_unless_full(homes, full_uninstall):
         remove_profiles=False, named_profiles=[])
     assert violations == []
     assert (userdata / "connections.json").exists() is not full_uninstall
+
+
+@pytest.mark.platforms("posix")
+def test_uninstall_removes_only_wrappers_for_the_selected_oma_checkout(tmp_path, monkeypatch):
+    from hermes_cli._launchers import _publish_conveniences
+
+    root = tmp_path / "path with spaces" / "oma-agent"
+    user_bin, system_bin = (tmp_path / name for name in ("user-bin", "system-bin"))
+    _publish_conveniences(root, user_bin, ("hermes", "hermes-acp", "oma-agent"))
+    _publish_conveniences(tmp_path / "other-install", system_bin, ("hermes", "oma-agent"))
+    monkeypatch.setattr(uninstall, "_wrapper_candidate_dirs", lambda: [user_bin, system_bin], raising=False)
+    assert set(uninstall.remove_wrapper_script(root)) == {user_bin / n for n in ("hermes", "hermes-acp", "oma-agent")}
+    assert {p.name for p in system_bin.iterdir()} == {"hermes", "oma-agent"}

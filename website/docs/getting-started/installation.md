@@ -130,6 +130,8 @@ existing layout; the installer does not move data. `--dir` / `HERMES_INSTALL_DIR
 and `--hermes-home` / `HERMES_HOME` override the POSIX paths. For a custom pair,
 pass both. Windows provides `-HermesHome` and `-InstallDir`.
 
+Direct OMA installs seed the shared campaign skill bundle and missing agent records for `default` and `maintenance` in the data directory without overwriting existing copies. A source-backed Desktop launch can find the same directory through the installed `oma-agent` wrapper, even when started without the shell's `PATH`.
+
 PM's tool store and per-install Python generations have separate lifetimes.
 See [Package management](../reference/package-management.md) for their locations.
 Do not remove the data root to repair an application installation.

@@ -5,6 +5,7 @@ import path from 'node:path'
 
 import { afterEach, test, vi } from 'vitest'
 
+import { initializeMainHermesHome, resolveMainHermesHome } from './main-hermes-home'
 import { resolveSourceInstallationBackend } from './source-backend'
 import { userLauncherInstallRoot } from './updater-process'
 
@@ -83,6 +84,41 @@ test('a user-bin launcher is ignored when it reports no Hermes source tree', ():
 
     sourceTree(notSource)
     assert.equal(userLauncherInstallRoot(process.platform === 'win32', hermesHome)?.root, notSource)
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true })
+  }
+})
+
+test.skipIf(process.platform === 'win32')('a direct OMA install supplies the GUI data home without a shell', (): void => {
+  const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'oma-desktop-home-')))
+
+  try {
+    const root = path.join(base, "it's a workspace", 'oma-agent')
+    const home = path.join(base, 'user')
+    const data = path.join(base, 'oma-agent-data')
+    sourceTree(root)
+    const launcher = path.join(root, '.hermes', 'bin', 'hermes')
+    fs.mkdirSync(path.dirname(launcher), { recursive: true })
+    fs.writeFileSync(launcher, '#!/bin/sh\nexit 1\n', { mode: 0o755 })
+    const marker = path.join(root, '.hermes', 'install-home')
+    fs.mkdirSync(data)
+    fs.writeFileSync(marker, `${data}\n`)
+    const userBin = path.join(home, '.local', 'bin')
+    fs.mkdirSync(userBin, { recursive: true })
+    const quoted = launcher.replaceAll("'", "'\"'\"'")
+    fs.writeFileSync(path.join(userBin, 'oma-agent'), `#!/bin/sh\nexec '${quoted}' "$@"\n`, { mode: 0o755 })
+    vi.stubEnv('HERMES_HOME', undefined)
+    vi.stubEnv('HERMES_DESKTOP_USER_DATA_DIR', undefined)
+    vi.stubEnv('HERMES_DATA_DIR_SUFFIX', undefined)
+    assert.deepEqual(resolveMainHermesHome(home), { home: data, sourceRoot: root })
+    assert.deepEqual(initializeMainHermesHome(home, true), { home: data, activeRoot: root })
+    assert.equal(process.env.HERMES_HOME, data)
+    vi.stubEnv('HERMES_HOME', path.join(base, 'explicit'))
+    assert.deepEqual(resolveMainHermesHome(home), { home: path.join(base, 'explicit'), sourceRoot: null })
+    vi.stubEnv('HERMES_HOME', undefined)
+    assert.deepEqual(resolveMainHermesHome(home, false), { home: path.join(home, '.hermes'), sourceRoot: null })
+    fs.writeFileSync(marker, 'relative-data\n')
+    assert.deepEqual(resolveMainHermesHome(home), { home: path.join(home, '.hermes'), sourceRoot: null })
   } finally {
     fs.rmSync(base, { recursive: true, force: true })
   }

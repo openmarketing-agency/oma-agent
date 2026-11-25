@@ -163,29 +163,24 @@ def remove_path_from_shell_configs():
     return removed_from
 
 
-def remove_wrapper_script():
-    """Remove the hermes wrapper script if it exists."""
-    wrapper_paths = [
-        Path.home() / ".local" / "bin" / "hermes",
-        Path.home() / ".local" / "bin" / "hermes-acp",
-        Path.home() / ".local" / "bin" / "hermes-agent",
-        Path("/usr/local/bin/hermes"),
-        Path("/usr/local/bin/hermes-acp"),
-        Path("/usr/local/bin/hermes-agent"),
-    ]
-    
+def _wrapper_candidate_dirs() -> tuple[Path, Path]:
+    return (Path.home() / ".local" / "bin", Path("/usr/local/bin"))
+
+
+def remove_wrapper_script(project_root: Path) -> list[Path]:
+    """Remove only published wrappers owned by the checkout being uninstalled."""
+    from hermes_cli._launchers import POSIX_USER_LAUNCHERS, _owns_launcher
+
+    root = project_root.resolve()
+    candidates = (directory / name for directory in _wrapper_candidate_dirs() for name in POSIX_USER_LAUNCHERS)
     removed = []
-    for wrapper in wrapper_paths:
-        if wrapper.exists():
-            try:
-                # Check if it's our wrapper (contains hermes_cli reference)
-                content = wrapper.read_text(encoding="utf-8-sig")
-                if 'hermes_cli' in content or 'hermes-agent' in content:
-                    wrapper.unlink()
-                    removed.append(wrapper)
-            except Exception as e:
-                log_warn(f"Could not remove {wrapper}: {e}")
-    
+    for wrapper in candidates:
+        try:
+            if (wrapper.is_symlink() or wrapper.is_file()) and _owns_launcher(wrapper, root):
+                wrapper.unlink()
+                removed.append(wrapper)
+        except (OSError, RuntimeError) as exc:
+            log_warn(f"Could not remove {wrapper}: {exc}")
     return removed
 
 
@@ -1034,7 +1029,8 @@ def _perform_uninstall(
          "Removed from User PATH: {}", "No Hermes-owned PATH entries in User environment"),
         (windows, "Removing HERMES_HOME / HERMES_GIT_BASH_PATH User env vars...",
          remove_hermes_env_vars_windows, "Removed User env var: {}", "No Hermes-set User env vars to remove"),
-        (True, "Removing hermes command...", remove_wrapper_script, "Removed {}", "No wrapper script found"),
+        (not windows, "Removing Hermes command wrappers...", lambda: remove_wrapper_script(project_root),
+         "Removed {}", "No wrapper script found"),
         (windows, "Removing Windows hermes launchers...",
          remove_windows_bin_launchers, "Removed {}", "No Windows hermes launchers found"),
         (True, "Removing Hermes-managed node/npm/npx symlinks...",
