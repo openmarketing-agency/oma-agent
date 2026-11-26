@@ -12,9 +12,9 @@ import sys
 from pathlib import Path
 
 try:
-    import yaml
+    from ruamel.yaml import YAML, YAMLError
 except ImportError:  # pragma: no cover
-    print("ERROR: PyYAML is not installed; validation was not run.")
+    print("ERROR: ruamel.yaml is not installed; run with the Hermes environment's Python. Validation was not run.")
     sys.exit(2)
 
 DIMS = ["job", "buyer", "price", "market", "channel"]
@@ -103,8 +103,8 @@ def main(argv):
         print(f"ERROR: {index_path} not found")
         return 1
     try:
-        idx = yaml.safe_load(index_path.read_text()) or {}
-    except yaml.YAMLError as e:
+        idx = YAML(typ="safe").load(index_path.read_text()) or {}
+    except YAMLError as e:
         print(f"ERROR: index.yaml is invalid YAML: {e}")
         return 1
 

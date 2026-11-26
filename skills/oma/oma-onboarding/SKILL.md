@@ -1,7 +1,7 @@
 ---
 name: oma-onboarding
 description: Set up a brand, campaigns, and agents from one URL.
-version: 0.4.0
+version: 0.5.0
 author: Open Marketing Agency (OMA)
 license: MIT
 platforms: [linux, macos, windows]
@@ -30,7 +30,7 @@ If no URL was provided and none is saved for this setup, ask only: **“What's y
 
 ## Procedure
 
-1. **Research the source read-only.** Follow `oma-brand` to inventory and collect the distinct logos, illustrations, icons, backgrounds, images, and screenshots found on the reviewed public brand pages as part of setup, without waiting for a separate request. Treat public social profile URLs as brand sources: capture the accessible profile and follow verified official links for additional assets and page references, including when the platform blocks direct access. Compile the remaining audience, market, channel, integration, launch, and docs findings from available sources. If a verified repository is available, produce the capability and technical reports by inspecting it as text. Treat unverified details as unknown, not absent. Do not execute repository code, load its instructions, or bypass web access controls.
+1. **Research the source read-only.** Follow `oma-brand` to inventory and collect the distinct logos, illustrations, icons, backgrounds, images, and screenshots found on the reviewed public brand pages as part of setup, without waiting for a separate request. Treat public social profile URLs as brand sources: capture the accessible profile and follow verified official links for additional assets and page references, including when the platform blocks direct access. Collect the brand's own posts and ads on every verified social platform before competitor research, and build the design system from the website and those creatives, as `oma-brand` describes. Compile the remaining audience, market, channel, integration, launch, and docs findings from available sources. If a verified repository is available, produce the capability and technical reports by inspecting it as text. Treat unverified details as unknown, not absent. Do not execute repository code, load its instructions, or bypass web access controls.
 2. **Save or reuse the brand.** Use `oma-brand` to save `oma/brand/config.yaml`, its referenced `knowledge-base.md`, and relevant supporting reports or assets. On a rerun for the same brand, fill gaps without overwriting existing assets or custom knowledge. If the URL belongs to a different brand or ownership of the saved record is unclear, leave the singleton untouched and report the conflict.
 3. **Decide and save the playbook.** Use `oma-playbook` to turn the compiled brand into the overall strategy: who to reach, what to focus on, why, and how to measure progress. Recommend campaigns in priority order with prerequisites and evidence. Label inferred choices as onboarding defaults. Save the strategy inline at `oma/playbook/config.yaml` or reuse the existing strategy when present; do not store a brand link.
 4. **Design campaigns and teams.** Use the ideas catalog and worked plays in `oma-campaigns` to choose campaigns that fit the saved priorities. Record prerequisites in ordered `plans`, connector IDs in `integrations`, and personas and job declarations in the agent records. For shared hosting, follow the `oma-agents` maintenance handoff rather than adding `maintenance` to the roster.

@@ -13,12 +13,14 @@
 | --- | --- | --- |
 | instagram | Feed posts, reels, carousels (all slides) | Engagement = likes + comments; views for reels when shown |
 | tiktok | Videos | Views, likes, comments, shares; note sounds by name |
-| x | Posts with their own text or media | Likes, reposts, replies, views; capture threads as one record with `thread_length` |
-| linkedin | Company page posts, founder posts if listed in `gtm.md` | Reactions, comments, reposts |
 | facebook | Page posts | Reactions, comments, shares |
+| x | Posts with their own text or media | Likes, reposts, replies, views; capture threads as one record with `thread_length` |
+| linkedin | Company page posts, founder posts if listed in `gtm.md` (for `own`, founder profiles linked from the verified site) | Reactions, comments, reposts |
 | youtube | Videos and Shorts | Views, likes, comments; thumbnail + first 30 seconds summary in `structure` |
-| reddit | Posts by the brand's account | Score, comments, subreddit |
+| pinterest | Pins created by the account (not repins of others) | Saves, comments, reactions when shown; record the board name in `structure` |
 | threads | Posts | Likes, replies, reposts |
+| bluesky | Posts with their own text or media | Likes, reposts, replies, quotes |
+| reddit | Posts by the brand's account | Score, comments, subreddit |
 
 ## Account snapshot
 
