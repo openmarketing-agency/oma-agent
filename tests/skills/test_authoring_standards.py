@@ -76,9 +76,9 @@ def test_oma_bundled_skills_exclude_the_optional_catalog():
     optional = {p.parent.name for p in (REPO / "optional-skills").rglob("SKILL.md")}
     assert bundled == {
         "computer-use", "hermes-agent", "oma-agents", "oma-brand",
-        "oma-campaigns", "oma-onboarding", "oma-playbook", "open-webui",
+        "oma-campaigns", "oma-competitors", "oma-creatives", "oma-onboarding", "oma-playbook", "open-webui",
     }
-    assert {"pdf", "weekly-review-planning"} <= optional
+    assert {"pdf", "wappalyzer", "weekly-review-planning"} <= optional
     assert not bundled & optional
 
 @pytest.mark.parametrize("p", _params())

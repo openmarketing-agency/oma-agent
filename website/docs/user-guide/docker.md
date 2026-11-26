@@ -745,11 +745,17 @@ The same syncing happens for SSH and Modal backends — skills and credential fi
 
 ## Installing more tools in the container
 
-Container startup prepares the optional Wappalyzer research dependency in
-`/opt/data/cache/research/wappalyzer/` with the default data volume. The first
-start needs access to GitHub and the npm registry. Later starts reuse the
-cached revision. If setup fails, Hermes still starts and logs the error.
-Enable the research skill with `hermes skills install official/research/wappalyzer`.
+To enable optional Wappalyzer research, install the skill and prepare the
+detector explicitly. With the default data volume, run these commands inside
+the container as the Hermes user.
+
+```sh
+hermes skills install official/research/wappalyzer
+/opt/hermes/.venv/bin/python /opt/data/skills/research/wappalyzer/scripts/wappalyzer_installation.py
+```
+
+Setup needs access to GitHub and the npm registry. It stores the pinned
+detector under `/opt/data/cache/research/wappalyzer/` for reuse across starts.
 
 The official image ships with a curated set of utilities (see [What the Dockerfile does](#what-the-dockerfile-does)), but not every tool an agent might want is preinstalled. There are five recommended approaches, in increasing order of effort and durability.
 

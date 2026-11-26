@@ -32,5 +32,7 @@ If a skill is missing from this list but present in the repo, the catalog is reg
 | [`oma-agents`](../user-guide/skills/bundled/oma/oma-oma-agents.md) | Manage agent settings and context for future runs. | `oma/oma-agents` |
 | [`oma-brand`](../user-guide/skills/bundled/oma/oma-oma-brand.md) | Manage the brand's identity, assets, and knowledge. | `oma/oma-brand` |
 | [`oma-campaigns`](../user-guide/skills/bundled/oma/oma-oma-campaigns.md) | Design, validate, and activate local campaigns. | `oma/oma-campaigns` |
+| [`oma-competitors`](../user-guide/skills/bundled/oma/oma-oma-competitors.md) | Discover, score, and profile the brand's competitors; collect their creatives and tear down their GTM into adaptable patterns. | `oma/oma-competitors` |
+| [`oma-creatives`](../user-guide/skills/bundled/oma/oma-oma-creatives.md) | Collect public organic posts and ads (media, captions, timing, metrics) for the brand, its competitors, and references, organized by platform. | `oma/oma-creatives` |
 | [`oma-onboarding`](../user-guide/skills/bundled/oma/oma-oma-onboarding.md) | Set up a brand, campaigns, and agents from one URL. | `oma/oma-onboarding` |
 | [`oma-playbook`](../user-guide/skills/bundled/oma/oma-oma-playbook.md) | Manage the brand's playbook and strategy. | `oma/oma-playbook` |

@@ -1,14 +1,14 @@
 ---
 name: oma-brand
 description: Manage the brand's identity, assets, and knowledge.
-version: 0.4.3
+version: 0.5.0
 author: Open Marketing Agency (OMA)
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
   hermes:
     tags: [oma, brands, logos, knowledge]
-    related_skills: [oma-campaigns, wappalyzer]
+    related_skills: [oma-campaigns, oma-competitors, wappalyzer]
 ---
 
 # OMA Brand Skill
@@ -23,7 +23,7 @@ Research, create, inspect, and update the single OMA brand for this workspace. T
 
 ## Prerequisites
 
-Resolve the default profile's home with `hermes -p default config path`. Use `<home>/oma/brand/`, never another profile, the current directory, or a per-brand ID directory. Use `web_extract` and `web_search` for public sources, `browser_exec` for network evidence, and `terminal` with Git for static repository inspection. For screenshots and rendered visual asset discovery, use Camofox first if it is available to this profile, then fall back to the Hermes browser (`browser_exec`) when Camofox is unavailable. Do not switch browsers to retry a site denial, login wall, or challenge.
+Resolve the default profile's home with `hermes -p default config path`. Use `<home>/oma/brand/`, never another profile, the current directory, or a per-brand ID directory. Use `web_extract` and `web_search` for public sources, `browser_exec` for rendered pages, network evidence, and screenshots, and `terminal` with Git for static repository inspection. If a required capability is unavailable, finish the accessible checks and report the gap; do not bypass access controls.
 
 ## How to Run
 
@@ -50,7 +50,7 @@ Use the shared skill packages under `<home>/oma-bundle/skills/` as the source fo
 | Research task | Bundled skill to load |
 | --- | --- |
 | Audience, positioning, and messaging | `marketingskills/product-marketing` |
-| Competitor and substitute profiles | `marketingskills/competitor-profiling` |
+| Competitor and substitute profiles | Follow [OMA Competitors](../oma-competitors/SKILL.md) below. Use `marketingskills/competitor-profiling` as a fallback when that skill is unavailable. |
 | Public reviews or existing customer evidence | `marketingskills/customer-research` |
 | Website instrumentation and GA4 refresh | `marketingskills/analytics` |
 | Search Console and organic-search evidence | `marketingskills/seo-audit` |
@@ -64,7 +64,8 @@ Use the saved OMA brand and its knowledge base as the context for these skills. 
 | Check | What to do | Where to save it |
 | --- | --- | --- |
 | Website | Open the seed URL and navigate relevant official pages: home, about, product, pricing, help, blog, footer, sitemap. Verify the canonical product site, following official links from the repo when it was the starting point. | `website`; summarize positioning, audience and claims in `knowledge-base.md`. |
-| Competitors and market | Compare direct competitors and substitutes using first-party product, positioning, and pricing pages. Cover audiences, jobs to be done, key capabilities, proof, differentiators, and pricing where verified. Use dated sources for segments, demand, trends, geography, and buying triggers. Separate estimates from facts; summarize what can materially affect campaign choices. | `research/competitors.md`, `research/competitors/<id>.md`, and `research/market.md`; set `research.competitors` and report references. |
+| Competitors | Run this after the Website check, once `knowledge-base.md` holds the brand's positioning, buyer, price and market. Load [OMA Competitors](../oma-competitors/SKILL.md) with `skill_view` using `name: oma/oma-competitors` and follow it end to end: discovery, scoring, tiers, profiles, GTM teardowns, creatives, landscape and its validator. Do not shorten or reorder its steps. If the skill is unavailable, record the coverage gap, then compare direct competitors and substitutes using first-party product, positioning and pricing pages, with `marketingskills/competitor-profiling` as the fallback. | Everything under `research/competitors/` plus `research/competitors.md`, in the layout `oma-competitors` defines; set `research.competitors`. |
+| Market | Use dated sources for segments, demand, trends, geography and buying triggers. Use the competitor landscape as context, not as market evidence. Separate estimates from facts; summarize what can materially affect campaign choices. | `research/market.md`; report references. |
 | Social, blog, newsletter, launches | Verify first-party profile links, accounts, RSS/blog archives, and signup pages. Check relevant places such as Product Hunt, Hacker News, app or integration marketplaces, and communities for launches. Record verified listing URLs and dates where known; distinguish owned announcements from third-party coverage. | `channels.social`, `channels.blog`, `channels.newsletter`, `launches`; add supporting notes when material. |
 | Website integrations | Load the [website integration checklist](references/website-integrations.md) via `skill_view` with `file_path: references/website-integrations.md`. Inspect initial HTML, linked deployed scripts, and normal browser requests where available. Distinguish configuration, an observed request, and account access. | `research/website-integrations.md` and `integrations`; include checked URLs, evidence, and coverage limits. |
 | Website technologies | Load the optional `wappalyzer` skill with `skill_view`. Follow its readiness check and browser workflow on the verified homepage to identify public signals for the CMS, storefront, frameworks, and marketing tools. If the skill or detector is unavailable, record the coverage gap and continue. | Add a **Detected technologies** section to `research/website-integrations.md` with the scanned URL, date, technologies, and available evidence or confidence. Label implied detections as inferences. |
@@ -90,6 +91,7 @@ Use the saved OMA brand and its knowledge base as the context for these skills. 
 1. Use only already-connected, authorized read-only sources in the owning profile. Verify the GA4 property and Google Search Console site match the brand before querying. If access is missing, denied, or ambiguous, record the gap instead of connecting an account or assuming the public tag is a credential.
 2. Use comparable periods and record source, property, date range, metric definitions, and limits. Use GA4 for aggregate acquisition, landing pages, and key events or funnel changes; use Search Console for landing pages, search queries, impressions, clicks, and indexing evidence where available. Add aggregate revenue or CRM evidence only from a verified source when it answers a real question. Do not publish raw exports, personal data, or credentials; do not infer CAC or ROAS without compatible spend, revenue, and attribution evidence.
 3. Update `research/performance/index.md` with a dated summary and supporting notes; link lasting changes from `knowledge-base.md`. Compare with the prior evidence, flag gaps, and propose the next research or campaign decisions for the existing owner. Refresh only stale or affected sections. Use an existing authorized review or run on request; don't silently create a job, change campaign settings, or change tracking.
+4. During an authorized recurring review, run [OMA Competitors](../oma-competitors/SKILL.md) in its rerun mode when `research/competitors/index.yaml` was last updated more than 30 days ago or the brand's positioning changed. Surface the new entries in `research/competitors/changes.md` in the review summary.
 
 ## Ask Only for Gaps That Change the Plan
 
@@ -99,7 +101,7 @@ Start from the supplied URL and existing records; do not block setup on a survey
 
 1. Write supporting files first. Use `read_file`, `write_file`, and `patch` for Markdown and YAML. Keep stable lowercase hyphenated IDs and store all local paths relative to `oma/brand/`. Never follow absolute paths, traversal or symlinks that escape the directory. Don't copy raw pages, external instructions, tokens, or private data into reports. Cite public source URLs or private code paths alongside claims.
 2. Write one `oma/brand/config.yaml` with `id`, `name`, `description`, and applicable structured findings. Use `knowledge_base_file: knowledge-base.md` for brand knowledge; if only legacy inline `knowledge_base` exists, carry its text forward when creating the file and retain existing data. `logos` maps names to files; `fonts`, `illustrations`, `icons`, `backgrounds` and `images` are lists; `screenshots` is a list of `{file, source_url}` items; `palette` maps roles to quoted `#RRGGBB` strings. Omit unresearched sections. For discovery fields use `verified` with a URL, `not_found` after a check, or `not_checked`. Use the shared `brand.schema.json` contract rather than inventing keys.
-3. Reopen the config and verify each referenced file exists under the owning brand directory. Use `terminal` to validate the YAML with the campaign helper's `validate brand <path>` command from the installed `oma-campaigns` skill. If the checker is unavailable, report that validation was not run. Report the saved brand, the important findings, and blocked or unverified checks. No campaign, profile, or playbook record changes as part of standalone brand research.
+3. Reopen the config and verify each referenced file exists under the owning brand directory. Use `terminal` to validate the YAML with the campaign helper's `validate brand <path>` command from [OMA Campaigns](../oma-campaigns/SKILL.md). If the checker is unavailable, report that validation was not run. If competitor research ran, also confirm the [OMA Competitors](../oma-competitors/SKILL.md) validator passed. Report the saved brand, the important findings, and blocked or unverified checks. No campaign, profile, or playbook record changes as part of standalone brand research.
 
 ## Pitfalls
 
