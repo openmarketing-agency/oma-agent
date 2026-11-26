@@ -7,7 +7,7 @@ from agent.prompt_builder import build_skills_system_prompt, clear_skills_system
 from agent.skill_utils import SKILL_PROMPT_DESC_LIMIT, clip_skill_description
 from agent.skills_index_delta import index_entries
 
-LONG = "Use when cutting, publishing, or abandoning a hermes-agent release and its notes."
+LONG = "Use when " + "cutting, publishing, or abandoning a Hermes release and its notes, " * 4
 
 
 @pytest.fixture(autouse=True)
@@ -72,7 +72,7 @@ def test_prompt_guides_search_for_unlisted_oma_skills(monkeypatch, tmp_path, one
 
 @pytest.mark.parametrize("sep", ["\t", "\u00a0"], ids=["tab", "nbsp"])
 def test_clip_cuts_at_any_whitespace_never_inside_a_word(sep):
-    desc = f"alpha{sep}" + f"bravo{sep}" * 12
+    desc = f"alpha{sep}" + f"bravo{sep}" * 40
     shown = clip_skill_description(desc)
     assert len(shown) <= SKILL_PROMPT_DESC_LIMIT and shown.endswith("...")
     assert set(shown[:-3].split(sep)) == {"alpha", "bravo"}  # whole words only, no "bra..."

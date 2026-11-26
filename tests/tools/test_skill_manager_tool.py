@@ -63,10 +63,12 @@ description: Updated description.
 Step 1: Do the new thing.
 """
 
-LONG_DESC_CONTENT = """\
+LONG_DESC = "Investigate " + "deployment " * 20 + "failures."
+
+LONG_DESC_CONTENT = f"""\
 ---
 name: long-desc
-description: Use when deploying multi-region Kubernetes clusters with custom CNI plugins and service mesh.
+description: {LONG_DESC}
 ---
 
 # Long Desc Skill
@@ -272,13 +274,13 @@ class TestCreateSkill:
             _create_skill("my-skill", VALID_SKILL_CONTENT)
             edit = _edit_skill("my-skill", LONG_DESC_CONTENT)
             patched = _patch_skill("my-skill", "A test skill for unit testing.",
-                                   "Use when deploying multi-region clusters with custom CNI plugins.")
+                                   LONG_DESC)
             legacy = tmp_path / "legacy"
             legacy.mkdir()
             (legacy / "SKILL.md").write_text(LONG_DESC_CONTENT.replace("long-desc", "legacy"))
             body = _edit_skill("legacy", LONG_DESC_CONTENT.replace("long-desc", "legacy") + "\nMore.\n")
-        assert edit["success"] is False and "60" in edit["error"]
-        assert patched["success"] is False and "60" in patched["error"]
+        assert edit["success"] is False and "220" in edit["error"]
+        assert patched["success"] is False and "220" in patched["error"]
         assert "A test skill for unit testing." in (tmp_path / "my-skill" / "SKILL.md").read_text()
         assert body["success"] is True
         fm, _ = parse_frontmatter(LONG_DESC_CONTENT)
@@ -287,15 +289,15 @@ class TestCreateSkill:
     def test_explicit_skill_md_paths_cannot_write_a_long_desc(self, tmp_path):
         """patch(file_path='SKILL.md') and write_file('SKILL.md') reach the same root file as a plain
         patch/edit, so the description written through them must fit the index width too."""
-        long_desc = "Use when deploying multi-region clusters with custom CNI plugins."
+        long_desc = LONG_DESC
         with _skill_dir(tmp_path):
             _create_skill("my-skill", VALID_SKILL_CONTENT)
             patched = _patch_skill("my-skill", "A test skill for unit testing.", long_desc, file_path="SKILL.md")
             written = _write_file("my-skill", "SKILL.md", VALID_SKILL_CONTENT.replace(
                 "A test skill for unit testing.", long_desc))
             body = _write_file("my-skill", "SKILL.md", VALID_SKILL_CONTENT + "\nMore.\n")
-        assert patched["success"] is False and "60" in patched["error"]
-        assert written["success"] is False and "60" in written["error"]
+        assert patched["success"] is False and "220" in patched["error"]
+        assert written["success"] is False and "220" in written["error"]
         assert body["success"] is True
         assert long_desc not in (tmp_path / "my-skill" / "SKILL.md").read_text()
 

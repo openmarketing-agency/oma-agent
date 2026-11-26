@@ -88,11 +88,11 @@ metadata:
 
 ### `description` rules (HARDLINE — the validator's 1024 is NOT the standard)
 
-- **≤ 60 characters.** One sentence. Ends with a period.
+- **≤ 220 characters.** One sentence. Ends with a period.
 - State the capability, not the implementation, and don't repeat the skill name or its category name (the index prints the category above the skill).
 - No marketing words ("powerful", "comprehensive", "seamless", "advanced").
-- 60 is the width the system prompt skill index shows; `skill_manage` rejects a new or changed description over it, and the index clips a longer legacy one at a word boundary.
-- If the description contains a `:`, wrap it in double quotes or YAML parses it as a mapping and the docs generator crashes. Quotes don't count toward the 60.
+- 220 is the width the system prompt skill index shows; `skill_manage` rejects a new or changed description over it, and the index clips a longer legacy one at a word boundary.
+- If the description contains a `:`, wrap it in double quotes or YAML parses it as a mapping and the docs generator crashes. Quotes don't count toward the 220.
 
 Good: `Track named companies for material news with cited digests.`
 Bad: `Use when a user asks to monitor named competitors or companies for product launches, pricing changes, funding, ...` (240 chars — rejected in review)
@@ -184,7 +184,7 @@ A skill exists to make the agent's process more predictable — the agent reliab
    m = re.search(r'\n---\s*\n', content[3:])
    fm = YAML(typ="safe").load(content[3:m.start()+3])
    assert "name" in fm and "description" in fm
-   assert len(fm["description"]) <= 60, f"description {len(fm['description'])} chars — hardline is 60"
+   assert len(fm["description"]) <= 220, f"description {len(fm['description'])} chars — hardline is 220"
    assert fm["description"].endswith(".")
    assert "platforms" in fm
    assert len(content) <= 100_000
@@ -220,7 +220,7 @@ A skill exists to make the agent's process more predictable — the agent reliab
 - [ ] File at `skills/<category>/<name>/SKILL.md` or `optional-skills/<category>/<name>/SKILL.md`
 - [ ] Frontmatter starts at byte 0 with `---`, closes with `\n---\n`
 - [ ] `name`, `description`, `version`, `author`, `license`, `platforms`, `metadata.hermes.{tags, related_skills}` all present
-- [ ] Description ≤ 60 chars, one sentence, ends with a period, no marketing words
+- [ ] Description ≤ 220 chars, one sentence, ends with a period, no marketing words
 - [ ] `author` credits the human contributor first
 - [ ] `platforms:` audited against actual prose/scripts, not copied from a sibling
 - [ ] Every `related_skills` entry resolves in-repo

@@ -848,7 +848,7 @@ def resolve_skill_config_values(config_vars: list[dict[str, Any]]) -> dict[str, 
 # Max description chars shown per row of the system-prompt skill index. skill_manage rejects a new or changed
 # description over it and tests/skills/test_authoring_standards.py holds shipped skills to it, so only legacy or
 # hand-edited skills ever reach clip_skill_description().
-SKILL_PROMPT_DESC_LIMIT = 60
+SKILL_PROMPT_DESC_LIMIT = 220
 _LAST_WHITESPACE_RE = re.compile(r"\s\S*$")
 _CLIP_TRAIL_RE = re.compile(r"[\s.,;:\-\u2013\u2014(/]+$")
 
