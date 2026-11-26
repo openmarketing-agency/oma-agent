@@ -9,18 +9,21 @@ Ledgerline sells payroll and HR software to US companies with 20 to 200 employee
 Ideas 8 (SEO blog engine), 11 (alternatives and vs pages), 15 (pillar guides) and 18 (rank-drop rescue). The playbook's priority is turning search into trials, and the research shows clear demand and weak existing content.
 
 ## Campaign
+This example selects Replicate (`replicate`) for original article illustrations or hero images. Omit it if approved existing assets are sufficient; drafting and publishing articles do not require Replicate.
+
 ```yaml
 id: search
 name: Search
 description: Turn payroll searches from small-business owners into Ledgerline trials.
 orchestrator: search__orchestrator
 agents: [search__orchestrator, search__researcher, search__writer, search__publisher]
-integrations: [google-search-console, google-analytics, wordpress-com]
-integration_categories: [analytics, "content & files"]
+integrations: [google-search-console, google-analytics, wordpress-com, replicate]
+integration_categories: [analytics, "content & files", "artificial intelligence"]
 goals:
   - Office managers and founders at 20 to 200 person US companies find Ledgerline through non-brand search and start a trial; track non-brand clicks and organic trials, with targets after a four-week baseline.
 plans:
   - "Reuse customer-proof's payroll-time-study before starting dependent work."
+  - "Use approved existing visuals first. If an article needs an original illustration or hero image, use authorized Replicate access; finish the text even if generation is unavailable."
   - "Publish \"How to run payroll for the first time\" and \"Gusto alternatives for growing teams\" from the keyword map built at creation."
   - "Then two articles a week across the first-payroll, compliance and switching clusters, one comparison page a month, and two refreshes a month."
   - "Build a pillar guide on running payroll in-house once the first-payroll cluster has five articles."

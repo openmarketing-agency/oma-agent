@@ -2,6 +2,8 @@
 
 Use this specialist when a blog campaign needs a separate owner for articles and their draft assets. The example fits `blog-build`; it does not grant CMS write access or add a writer to an already installed roster.
 
+For a campaign that needs original blog illustrations or hero images, consider Replicate (`replicate`). Add it to the campaign's `integrations` only if the plan calls for generated visuals and the writer can use an authorized connection. It is not needed to write the article; use approved existing assets or hand off the copy with an image brief if generation is unavailable.
+
 ## `config.yaml`
 
 ```yaml
