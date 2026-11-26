@@ -14,11 +14,34 @@ hosted agents don't expose). It must:
     through — 503 when the gateway is unreachable so NAS retries.
 """
 
+import pytest
+from fastapi import HTTPException
 from starlette.testclient import TestClient
 
 from hermes_cli import web_server
 import hermes_cli.config as _cfg_mod
 import hermes_cli.web_server_cron as _web_server_cron
+
+
+def test_dashboard_cannot_manually_fire_control_campaign_collector(tmp_path, monkeypatch):
+    from hermes_cli.oma_campaigns.analytics_cron import JOB_ID
+
+    profile = tmp_path / "profiles/demo__analyst"
+    profile.mkdir(parents=True)
+    campaign = tmp_path / "oma/campaigns/demo/config.yaml"
+    campaign.parent.mkdir(parents=True)
+    campaign.write_text("id: demo\nmode: control\ninstallation_state: installed\n"
+                        "lifecycle_state: resumed\nagents: [demo__analyst]\n", encoding="utf-8")
+    monkeypatch.setattr(_web_server_cron, "_cron_profile_home", lambda name: (name, profile))
+
+    class LegacyProvider:
+        def fire_due(self, job_id, *, adapters=None, loop=None):
+            return True
+
+    monkeypatch.setattr("cron.scheduler_provider.resolve_cron_scheduler", LegacyProvider)
+    with pytest.raises(HTTPException, match="control mode") as exc:
+        _web_server_cron._fire_cron_job_for_profile(profile.name, JOB_ID)
+    assert exc.value.status_code == 409
 
 
 def _client(auth_required: bool):

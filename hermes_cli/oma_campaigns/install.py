@@ -26,7 +26,7 @@ from hermes_cli.oma_campaigns.settings import (
     credential_keys, enforce_toolset_baseline, materialize_agent_settings, read_agent_record, resolve_settings, settings_from,
 )
 from hermes_cli.oma_campaigns.source import (
-    DEFAULT_CAMPAIGN_MODE, PUBLICATION_APPROVAL_GUIDANCE,
+    DEFAULT_CAMPAIGN_MODE, PUBLICATION_APPROVAL_GUIDANCE, PUBLICATION_DELIVERY_GUIDANCE,
     Agent, Campaign, campaign_fields, checked_id, read_mapping, resolve,
 )
 from hermes_cli.profile_provision import ProfileCreateRequest, provision_profile
@@ -295,27 +295,87 @@ def _campaign_context_soul(config_path: Path) -> str:
 def campaign_soul(soul: str, agent_id: str, orchestrator: str, agents: tuple[str, ...], board: str,
                   campaign_config: Path, saves: Path, scratch: Path) -> str:
     campaign_context = _campaign_context_soul(campaign_config)
+    campaign_id = campaign_config.parent.name
+    analyst_id = f"{campaign_id}__analyst"
+    publisher_id = f"{campaign_id}__publisher"
     if agent_id == orchestrator:
         roster = ", ".join(f"`{name}`" for name in agents)
         board_role = f"Coordinate the team's work here. Assign tasks only within your campaign roster: {roster}."
     else:
         board_role = f"Your orchestrator is `{orchestrator}`. Return handoffs on your assigned task."
+    blocker_guidance = (
+        "## Handling blockers\n\n"
+        "Complete the assigned task with what you have: use your authorized tools, saved context, prior work, and "
+        "verified alternatives. If a preferred input is missing but the result still meets the task's requirements, "
+        "deliver it and note the limitation instead of blocking. Do not claim that unfinished work is complete. "
+        "Mark only the affected task as Blocked, and only when a verified missing prerequisite prevents completion "
+        "and the team has no authorized way to resolve it. Save finished portions and record what you checked, "
+        "what is still missing, and who can take the next action on the existing card. Ask the user only for access "
+        "or a decision the team cannot provide; never ask for secrets. Use linked dependencies for routine waits, "
+        "and keep independent work moving. Do not bypass permissions or workflow gates.\n\n"
+    )
+    blocker_review = (
+        "## Reviewing blocked work\n\n"
+        "At each campaign board review, use `kanban_list` with `status: blocked` to review every blocked card on "
+        "this board, including unassigned cards. If the list is truncated, use `next_limit`; if still truncated at "
+        f"the tool limit, use `hermes kanban --board {board} list --status blocked --json` to get the full list. "
+        "Read each card's latest blocker reason, handoffs, and dependencies. Try to resolve the blocker yourself first "
+        "with your existing authority: recheck the prerequisite, supply missing context, or fix an internal dependency. "
+        "If the fix requires another role, coordinate it with a teammate who already has the right access. "
+        "When a missing destination is confirmed, update the existing publication draft rather than creating a duplicate. "
+        "If a delivery attempt has an uncertain outcome, have the publisher reconcile it before any retry. "
+        "Record the verified fix and any remaining dependencies, then use `kanban_unblock` on the same card so it can "
+        "resume through normal dispatch. Do not unblock just to retry unchanged conditions. Keep a card blocked only if "
+        "the essential prerequisite is still unresolved. Record what you tried and ask the person who can resolve it "
+        "for the specific action the team cannot take. "
+        "If board tools are unavailable in a task-scoped run, leave findings on your assigned card for the next board review.\n\n"
+        if agent_id == orchestrator else ""
+    )
+    analyst_guidance = (
+        "## Campaign analytics\n\n"
+        "Gather external analytics only with read-only tools from your configured MCP servers. "
+        "Report the metrics and periods you can verify. If the required property or metric cannot be read, report it as "
+        "unavailable, not zero. If there is no usable MCP source for the required data, block only the work that needs it "
+        "and name the property or read access needed.\n\n"
+        if agent_id == analyst_id else ""
+    )
+    publisher_guidance = (
+        "## Campaign publishing\n\n"
+        f"{PUBLICATION_APPROVAL_GUIDANCE} "
+        f"Claim that revision. {PUBLICATION_DELIVERY_GUIDANCE} "
+        "If there is no authorized connection for the exact saved destination, report what account or access is needed "
+        "and block delivery only. "
+        "Record the provider receipt after dispatch. If the claim is unavailable, report the blocker without sending.\n\n"
+        "For an authorized edit to an existing live item, "
+        "verify the destination, apply only the requested change through the authorized connector, and read it back. "
+        "Do not create a publication record or request publication approval for that edit, even if an older role note "
+        "or play calls all live writes publications. This does not grant permission to write, change the target, "
+        "republish, or send new content.\n\n"
+        if agent_id == publisher_id else ""
+    )
+    authoring_guidance = (
+        "## Campaign publications\n\n"
+        "When assigned to prepare a post or reply, use the best available authorized resources and campaign context. "
+        "Do not block publication creation because a resource is missing. Adapt the content to the available inputs, "
+        "omit unsupported claims, and note material limitations on the task. "
+        "Save the finished content in OMA and record its ID on the assigned Kanban task. "
+        "A task comment alone is not the deliverable. Resolve the exact platform, account ID and any reply target "
+        "from the assignment, campaign context, or available read-only connection information. Do not check publishing credentials "
+        "or write access. Submit the kind, content and known destination fields as JSON on stdin to "
+        "`python -m hermes_cli.oma_campaigns.publications save`. Do not send it directly or create your own publishing task; "
+        "OMA handles the handoff. A missing or ambiguous destination blocks the handoff, not the save. If you cannot resolve it, "
+        "omit the unresolved fields, save the content as a draft, and flag what's missing on the task. Do not guess the "
+        "destination or discard the finished work. Use `python -m hermes_cli.oma_campaigns.publications show <id>` to read it. "
+        "When the destination is known, re-run the save command with `--id <id> --revision <revision>` and the full JSON "
+        "to update that same record.\n\n"
+        "Route authorized edits to existing live content to the publisher instead of saving them as new publications.\n\n"
+        if agent_id not in (analyst_id, publisher_id) else ""
+    )
     return (
         f"{soul.rstrip()}\n\n{campaign_context}\n## Campaign Kanban board\n\n"
         f"Use only `{board}` for this campaign's Kanban work. {board_role}\n\n"
-        "## Campaign publications\n\n"
-        "Save each intended post or reply as a publication, in every campaign mode. Submit the exact platform, "
-        "account, kind, content and reply target as JSON on stdin to "
-        "`python -m hermes_cli.oma_campaigns.publications save`. Do not send it directly. "
-        "Resolve the account from the campaign's own connection, never from the brand record: name a platform "
-        "the campaign has connected, and use the account that connection is authenticated as, confirmed with a "
-        "read-only profile or identity call. Do not copy a public handle or invent an id; if the platform is not "
-        "connected, or the connection cannot confirm the account, report the blocker instead of saving a draft "
-        f"for it. {PUBLICATION_APPROVAL_GUIDANCE} The runtime queues the campaign publisher. "
-        "Only the publisher sends posts and replies, after claiming the exact saved revision, and records the "
-        "provider receipt. Use the campaign's authorized connector on any channel for actions it supports and "
-        "the platform and venue permit. If the required tool, permission, or claim is unavailable, report "
-        "the blocker without sending.\n\n"
+        f"{blocker_guidance}{blocker_review}"
+        f"{analyst_guidance}{authoring_guidance}{publisher_guidance}"
         "## Campaign scratch directory\n\n"
         f"Use `{scratch}` for this profile's temporary campaign files.\n\n"
         "## Saved context\n\n"
@@ -341,7 +401,7 @@ def _publish_profiles(campaign: Campaign, configs: dict[str, dict], paths: dict[
 def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
     """Add a missing analyst without reinstalling the roster; caller owns the install lock."""
     from hermes_cli.oma_campaigns.analytics_cron import ensure_job
-    from hermes_cli.oma_campaigns.analytics_sources import validate_bindings
+    from hermes_cli.oma_campaigns.credentials import remove_retired_analytics_keys, retired_analytics_keys
 
     campaign_id = config["id"]
     agent_id = f"{campaign_id}__analyst"
@@ -357,15 +417,16 @@ def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
     if new_record:
         authored = agent_defaults({
             "id": agent_id, "name": "Analyst", "description": "Collect and report campaign analytics.",
-            "campaign_id": campaign_id, "agent": {"enabled_toolsets": ["camofox"]}, "analytics_sources": [],
+            "campaign_id": campaign_id, "agent": {"enabled_toolsets": ["camofox"]},
         }, agent_id, orchestrator=False, campaign_id=campaign_id)
     else:
         _, authored = read_agent_record(home, campaign_id, agent_id)
+    retired_record = "analytics_sources" in authored
+    authored.pop("analytics_sources", None)
     if not soul_path.is_file():
         atomic_write_text(soul_path, f"You are the analyst for {config['name']}. Report measured observations. "
                           "Do not publish, message accounts, or guess missing metrics. OMA manages your collector.\n",
                           create_mode=0o600)
-    validate_bindings(authored.get("analytics_sources", []))
     if not profile.exists():
         saved, credentials = snapshot(home, config)
         effective = resolve_settings(settings_from(saved, campaign_id), settings_from(authored, agent_id))
@@ -387,8 +448,13 @@ def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
         provision_profile(ProfileCreateRequest(name=agent_id, alias=False, mirror_credentials=False,
                                                description=agent.description, soul=soul),
                           initialize=partial(_initialize, agent, configs[agent_id], credentials))
-    if new_record:
+    remove_retired_analytics_keys(profile, retired_analytics_keys(load_env_file(_real_path(profile / ".env"))))
+    if new_record or retired_record:
         atomic_config_replace(record_path, authored)
+    if config.get("mode") == "control" and config.get("installation_state") == "installed":
+        from hermes_cli.oma_campaigns.lifecycle import _control_cron
+
+        _control_cron([profile], park=True)
     ensure_job(profile)
     if agent_id not in roster:
         config = {**config, "agents": [*roster, agent_id]}

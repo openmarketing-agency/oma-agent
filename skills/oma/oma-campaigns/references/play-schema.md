@@ -62,8 +62,8 @@ Unknown fields fail validation, so typos are caught. `TODO` anywhere in `play.ya
 
 - `cadence`: `N/day`, `N/week`, `N/month`, `N/quarter`, `daily`, `weekly`, `monthly`, `per_event` or `once`. Cadences are drafting defaults, not campaign keys.
 - `owner`: the role that makes the item. The publisher ships it.
-- `approval`: `none` (internal work), `per_item`, or `batch` (a set reviewed together). These are play-planning labels, not runtime rules. For each publication record, `yolo` auto-approves without a human; `approve` and `control` require a human to approve the exact revision.
-- `standing_ok: true`: after 10 approvals in a row without edits, the user may switch this deliverable to standing approval. Any edit, complaint or rule change switches it back.
+- `approval`: `none`, `per_item`, or `batch` (a set reviewed together). These are planning labels, not extra gates for authorized live edits or internal drafts. New publications are auto-approved in `yolo` and require a human to approve the exact revision in `approve` or `control`.
+- `standing_ok`: legacy planning metadata. It neither bypasses publication approval in `approve` or `control` nor adds an approval step in `yolo`.
 
 ## `jobs`
 
@@ -72,7 +72,7 @@ Unknown fields fail validation, so typos are caught. `TODO` anywhere in `play.ya
 - `cadence` as above, `hourly` for lightweight activity checks, or `custom` with a `schedule_note` describing the schedule. Keep broader social performance reviews at weekly cadence.
 - `checks` name the activity or data to read. Write them as activity ("new comments and replies on our posts"), never as access checks.
 - `max_items` bounds each run.
-- `scripts/plays.py jobs <campaign-id> --play <play-id> --agent <role> --sources "..."` drafts existing native `jobs` entries for one owning agent. It doesn't save or schedule them.
+- `scripts/plays.py jobs <campaign-id> --play <play-id> --agent <role> --sources "..."` drafts existing native `jobs` entries for one owning agent. It doesn't save or schedule them. `control` never runs campaign cron.
 
 ## `kpis`, `limits`, `slots`, `kickoff`, `plan`
 

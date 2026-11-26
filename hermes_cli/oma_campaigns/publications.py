@@ -19,7 +19,9 @@ from hermes_cli import kanban_db
 from hermes_cli.kanban_db_connect import connect_closing
 from hermes_cli.oma_campaigns.install import _campaign_config_path, _campaigns_dir, _status
 from hermes_cli.oma_campaigns.schema import validate_record
-from hermes_cli.oma_campaigns.source import DEFAULT_CAMPAIGN_MODE, PUBLICATION_APPROVAL_GUIDANCE, read_mapping
+from hermes_cli.oma_campaigns.source import (
+    DEFAULT_CAMPAIGN_MODE, PUBLICATION_APPROVAL_GUIDANCE, PUBLICATION_DELIVERY_GUIDANCE, read_mapping,
+)
 from hermes_cli.oma_campaigns.storage import campaign_data_exists, connect_campaign_data
 from hermes_cli.sqlite_safe_read import connect_tracked
 
@@ -95,7 +97,8 @@ def list_publications(home: Path, campaign_id: str, *, before: int | None = None
     directory, config = _campaign(home, campaign_id)
     with connect_campaign_data(directory) as conn:
         rows = conn.execute(
-            _SELECT + " WHERE (? IS NULL OR p.seq < ?) ORDER BY p.seq DESC LIMIT ?", (before, before, limit + 1),
+            _SELECT + " WHERE p.status != 'draft' AND (? IS NULL OR p.seq < ?) ORDER BY p.seq DESC LIMIT ?",
+            (before, before, limit + 1),
         ).fetchall() if conn else []
     publications = [_view(row) for row in rows[:limit]]
     claimed = [item for item in publications if item["status"] == "publishing" and item["task_id"]]
@@ -140,34 +143,48 @@ def _agent_campaign() -> tuple[Path, str, str]:
     return profile.parent.parent, profile.name.split("__", 1)[0], profile.name
 
 
+def get_publication(home: Path, campaign_id: str, agent_id: str, publication_id: str) -> dict:
+    directory, config = _campaign(home, campaign_id)
+    if agent_id not in config["agents"]:
+        raise PublicationError(403, "The agent does not belong to this campaign.")
+    with connect_campaign_data(directory) as conn:
+        return _view(_row(conn, publication_id))
+
+
 def save_publication(home: Path, campaign_id: str, agent_id: str, draft: dict, *,
                      publication_id: str | None = None, revision: int | None = None) -> dict:
     directory, config = _campaign(home, campaign_id)
     if agent_id not in config["agents"]:
         raise PublicationError(403, "The agent does not belong to this campaign.")
+    if publication_id is None and revision is not None:
+        raise PublicationError(422, "A new publication has no previous revision.")
     payload = _draft_json(draft)
-    automatic = publication_id is None and config.get("mode", DEFAULT_CAMPAIGN_MODE) == "yolo"
+    ready = "platform" in draft and "account" in draft and (draft["kind"] == "post" or "target" in draft)
+    yolo = config.get("mode", DEFAULT_CAMPAIGN_MODE) == "yolo"
+    item_id = publication_id if publication_id is not None else uuid4().hex
     at = _now()
     with connect_campaign_data(directory, write=True) as conn:
-        if publication_id is None:
-            if revision is not None:
-                raise PublicationError(422, "A new publication has no previous revision.")
-            publication_id, revision = uuid4().hex, 1
-            if automatic:
-                _publisher(home, config)
+        row = _row(conn, item_id) if publication_id is not None else None
+        if row is not None:
+            _check_revision(row, revision)
+            if row["status"] not in ("draft", "pending_approval"):
+                raise PublicationError(409, "Only drafts and publications awaiting approval can be edited.")
+        automatic = ready and yolo
+        status = ("approved" if automatic else "pending_approval") if ready else "draft"
+        if automatic:
+            _publisher(home, config)
+        if row is None:
+            revision = 1
             conn.execute("INSERT INTO publications (id, revision, status, created_at, updated_at, approved_at) "
                          "VALUES (?, 1, ?, ?, ?, ?)",
-                         (publication_id, "approved" if automatic else "pending_approval", at, at, at if automatic else None))
+                         (item_id, status, at, at, at if automatic else None))
         else:
-            row = _row(conn, publication_id)
-            _check_revision(row, revision)
-            if row["status"] != "pending_approval":
-                raise PublicationError(409, "Only publications awaiting approval can be edited.")
             revision = row["revision"] + 1
-            conn.execute("UPDATE publications SET revision = ?, updated_at = ? WHERE id = ?", (revision, at, publication_id))
-        conn.execute("INSERT INTO publication_revisions VALUES (?, ?, ?)", (publication_id, revision, payload))
-        record = _view(_row(conn, publication_id))
-    return _enqueue(home, directory, config, publication_id, record["revision"]) if automatic else record
+            conn.execute("UPDATE publications SET revision = ?, status = ?, updated_at = ?, approved_at = ? WHERE id = ?",
+                         (revision, status, at, at if automatic else None, item_id))
+        conn.execute("INSERT INTO publication_revisions VALUES (?, ?, ?)", (item_id, revision, payload))
+        record = _view(_row(conn, item_id))
+    return _enqueue(home, directory, config, item_id, record["revision"]) if automatic else record
 
 
 def approve_publication(home: Path, campaign_id: str, publication_id: str, revision: int, approver: str) -> dict:
@@ -181,6 +198,8 @@ def approve_publication(home: Path, campaign_id: str, publication_id: str, revis
     with connect_campaign_data(directory, write=True) as conn:
         row = _row(conn, publication_id)
         _check_revision(row, revision)
+        if row["status"] == "draft":
+            raise PublicationError(409, "Set the publication's exact destination before approving it.")
         if row["status"] == "pending_approval" or (row["status"] == "approved" and row["approved_by"] is None):
             _publisher(home, config)
             at = _now()
@@ -206,9 +225,7 @@ def _enqueue(home: Path, directory: Path, config: dict, publication_id: str, rev
                 body=(f"Publication ID: {publication_id}; revision: {revision}. "
                       f"{PUBLICATION_APPROVAL_GUIDANCE} "
                       f"Claim the saved revision with `python -m hermes_cli.oma_campaigns.publications claim {publication_id} {revision}`. "
-                      "Use the campaign's authorized connector to perform the saved post or reply on any channel "
-                      "that permits the action. Verify write access, then send the returned content unchanged to its "
-                      "exact account and target. Do not substitute an account, target, or browser write. "
+                      f"{PUBLICATION_DELIVERY_GUIDANCE} "
                       f"Before completing this task, run `python -m hermes_cli.oma_campaigns.publications finish "
                       f"{publication_id} {revision}`. Pass JSON on stdin with `claim_token` from claim and `result` "
                       "containing the verified `provider_id` and optional `url`, or `error` for a definitive blocker "
@@ -299,6 +316,7 @@ def main(argv=None) -> int:
     save = commands.add_parser("save", help="Submit a draft (JSON on stdin)")
     save.add_argument("--id")
     save.add_argument("--revision", type=int)
+    commands.add_parser("show", help="Read a saved publication or draft by ID").add_argument("id")
     for name, help_text in (("claim", "Claim an approved revision (publisher only)"),
                             ("finish", "Record {claim_token, result} on stdin (publisher only)")):
         sub = commands.add_parser(name, help=help_text)
@@ -309,6 +327,8 @@ def main(argv=None) -> int:
         scope = _agent_campaign()
         if args.command == "save":
             result = save_publication(*scope, _input(), publication_id=args.id, revision=args.revision)
+        elif args.command == "show":
+            result = get_publication(*scope, args.id)
         elif args.command == "claim":
             result = claim_publication(*scope, args.id, args.revision)
         else:

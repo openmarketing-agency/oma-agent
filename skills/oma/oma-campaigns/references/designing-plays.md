@@ -78,4 +78,4 @@ Run `scripts/plays.py validate <play-id>` and fix every error. Then read it as t
 
 ## What never changes
 
-Keep one orchestrator and one publisher. Route supported writes through authorized official integrations and respect platform and venue rules. For OMA publications, `yolo` auto-approves; `approve` and `control` require human approval of the exact revision. Keep verified rather than assumed access, no invented metrics, testimonials or claims, and no terminal for roles that read untrusted content.
+Keep one orchestrator and one publisher. Route supported writes through authorized official integrations and respect platform and venue rules. For new OMA publications, `yolo` auto-approves without asking; `approve` and `control` require human approval of the exact revision. Do not apply publication approval to authorized edits of existing live content. `control` runs no campaign cron. Keep verified rather than assumed access, no invented metrics, testimonials or claims, and no terminal for roles that read untrusted content.

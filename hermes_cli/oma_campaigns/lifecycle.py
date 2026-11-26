@@ -6,7 +6,7 @@ from pathlib import Path
 
 from agent.runtime_scope import bind_profile_scope
 from cron.executions import latest_executions
-from cron.extra_fire import queued
+from cron.extra_fire import RESTORE_KEY, queued
 from cron.jobs import (_jobs_lock, _parse_aware, cancel_job_run, compute_next_run, is_job_runnable, list_jobs,
                        load_jobs, resume_job, save_jobs, trigger_job, update_job, use_cron_store)
 from cron.quota_hold import hold_active
@@ -96,15 +96,31 @@ def _control_cron(profiles: list[Path], *, park: bool) -> None:
         with use_cron_store(profile), _jobs_lock():
             parked = json.loads(snapshot.read_text(encoding="utf-8-sig")) if snapshot.exists() else []
             jobs = load_jobs()
-            if park and jobs:
-                retained = [job for job in jobs if is_managed_job(profile, job)]
+            if park:
+                # Older runtimes could park the collector itself. Recover it without restoring ordinary jobs.
+                by_id = {job["id"]: job for job in [*parked, *jobs]}
+                retained = [dict(job) for job in by_id.values() if is_managed_job(profile, job)]
+                for job in retained:
+                    if queued(job):
+                        # Discard a run-now queued before entering control, not its normal slot.
+                        job["next_run_at"] = job.pop(RESTORE_KEY)
+                        job.pop("manual_run_at", None)
+                        job.pop("manual_run_prompt", None)
+                parked_by_id = {job["id"]: job for job in parked}
                 retained_ids = {job["id"] for job in retained}
-                by_id = {job["id"]: job for job in [*parked, *jobs] if job["id"] not in retained_ids}
-                if by_id:
-                    atomic_json_write(snapshot, list(by_id.values()), mode=0o600, fsync_dir=True)
-                elif snapshot.exists():
-                    snapshot.unlink()
-                save_jobs(retained, replace=True)
+                for job in jobs:
+                    if job["id"] not in retained_ids:
+                        parked_by_id[job["id"]] = job
+                if list(parked_by_id.values()) != parked:
+                    atomic_json_write(snapshot, list(parked_by_id.values()), mode=0o600, fsync_dir=True)
+                if jobs != retained:
+                    save_jobs(retained, replace=True)
+                if retained_ids & parked_by_id.keys():
+                    remaining = [job for job_id, job in parked_by_id.items() if job_id not in retained_ids]
+                    if remaining:
+                        atomic_json_write(snapshot, remaining, mode=0o600, fsync_dir=True)
+                    else:
+                        snapshot.unlink()
             elif not park and snapshot.exists():
                 # Keep the live copy on retry if a previous restore was interrupted.
                 by_id = {job["id"]: job for job in [*parked, *jobs]}
@@ -129,6 +145,12 @@ def set_mode(home: Path, campaign_id: str, mode: str) -> dict:
             _control_cron(profiles, park=True)
         else:
             _control_cron(profiles, park=False)
+            if config.get("mode") == "control" and status["state"] == "installed":
+                from hermes_cli.oma_campaigns.analytics_cron import ensure_job
+
+                analyst = home / "profiles" / f"{campaign_id}__analyst"
+                if analyst in profiles:
+                    ensure_job(analyst)
             atomic_config_write(path, updated)
     return {"id": campaign_id, "mode": mode}
 
@@ -178,11 +200,16 @@ def set_lifecycle(home: Path, campaign_id: str, target: str) -> dict:
         mode = config.get("mode", DEFAULT_CAMPAIGN_MODE)
         if mode == "control":
             _control_cron(profiles, park=True)
+            from hermes_cli.oma_campaigns.analytics_cron import ensure_job
+
+            analyst = home / "profiles" / f"{campaign_id}__analyst"
+            if analyst in profiles:
+                ensure_job(analyst)
         else:
             _control_cron(profiles, park=False)
             if mode in ("yolo", "approve"):
                 _activate_new_jobs(profiles)
-        _prepare_recurring_jobs(profiles)
+            _prepare_recurring_jobs(profiles)
         atomic_config_write(path, {**config, "lifecycle_state": "resumed"})
     rescan_gateway_profiles(home)
     return {"id": campaign_id, "state": "resumed"}

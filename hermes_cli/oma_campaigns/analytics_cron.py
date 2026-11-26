@@ -78,7 +78,7 @@ def analytics_status(home: Path, campaign_id: str) -> dict:
 
     directory, profile, config = _config(home, campaign_id)
     with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
-        job = get_job(JOB_ID) if analyst_profile(profile) and profile.is_dir() else None
+        job = get_job(JOB_ID) if profile.is_dir() and analyst_profile(profile) else None
         status = _status(job if job and is_managed_job(profile, job) else None)
     if status["state"] == "queued" and config.get("lifecycle_state") != "resumed":
         status.update(state="idle", run_id=None)
@@ -93,6 +93,8 @@ def refresh_analytics(home: Path, campaign_id: str) -> dict:
     directory, profile, _ = _config(home, campaign_id)
     with _install_lock(directory / "config.yaml"), bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
         config = read_mapping(_member(directory, "config.yaml"))
+        if config.get("mode") == "control":
+            raise AnalyticsError(409, "Analytics refresh is disabled in control mode.")
         if config.get("lifecycle_state") != "resumed" or not analyst_profile(profile) or not profile.is_dir():
             raise AnalyticsError(409, "Start the campaign and install its analyst before refreshing analytics.")
         with _jobs_lock():

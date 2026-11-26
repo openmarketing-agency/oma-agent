@@ -2,6 +2,8 @@
 
 Use this role to draft channel-native posts, replies, captions, scripts, and requested media. The example matches `social-media__content-creator` in the social media campaign template and uses LinkedIn as its example channel. Adapt the shared writing skills to the actual channels and formats.
 
+For generated social media, consider Higgsfield (`higgsfield`) for images or short video clips, or HeyGen (`heygen`) for presenter-led video with an authorized presenter and voice. Declare the selected provider in the campaign's `integrations`, not both by default. If no generation connection is available, keep the copy or script moving with approved assets or a media brief.
+
 ## `config.yaml`
 
 ```yaml

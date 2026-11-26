@@ -3,7 +3,7 @@
 Checked 2026-11-23.
 
 ## Who publishes
-The publisher, through the official YouTube API, after approval: uploads, titles, descriptions, thumbnails and comment replies.
+The publisher uses the official YouTube API. New uploads and comment replies follow the campaign's publication mode. Authorized edits to the title, description, or thumbnail of an existing video do not need publication approval.
 
 ## Rules
 - Disclose realistic content made or meaningfully changed with AI using YouTube's altered or synthetic content setting.

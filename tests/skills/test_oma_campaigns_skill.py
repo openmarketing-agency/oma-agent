@@ -288,6 +288,8 @@ def test_campaign_publications_handoff(bundle, capsys, mode, legacy):
     if mode == "yolo":
         assert saved["status"] == "approved" and saved["task_id"]
         assert saved["approval"]["source"] == "automatic" and saved["approval"]["by"] is None
+        with pytest.raises(PublicationError, match="does not use manual publication approval"):
+            approve_publication(home, "demo", item, 1, "owner")
     else:
         assert saved["status"] == "pending_approval" and saved["task_id"] is None
         with pytest.raises(PublicationError, match="not available"):
@@ -310,11 +312,16 @@ def test_campaign_publications_handoff(bundle, capsys, mode, legacy):
         ordinary = kanban_db.create_task(conn, title="Ordinary work", assignee="demo__worker")
         assert (kanban_db.claim_task(conn, ordinary) is None) == (mode == "control")
         task = kanban_db.claim_task(conn, saved["task_id"])
-        assert task is not None and task.assignee == role.name and item in task.body
-        assert draft["content"]["text"] not in task.body
-        assert "yolo mode does not require human approval" in task.body
-        assert "approve and control modes require human approval of the exact revision" in task.body
-        assert "authorized connector" in task.body
+        assert task is not None and task.assignee == role.name
+        task_body = task.body or ""
+        assert item in task_body and draft["content"]["text"] not in task_body
+        assert "OMA assigns delivery only after the exact revision is approved" in task_body
+        assert "Do not request another approval" in task_body
+        assert not {"yolo", "approve", "control"} & set(task_body.lower().split())
+        assert "authorized connector" in task_body
+        assert "verify only the exact saved destination" in task_body
+        assert "publish the saved content immediately and unchanged" in task_body
+        assert "Do not review, fact-check, or edit the content" in task_body
     if legacy:
         assert not data_path.exists()  # Dispatcher admission is also read-only.
     with pytest.raises(PublicationError, match="Only the campaign publisher"):
@@ -357,25 +364,197 @@ def test_campaign_publications_handoff(bundle, capsys, mode, legacy):
         ]
 
 
-def test_publisher_soul_explains_publication_modes(bundle, capsys):
+@pytest.mark.parametrize("mode", ["approve", "control", "yolo"])
+def test_campaign_keeps_unaddressed_content_out_of_approvals_until_completed(bundle, mode, capsys):
+    from agent.runtime_scope import bind_profile_scope
+    from hermes_cli.config import atomic_config_write
+    from hermes_cli.oma_campaigns import publications
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    home, source, main = bundle
+    path = source / "campaigns/demo/config.yaml"
+    atomic_config_write(path, {**read_mapping(path), "model": "provider/test-model", "mode": mode})
+    assert main(["install", "demo"]) == 0
+    assert main(["lifecycle", "demo", "resumed"]) == 0
+    scope = (home, "demo")
+    author = (*scope, "demo__worker")
+    body = {"kind": "reply", "content": {"text": "Finished copy without publishing access."}}
+    draft = publications.save_publication(*author, body)
+    item = draft["id"]
+    assert draft["status"] == "draft" and draft["approval"] is None and draft["task_id"] is None
+    capsys.readouterr()
+    with bind_profile_scope(home / "profiles/demo__worker", hydrate_secrets=False):
+        assert publications.main(["show", item]) == 0
+    assert json.loads(capsys.readouterr().out) == draft
+    assert publications.list_publications(*scope)["publications"] == []
+    with pytest.raises(publications.PublicationError, match="not available"):
+        publications.claim_publication(*scope, "demo__publisher", item, 1)
+    if mode != "yolo":
+        with pytest.raises(publications.PublicationError, match="destination"):
+            publications.approve_publication(*scope, item, 1, "owner")
+
+    addressed = {**body, "platform": "x", "account": {"id": "assigned-account"}}
+    draft = publications.save_publication(*author, addressed, publication_id=item, revision=1)
+    assert draft["status"] == "draft"  # The reply target is still missing.
+    addressed["target"] = {"id": "assigned-thread"}
+    queued = publications.save_publication(*author, addressed, publication_id=item, revision=2)
+    assert queued["id"] == item and queued["revision"] == 3
+    assert publications.list_publications(*scope)["publications"] == [queued]
+    if mode != "yolo":
+        assert queued["status"] == "pending_approval" and not queued["task_id"]
+        with pytest.raises(publications.PublicationError, match="changed"):
+            publications.approve_publication(*scope, item, 2, "owner")
+        queued = publications.approve_publication(*scope, item, 3, "owner")
+    assert queued["status"] == "approved" and queued["task_id"]
+    claim = publications.claim_publication(*scope, "demo__publisher", item, 3)
+    assert {key: claim[key] for key in addressed} == addressed
+
+
+def test_saving_draft_preserves_publications_in_pre_upgrade_database(bundle):
+    from hermes_cli.oma_campaigns.publications import list_publications, save_publication
+    from hermes_cli.oma_campaigns.storage import _INDEX, _PUBLICATIONS, _REVISIONS
+
+    home, source, main = bundle
+    assert main(["install", "demo"]) == 0
+    directory = source / "campaigns/demo"
+    old = directory / "publications.sqlite3"
+    item = "1" * 32
+    content = {"kind": "post", "platform": "x", "account": {"id": "known"}, "content": {"text": "Existing copy"}}
+    with closing(sqlite3.connect(old)) as conn, conn:
+        conn.executescript(_PUBLICATIONS.replace("'draft', ", "") + _REVISIONS + _INDEX)
+        conn.execute("INSERT INTO publications (id, revision, status, created_at, updated_at) "
+                     "VALUES (?, 2, 'pending_approval', 'before', 'before')", (item,))
+        for revision in (1, 2):
+            conn.execute("INSERT INTO publication_revisions VALUES (?, ?, ?)", (item, revision, json.dumps(content)))
+        conn.execute("CREATE TABLE unrelated (value TEXT)")
+        conn.execute("INSERT INTO unrelated VALUES ('keep')")
+    previous = list_publications(home, "demo")["publications"]
+    assert previous[0]["id"] == item and previous[0]["revision"] == 2
+    assert not (directory / "data.sqlite3").exists()
+    draft = save_publication(home, "demo", "demo__worker", {"kind": "post", "content": {"text": "Keep me"}})
+    assert draft["status"] == "draft"
+    assert list_publications(home, "demo", limit=1)["publications"] == previous
+    with closing(sqlite3.connect(directory / "data.sqlite3")) as conn:
+        assert conn.execute("SELECT revision FROM publication_revisions WHERE publication_id = ? ORDER BY revision",
+                            (item,)).fetchall() == [(1,), (2,)]
+        assert conn.execute("SELECT value FROM unrelated").fetchone() == ("keep",)
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+    assert old.is_file()
+
+
+def test_campaign_souls_separate_authoring_publishing_and_analytics(bundle, capsys):
     from hermes_cli.oma_campaigns.sync import sync_agent
 
     home, source, main = bundle
     assert main(["install", "demo"]) == 0, capsys.readouterr().err
     path = home / "profiles/demo__publisher/SOUL.md"
     soul = path.read_text(encoding="utf-8")
-    assert "yolo mode does not require human approval" in soul
-    assert "approve and control modes require human approval of the exact revision" in soul
-    assert "posts and replies" in soul
+    assert "OMA assigns delivery only after the exact revision is approved" in soul
+    assert "Do not request another approval" in soul
+    assert not {"yolo", "approve", "control"} & set(soul.lower().split())
+    assert "wordpress" not in soul.lower()
+    assert "Do not create a publication record or request publication approval for that edit" in soul
+    assert "verify only the exact saved destination" in soul
+    assert "publish the saved content immediately and unchanged" in soul
+    assert "Do not review, fact-check, or edit the content" in soul
+    assert "Skip any editorial checks suggested by older role notes, plays, or skills" in soul
+    assert "manually trigger campaign cron jobs" not in soul
+    assert "## Campaign publications\n" not in soul
+    assert "publications save" not in soul
+    analyst_soul = (home / "profiles/demo__analyst/SOUL.md").read_text(encoding="utf-8")
+    assert "## Campaign analytics\n" in analyst_soul
+    assert "## Campaign publications\n" not in analyst_soul
+    assert "publications save" not in analyst_soul
+    for role in ("orchestrator", "worker"):
+        producer_soul = (home / f"profiles/demo__{role}/SOUL.md").read_text(encoding="utf-8")
+        assert "Do not check publishing credentials" in producer_soul
+        assert "record its ID on the assigned Kanban task" in producer_soul
+        assert "use the best available authorized resources and campaign context" in producer_soul
+        assert "Do not block publication creation because a resource is missing" in producer_soul
+        assert "A missing or ambiguous destination blocks the handoff, not the save" in producer_soul
+        assert "approval" not in producer_soul.lower()
+        assert "yolo" not in producer_soul.lower()
+        assert "control mode" not in producer_soul.lower()
+    path.write_text(soul + "\n## Campaign publications\n\nStale generated authoring guidance.\n", encoding="utf-8")
     (source / "agents/demo__publisher/SOUL.md").write_text("Updated publisher persona.\n", encoding="utf-8")
     assert "SOUL.md" in sync_agent(home, "demo__publisher")["updated"]
     assert path.read_text(encoding="utf-8") == soul.replace("I am the publisher.", "Updated publisher persona.", 1)
 
 
-def test_campaign_analyst_refresh_runs_in_control_and_saves_data(bundle):
+def test_campaign_blocker_guidance_scopes_board_review_to_orchestrator_and_syncs(bundle):
+    from hermes_cli.oma_campaigns.sync import sync_campaign
+
+    home, _, main = bundle
+    assert main(["install", "demo"]) == 0
+    heading = "\n## Handling blockers\n"
+    guidance = {}
+    for role in ("orchestrator", "worker", "publisher", "analyst"):
+        path = home / f"profiles/demo__{role}/SOUL.md"
+        before, after = path.read_text(encoding="utf-8").split(heading, 1)
+        guidance[path] = after
+        assert "Complete the assigned task with what you have" in after
+        assert "Mark only the affected task as Blocked" in after
+        assert ("`kanban_list` with `status: blocked`" in after) == (role == "orchestrator")
+        assert ("review every blocked card" in after) == (role == "orchestrator")
+        assert ("Try to resolve the blocker yourself first" in after) == (role == "orchestrator")
+        assert ("`kanban_unblock`" in after) == (role == "orchestrator")
+        path.write_text(before, encoding="utf-8")
+
+    sync_campaign(home, "demo")
+    for path, after in guidance.items():
+        assert path.read_text(encoding="utf-8").split(heading, 1)[1] == after
+
+
+def test_resaving_ready_publication_in_yolo_auto_approves_and_assigns_latest_revision(bundle):
+    from hermes_cli import kanban_db
+    from hermes_cli.kanban_db_connect import connect_closing
+    from hermes_cli.oma_campaigns.publications import list_publications, save_publication
+
+    home, _, main = bundle
+    assert main(["install", "demo"]) == 0
+    author = (home, "demo", "demo__worker")
+    body = {"kind": "post", "platform": "x", "account": {"id": "connected"}, "content": {"text": "First revision"}}
+    first = save_publication(*author, body)
+    assert first["status"] == "pending_approval" and first["task_id"] is None
+    assert main(["mode", "demo", "yolo"]) == 0
+    assert list_publications(home, "demo")["publications"] == [first]
+    updated = save_publication(*author, {**body, "content": {"text": "Latest revision"}},
+                               publication_id=first["id"], revision=first["revision"])
+    assert updated["status"] == "approved" and updated["approval"]["source"] == "automatic"
+    assert updated["id"] == first["id"] and updated["revision"] == 2
+    with connect_closing(board="campaign-demo") as conn:
+        [task] = kanban_db.list_tasks(conn)
+        assert task.id == updated["task_id"] and task.assignee == "demo__publisher"
+        assert f"Publication ID: {updated['id']}; revision: 2." in (task.body or "")
+
+
+def test_campaign_sync_removes_only_retired_analyst_options(bundle):
+    from agent.secret_scope import load_env_file
+    from hermes_cli.config import atomic_config_write
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import sync_campaign
+
+    home, source, main = bundle
+    assert main(["install", "demo"]) == 0
+    record = source / "agents/demo__analyst/config.yaml"
+    old_key = "OMA_ANALYTICS_GOOGLE_LEGACY"
+    atomic_config_write(record, {**read_mapping(record), "analytics_sources": []})
+    env = home / "profiles/demo__analyst/.env"
+    env.write_text(f"{old_key}=retired-fixture\nCOMPOSIO_API_KEY=keep-fixture\n", encoding="utf-8")
+    sync_campaign(home, "demo", env={old_key: "stale-client-fixture"})
+    assert "analytics_sources" not in read_mapping(record)
+    assert old_key not in read_mapping(record)["all-keys"]
+    assert old_key not in read_mapping(source / "campaigns/demo/config.yaml")["all-keys"]
+    assert load_env_file(env) == {"COMPOSIO_API_KEY": "keep-fixture"}
+    assert "Gather external analytics only with read-only tools from your configured MCP servers." in (
+        env.parent / "SOUL.md"
+    ).read_text(encoding="utf-8")
+
+
+def test_campaign_analyst_refresh_runs_in_approve_and_saves_data(bundle):
     from agent.runtime_scope import bind_profile_scope
     from cron import scheduler
-    from cron.jobs import claim_job_for_fire, create_job, get_due_jobs, get_job, list_jobs, update_job, use_cron_store
+    from cron.jobs import get_due_jobs, get_job, update_job, use_cron_store
     from hermes_cli.config import atomic_config_write
     from hermes_cli.oma_campaigns.analytics import AnalyticsError, list_analytics
     from hermes_cli.oma_campaigns.analytics_cron import JOB_ID, analytics_status, refresh_analytics
@@ -384,15 +563,13 @@ def test_campaign_analyst_refresh_runs_in_control_and_saves_data(bundle):
 
     home, source, main = bundle
     path = source / "campaigns/demo/config.yaml"
-    atomic_config_write(path, {**read_mapping(path), "model": "provider/test-model"})
+    atomic_config_write(path, {**read_mapping(path), "model": "provider/test-model", "mode": "approve"})
     assert main(["install", "demo"]) == 0
     profile = home / "profiles/demo__analyst"
     with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
         analyst_job = get_job(JOB_ID)
         assert analyst_job is not None
         regular_slot = analyst_job["next_run_at"]
-        ordinary = create_job(name="Ordinary analyst job", prompt="Not the collector", schedule="1h")
-    assert main(["mode", "demo", "control"]) == 0
     with pytest.raises(AnalyticsError, match="Start the campaign"):
         refresh_analytics(home, "demo")
     assert main(["lifecycle", "demo", "resumed"]) == 0
@@ -407,8 +584,6 @@ def test_campaign_analyst_refresh_runs_in_control_and_saves_data(bundle):
     assert refresh_analytics(home, "demo")["run_id"] == queued["run_id"]
     assert analytics_status(home, "demo")["state"] == "queued"
     with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
-        assert [row["id"] for row in list_jobs(include_disabled=True)] == [JOB_ID]
-        assert not claim_job_for_fire(ordinary["id"], force=True)
         assert [row["id"] for row in get_due_jobs()] == [JOB_ID]
         assert scheduler.tick(verbose=False, headless=True) == 1
     [row] = list_analytics(home, "demo", source="oma-publications", metric="drafts_created")["observations"]
@@ -441,7 +616,7 @@ def test_campaign_resume_catches_up_one_overdue_analyst_run(bundle, minutes_sinc
 
     home, source, main = bundle
     config = source / "campaigns/demo/config.yaml"
-    atomic_config_write(config, {**read_mapping(config), "model": "provider/test-model", "mode": "control"})
+    atomic_config_write(config, {**read_mapping(config), "model": "provider/test-model", "mode": "approve"})
     assert main(["install", "demo"]) == 0
     profile = home / "profiles/demo__analyst"
     assert main(["lifecycle", "demo", "resumed"]) == 0
@@ -496,6 +671,60 @@ def test_campaign_control_removes_registered_cron_and_restores_operator_pause(bu
         jobs = {job["id"]: job for job in list_jobs(include_disabled=True)}
         assert not jobs[operator["id"]]["enabled"]
         assert any(job.get("oma_job_id") == "sample" and job["enabled"] for job in jobs.values())
+
+
+@pytest.mark.parametrize("start_mode", ["approve", "control"])
+def test_campaign_control_runs_only_scheduled_managed_analytics(bundle, start_mode):
+    from datetime import UTC, datetime
+
+    from agent.runtime_scope import bind_profile_scope
+    from cron import scheduler
+    from cron.jobs import claim_job_for_fire, get_due_jobs, get_job, save_jobs, trigger_job, use_cron_store
+    from hermes_cli.config import atomic_config_write
+    from hermes_cli.oma_campaigns.analytics import AnalyticsError
+    from hermes_cli.oma_campaigns.analytics_cron import JOB_ID, analytics_status, refresh_analytics
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import sync_campaign
+
+    home, source, main = bundle
+    path = source / "campaigns/demo/config.yaml"
+    atomic_config_write(path, {**read_mapping(path), "model": "provider/test-model", "mode": start_mode})
+    assert main(["install", "demo"]) == 0
+    profile = home / "profiles/demo__analyst"
+    with use_cron_store(profile):
+        original = get_job(JOB_ID)
+    assert original is not None
+    if start_mode == "approve":
+        assert main(["mode", "demo", "control"]) == 0
+        with use_cron_store(profile):
+            assert get_job(JOB_ID) == original
+            # Simulate a collector parked by an older all-cron-disabled runtime.
+            snapshot = profile / "cron/oma-control-jobs.json"
+            snapshot.write_text(json.dumps([original]), encoding="utf-8")
+            save_jobs([], replace=True)
+    assert main(["lifecycle", "demo", "resumed"]) == 0
+    sync_campaign(home, "demo")
+    with pytest.raises(AnalyticsError, match="control mode"):
+        refresh_analytics(home, "demo")
+    with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
+        managed = get_job(JOB_ID)
+        assert managed is not None and managed["created_at"] == original["created_at"]
+        due = {**managed, "next_run_at": datetime.now(UTC).isoformat()}
+        ordinary = {**due, "id": "ordinary-analyst-job", "name": "Ordinary analyst job"}
+        save_jobs([due, ordinary])
+        with pytest.raises(ValueError, match="control mode"):
+            trigger_job(JOB_ID)
+        with pytest.raises(ValueError, match="control mode"):
+            trigger_job(ordinary["id"])
+        assert not claim_job_for_fire(JOB_ID, force=True)
+        assert not claim_job_for_fire(JOB_ID, manual=True)
+        assert not claim_job_for_fire(ordinary["id"], force=True)
+        assert not claim_job_for_fire(ordinary["id"])
+        assert [job["id"] for job in get_due_jobs()] == [JOB_ID]
+        assert scheduler.tick(verbose=False, headless=True) == 1
+        assert scheduler.tick(verbose=False, headless=True) == 0
+    status = analytics_status(home, "demo")
+    assert status["state"] == "idle" and status["last_successful_refresh_at"]
 
 
 def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
@@ -560,8 +789,9 @@ def test_install_generated_records_without_bundle_campaigns(bundle, capsys):
         assert f"`{oma / 'brand' / 'config.yaml'}`" in soul
         assert "`brand_id`" not in soul and "`playbook`" not in soul
         assert "Do not scan other records" in soul
-        assert "Resolve the account from the campaign's own connection" in soul
-        assert "report the blocker instead of saving a draft" in soul
+        if agent_id != "demo__publisher":
+            assert "omit the unresolved fields, save the content as a draft" in soul
+            assert "Do not send it directly or create your own publishing task" in soul
         agent_record = read_mapping(source / "agents" / agent_id / "config.yaml")
         assert agent_record["campaign_id"] == "demo"
         assert not (profile / "cron" / "jobs.json").exists()

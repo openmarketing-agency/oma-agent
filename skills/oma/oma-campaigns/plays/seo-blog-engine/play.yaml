@@ -90,7 +90,7 @@ slots:
 
 kickoff:
   - {owner: researcher, task: "Write the briefs for the first two articles from the keyword map saved at creation."}
-  - {owner: writer, task: "Draft the first article for approval."}
+  - {owner: writer, task: "Draft the first article and hand it off to the publisher."}
   - {owner: orchestrator, task: "Pull the Search Console baseline for the last 3 months."}
 
 plan:

@@ -808,7 +808,8 @@ def build_prompt(cid: str, job: dict, owner_is_orchestrator: bool, cfg_path: Pat
     if owner_is_orchestrator:
         text += "Decide what to continue, change or queue, and propose changes outside your authority. "
     text += (
-        "Queue only new work and route anything public to the publisher for approval. Do not post or send "
+        "Queue only new work. Route new posts and replies to the publisher under the campaign's publication mode; "
+        "route authorized edits to existing live content without requesting publication approval. Do not post or send "
         "messages from this job. Record material decisions and stop when nothing meaningful changed."
     )
     return text
@@ -1109,7 +1110,7 @@ TODO The weekly or phase-by-phase routine.
 
 ## Non-negotiables
 - TODO Rules specific to this kind of work. Platform rules live in channels/<channel>.md.
-- Only the publisher makes external writes, using an authorized connector. Follow the campaign mode for publication approval.
+- Only the publisher makes external writes, using an authorized connector. Follow the campaign mode for new publications; do not add publication approval to authorized in-place edits. No campaign cron runs in `control`.
 - No invented metrics, testimonials or claims.
 
 ## Measuring

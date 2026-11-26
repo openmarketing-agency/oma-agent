@@ -88,7 +88,7 @@ slots:
 
 kickoff:
   - {owner: merchandiser, task: "Write the product and stock rules for the cart flow."}
-  - {owner: flow-writer, task: "Write the three cart emails for approval."}
+  - {owner: flow-writer, task: "Draft the three cart emails and hand them off to the publisher."}
   - {owner: orchestrator, task: "Record the current cart recovery baseline from the store."}
 
 plan:

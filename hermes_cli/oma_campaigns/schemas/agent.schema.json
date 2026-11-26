@@ -11,17 +11,6 @@
     "campaign_id": { "type": ["string", "null"], "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])" },
     "oma_skills": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/profile_id" } },
     "jobs": { "type": "array", "items": { "$ref": "#/$defs/job" } },
-    "analytics_sources": {
-      "type": "array", "maxItems": 8, "uniqueItems": true,
-      "items": {
-        "type": "object", "required": ["source", "account", "token_env"], "additionalProperties": false,
-        "properties": {
-          "source": { "enum": ["google-analytics", "google-search-console"] },
-          "account": { "type": "string", "minLength": 1, "maxLength": 512 },
-          "token_env": { "type": "string", "pattern": "^OMA_ANALYTICS_GOOGLE_[A-Z_0-9]{1,48}$" }
-        }
-      }
-    },
     "model": { "$ref": "#/$defs/model", "description": "The agent's explicit model override. Omit it to inherit the campaign model." },
     "mcp_servers": { "$ref": "#/$defs/mcp_servers" },
     "effective": {

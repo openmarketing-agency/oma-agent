@@ -7,11 +7,12 @@ Two useful articles go live every week, each answering one search intent better 
 1. Monday, orchestrator: pick next week's topics from the keyword map and Search Console, and queue them.
 2. Researcher: a brief per topic within a day.
 3. Writer: a draft per brief within two days.
-4. Approval, then the publisher ships, requests indexing and records the URL.
+4. The publisher saves each new article and follows the campaign's publication mode before shipping it. Then request indexing and record the URL.
 5. Weekly review: compare 28-day windows, pick refreshes, adjust the map.
 
 ## Craft
 - One page per intent. Check the existing site first, and refresh rather than duplicate.
+- For an authorized edit to an existing article, update the specified fields in place and verify the live result. Do not treat a metadata edit as a new publication.
 - Lead with the answer. Use the searcher's words in the title and first paragraph.
 - Every page carries at least one first-hand element: a screenshot, a product number, a worked example or a quote from the team.
 - Internal links from at least two related pages, and one clear call to action.

@@ -3,7 +3,7 @@
 Checked 2026-11-23.
 
 ## Who publishes
-The publisher, through the CMS integration (for example WordPress or Ghost), after the item is approved. Without the integration, the publisher hands over the approved draft and records the URL once a person publishes it.
+The publisher uses the authorized CMS integration (for example WordPress or Ghost). For a new article, follow the campaign's publication mode. For authorized changes to an existing article's excerpt, metadata, or other specified fields, update those fields in place and read them back without asking for publication approval. Without the integration, hand the draft or proposed edit to the authorized person and record the verified URL once live.
 
 ## Rules
 - Every page must be useful to a person on its own. Google treats pages made mainly to rank, at scale, as scaled content abuse, whether a person or AI wrote them.

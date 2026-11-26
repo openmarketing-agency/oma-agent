@@ -16,6 +16,7 @@ from hermes_cli.config import (
 from hermes_cli.config_backend import config_version, require_file_tooling
 from hermes_cli.oma_campaigns.credentials import (
     apply_credential_updates, key_status, plan_credential_updates, read_sync_env, validate_sync_env,
+    remove_retired_analytics_keys, retired_analytics_keys,
 )
 from hermes_cli.oma_campaigns.defaults import snapshot
 from hermes_cli.oma_campaigns.install import (
@@ -73,6 +74,7 @@ class _AgentUpdate:
     all_keys: set[str]
     available_keys: set[str]
     credentials: dict[str, str] = field(repr=False)
+    retired_keys: set[str]
     skills: tuple | None = field(repr=False)
     jobs: dict | None = field(repr=False)
 
@@ -146,18 +148,22 @@ def _plan_agent(home: Path, agent_id: str, env: dict[str, str], *, campaign: _Ca
         orchestrator=bool(campaign and agent_id == campaign.status["orchestrator"]),
     )
     stored = load_env_file(_member(profile, ".env"))
+    retired = retired_analytics_keys(stored) if campaign and agent_id == f"{campaign_id}__analyst" else set()
     if campaign and "model" not in record:
         inherited = {name: value for name, value in campaign.inherited_credential.items() if not stored.get(name)}
         env = {**inherited, **env}
     credentials = plan_credential_updates(profile, set(env), stored, env)
     required = credential_keys(settings_from(next_native, agent_id))
-    names, available = key_status(required, {**stored, **credentials})
+    names, available = key_status(required, {key: value for key, value in {**stored, **credentials}.items()
+                                              if key not in retired})
     next_record = materialize_agent_settings(record, resolved) if campaign else dict(record)
+    if campaign and agent_id == f"{campaign_id}__analyst":
+        next_record.pop("analytics_sources", None)
     next_record["all-keys"] = sorted(names)
     next_record["available-keys"] = sorted(available)
     return _AgentUpdate(agent_id, record_path, digest, native_path, before, next_record if next_record != record else None,
                         next_native, source_soul, native_soul, rendered, tuple(updated + profile_changes),
-                        names, available, credentials, plan_role_skills(home, profile, record.get("oma_skills")),
+                        names, available, credentials, retired, plan_role_skills(home, profile, record.get("oma_skills")),
                         plan_role_jobs(profile, record.get("jobs"))
                         if defaults.get("mode") != "control" and agent_id != f"{campaign_id}__analyst" else None)
 
@@ -185,7 +191,8 @@ def _apply(update: _AgentUpdate) -> tuple[list[str], str]:
     with bind_profile_scope(profile, hydrate_secrets=False):
         _verify_plan(update)
         with apply_role_skills(update.skills) as skills_changed:
-            if update.credentials:
+            if update.credentials or update.retired_keys:
+                remove_retired_analytics_keys(profile, update.retired_keys)
                 apply_credential_updates(profile, update.credentials)
                 changed.append("env")
             if update.updated:

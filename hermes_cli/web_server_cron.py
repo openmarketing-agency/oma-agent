@@ -362,7 +362,7 @@ def _create_cron_job_sync(body: CronJobCreate, profile: Optional[str] = None):
 
 
 def _fire_cron_job_for_profile(profile: str, job_id: str, *, force: bool = False) -> bool:
-    """Run ONE due cron job for ``profile`` via the scheduler provider's ``fire_due``.
+    """Manually run one cron job for ``profile`` via the scheduler provider's ``fire_due``.
 
     DEPRECATED for NAS webhook fires — superseded by :func:`_forward_cron_fire_to_gateway`, since
     fires must run in the GATEWAY process (it owns the live adapters; the standalone path here
@@ -371,6 +371,10 @@ def _fire_cron_job_for_profile(profile: str, job_id: str, *, force: bool = False
     """
     _profile_name, home = _cron_profile_home(profile)
     from cron.scheduler_provider import provider_fire_due_accepts, provider_supports_force_fire, resolve_cron_scheduler
+    from hermes_cli.oma_campaigns.admission import profile_cron_disabled
+
+    if profile_cron_disabled(home):
+        raise HTTPException(status_code=409, detail="Manual campaign cron runs are disabled in control mode.")
     with _cron_store_scope(home):
         provider = resolve_cron_scheduler()
         if force:

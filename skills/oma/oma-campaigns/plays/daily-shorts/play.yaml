@@ -98,7 +98,7 @@ slots:
 kickoff:
   - {owner: idea-scout, task: "Find the first seven ideas from search suggestions and comments."}
   - {owner: scriptwriter, task: "Write the first seven scripts."}
-  - {owner: producer, task: "Produce the first three videos for approval."}
+  - {owner: producer, task: "Produce the first three videos and hand them off to the publisher."}
 
 plan:
   - Publish the first three Shorts this week from real audience questions.

@@ -3,7 +3,7 @@
 Checked 2026-11-24.
 
 ## Who publishes
-The publisher, through the GitHub integration: pull requests, releases and approved replies on the brand's own repositories. Pull requests to other projects, such as awesome lists, go out only after approval.
+The publisher uses the authorized GitHub integration for pull requests, releases and replies. Follow the campaign's publication mode for new public submissions. Verify the destination and the scope of authorization separately, especially before submitting to another project's repository.
 
 ## Rules
 - Spam and inauthentic activity are banned. No bulk or unsolicited issues, pull requests or comments on other people's repositories, and no fake stars, forks or accounts.
