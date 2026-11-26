@@ -13,12 +13,13 @@ import sys
 from pathlib import Path
 
 try:
-    import yaml
+    from ruamel.yaml import YAML, YAMLError
 except ImportError:  # pragma: no cover
-    print("ERROR: PyYAML is not installed; validation was not run.")
+    print("ERROR: ruamel.yaml is not installed; run with the Hermes environment's Python. Validation was not run.")
     sys.exit(2)
 
-PLATFORMS = {"instagram", "tiktok", "x", "linkedin", "facebook", "youtube", "reddit", "threads"}
+PLATFORMS = {"instagram", "tiktok", "facebook", "x", "linkedin", "youtube", "pinterest", "threads",
+             "bluesky", "reddit"}
 LIBRARIES = {"meta", "google", "linkedin", "tiktok"}
 COVERAGE = {"checked", "blocked", "not_found", "not_checked"}
 FORMATS = {"image", "video", "carousel", "text", "story", "reel", "short", "thread", "other"}
@@ -38,7 +39,7 @@ def to_date(v):
     if isinstance(v, dt.date):
         return v
     try:
-        return dt.datetime.fromisoformat(str(v).replace("Z", "+00:00")).date()
+        return dt.datetime.fromisoformat(str(v)).date()
     except (TypeError, ValueError):
         return None
 
@@ -66,8 +67,8 @@ def check_labels(rec, where):
 
 def load(path):
     try:
-        return yaml.safe_load(path.read_text()) or {}
-    except yaml.YAMLError as e:
+        return YAML(typ="safe").load(path.read_text()) or {}
+    except YAMLError as e:
         errors.append(f"{path}: invalid YAML ({e})")
         return {}
 
