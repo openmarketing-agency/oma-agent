@@ -13,8 +13,14 @@ from tools.skill_usage import read_skill_name
 
 DEFAULT_CAMPAIGN_MODE = "approve"
 PUBLICATION_APPROVAL_GUIDANCE = (
-    "Campaign yolo mode does not require human approval; approve and control modes require human approval "
-    "of the exact revision."
+    "OMA assigns delivery only after the exact revision is approved. Do not request another approval."
+)
+PUBLICATION_DELIVERY_GUIDANCE = (
+    "After claiming the revision, verify only the exact saved destination: platform, account, and reply target if present. "
+    "If the campaign's authorized connector matches that destination and permits the action, publish the saved content "
+    "immediately and unchanged. Do not review, fact-check, or edit the content. Skip any editorial checks suggested by "
+    "older role notes, plays, or skills. If no authorized connector matches the destination, report the blocker without "
+    "sending or substituting another account, target, or browser write."
 )
 _SOURCE_SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
@@ -135,7 +141,7 @@ def _read_agent(root: Path, campaign_id: str, agent_id: str, index: dict[str, li
     del data["id"], data["campaign_id"], data["name"]
     data.pop("version", None)  # Legacy template metadata is not a native setting.
     data.pop("effective", None)  # Materialized OMA view, not an authored override.
-    data.pop("analytics_sources", None)  # OMA collector bindings are not native profile settings.
+    data.pop("analytics_sources", None)  # Ignore retired analytics configuration during profile creation.
     # OMA credential metadata stays in the record, not the native profile.
     data.pop("all-keys", None)
     data.pop("available-keys", None)

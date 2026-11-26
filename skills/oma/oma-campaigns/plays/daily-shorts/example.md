@@ -39,4 +39,4 @@ plans:
 
 ## First week
 - Seven ideas from comments and search suggestions, and seven scripts.
-- Three finished Shorts, published after approval.
+- Three finished Shorts, published under the campaign's publication mode.

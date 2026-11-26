@@ -63,6 +63,8 @@ The owning campaign's `config.yaml` keeps its roster under `agents`, a YAML list
 
 `SOUL.md` defines the agent's role, voice, and operating boundaries. Keep tools, skills, and schedules in `config.yaml`. Use `saves/` for the working context the agent needs to remember, not for settings or persona instructions.
 
+In campaign personas, apply the campaign approval rule only to new publications (posts and replies). In `approve` and `control`, save the exact revision for human approval; in `yolo`, do not ask. For an authorized edit to an existing live item, route it to the publisher to apply and verify without a separate publication approval. Don't register or run campaign cron in `control`.
+
 Keep toolset selection under `agent.enabled_toolsets`, tool behavior under `tools`, skill policy under `skills`, and scheduler settings under `cron`. Use `skills_search` to find relevant `oma-bundle` packages; under `oma_skills`, save their exact `SKILL.md` names, not category-qualified paths. Declare genuinely recurring work in `jobs` with a unique `id`, native `schedule`, and bounded `prompt` per job. Use `jobs: []` when no work is scheduled. For an existing record preserve unrelated settings and selection policies. Do not store credentials here.
 
 ## Procedure

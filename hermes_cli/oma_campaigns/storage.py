@@ -12,12 +12,12 @@ from hermes_cli.oma_campaigns.source import _member
 
 _DATA_NAME = "data.sqlite3"
 _LEGACY_NAME = "publications.sqlite3"
-_SCHEMA = """
+_PUBLICATIONS = """
 CREATE TABLE IF NOT EXISTS publications (
     seq INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL UNIQUE,
     revision INTEGER NOT NULL CHECK (revision > 0),
-    status TEXT NOT NULL CHECK (status IN ('pending_approval', 'approved', 'publishing', 'published', 'failed')),
+    status TEXT NOT NULL CHECK (status IN ('draft', 'pending_approval', 'approved', 'publishing', 'published', 'failed')),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     approved_by TEXT,
@@ -26,14 +26,16 @@ CREATE TABLE IF NOT EXISTS publications (
     claim_token TEXT,
     result TEXT
 );
+"""
+_REVISIONS = """
 CREATE TABLE IF NOT EXISTS publication_revisions (
     publication_id TEXT NOT NULL REFERENCES publications(id),
     revision INTEGER NOT NULL,
     draft TEXT NOT NULL,
     PRIMARY KEY (publication_id, revision)
 );
-CREATE INDEX IF NOT EXISTS idx_publications_task ON publications(task_id);
 """
+_INDEX = "CREATE INDEX IF NOT EXISTS idx_publications_task ON publications(task_id);"
 
 
 def _existing_file(directory: Path, name: str) -> Path | None:
@@ -65,12 +67,29 @@ def _initialize(path: Path, legacy: Path | None) -> None:
                     source.execute("SELECT 1 FROM sqlite_schema LIMIT 1").fetchone()
                     source.backup(dest)
                 dest.execute("PRAGMA journal_mode = DELETE")
-            dest.executescript(_SCHEMA)
+            dest.executescript(_PUBLICATIONS + _REVISIONS + _INDEX)
         try:
             os.link(staged, path)
         except FileExistsError:
             if _existing_file(path.parent, path.name) is None:
                 raise
+
+
+def _enable_publication_drafts(conn: sqlite3.Connection) -> None:
+    definition = conn.execute("SELECT sql FROM sqlite_schema WHERE name = 'publications' AND type = 'table'").fetchone()
+    if "'draft'" in definition[0]:
+        return
+    # Rebuild only the publication tables to widen their CHECK constraint. The caller's
+    # write transaction makes the migration atomic, including both sides of the foreign key.
+    conn.execute("ALTER TABLE publication_revisions RENAME TO publication_revisions_previous")
+    conn.execute("ALTER TABLE publications RENAME TO publications_previous")
+    conn.execute(_PUBLICATIONS)
+    conn.execute(_REVISIONS)
+    conn.execute("INSERT INTO publications SELECT * FROM publications_previous")
+    conn.execute("INSERT INTO publication_revisions SELECT * FROM publication_revisions_previous")
+    conn.execute("DROP TABLE publication_revisions_previous")
+    conn.execute("DROP TABLE publications_previous")
+    conn.execute(_INDEX)
 
 
 @overload
@@ -101,4 +120,6 @@ def connect_campaign_data(directory: Path, *, write: bool = False):
         if write:
             conn.execute("BEGIN IMMEDIATE")
         with conn:
+            if write:
+                _enable_publication_drafts(conn)
             yield conn

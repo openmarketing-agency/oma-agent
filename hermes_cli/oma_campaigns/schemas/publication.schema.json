@@ -3,7 +3,7 @@
   "title": "OMA Publication Draft",
   "type": "object",
   "additionalProperties": false,
-  "required": ["platform", "account", "kind", "content"],
+  "required": ["kind", "content"],
   "properties": {
     "platform": {"type": "string", "pattern": "^[a-z0-9]+(?:[-_][a-z0-9]+)*(?![\\s\\S])", "maxLength": 64},
     "kind": {"enum": ["post", "reply"]},
@@ -43,9 +43,8 @@
       }
     }
   },
-  "if": {"properties": {"kind": {"const": "reply"}}},
-  "then": {"required": ["target"]},
-  "else": {"not": {"required": ["target"]}},
+  "if": {"properties": {"kind": {"const": "post"}}},
+  "then": {"not": {"required": ["target"]}},
   "$defs": {
     "id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^\\S+(?![\\s\\S])"},
     "label": {"type": "string", "maxLength": 256},

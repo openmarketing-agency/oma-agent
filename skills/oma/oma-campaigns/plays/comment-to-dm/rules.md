@@ -6,7 +6,7 @@ A post teaches something worth saving and ends with "comment ROUTINE and I'll se
 ## Rhythm
 1. Orchestrator: plans three keyword posts a week, each with one offer.
 2. Content-maker: carousel or Reel plus caption. Dm-writer: the message set.
-3. After approval, the publisher posts. The hourly job finds eligible new keyword comments; approve and send replies through the publication workflow, not from the scheduled review.
+3. The publisher follows the campaign's publication mode for the post and any new replies. In `approve` or `yolo`, the hourly review can find eligible new keyword comments; route replies through the publication workflow, not directly from the scheduled review. In `control` there is no hourly job.
 4. The publisher continues conversations inside the messaging window and flags complaints, refunds and medical questions for a person.
 5. Check new comments and reply handoffs hourly. Compare comments, replies, clicks and sales per post weekly.
 

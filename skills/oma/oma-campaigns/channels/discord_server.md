@@ -3,7 +3,7 @@
 Checked 2026-11-24.
 
 ## Who publishes
-The publisher, through the bot the brand installed on its own server, after approval of each template or announcement. Answers in a help channel can run on standing approval once the user switches it on. OMA never uses a personal account; self-bots and user-bots are banned.
+The publisher uses the bot the brand installed on its own server. New announcements and replies follow the campaign's publication mode. OMA never uses a personal account; self-bots and user-bots are banned.
 
 ## Rules
 - The bot posts in the server's own channels. No direct messages a member didn't ask for, and no DMs unrelated to the bot's function, such as advertising.

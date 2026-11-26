@@ -98,7 +98,7 @@ slots:
   - {id: cohort_source, required: true, source: integration, ask: "Where the list of recent customers comes from."}
 
 kickoff:
-  - {owner: request-writer, task: "Write the request and reminder templates for approval."}
+  - {owner: request-writer, task: "Draft the request and reminder templates for the publisher."}
   - {owner: reply-writer, task: "Draft replies to every review from the last 90 days that has none."}
   - {owner: post-writer, task: "Write the first two profile posts."}
 

@@ -3,7 +3,7 @@
 Checked 2026-11-24.
 
 ## Who does what
-OMA finds shows, researches each host and episode, and drafts the pitch and a one-page guest sheet. The pitch goes out by email from the guest's own mailbox, after approval, so the rules in `email.md` apply. The guest records the appearance themselves.
+OMA finds shows, researches each host and episode, and drafts the pitch and a one-page guest sheet. The pitch goes out by email from the guest's authorized mailbox under the campaign's publication mode and the rules in `email.md`. The guest records the appearance themselves.
 
 ## Rules
 - Pitch only shows where the guest has real expertise for that audience. Say why this guest fits this show, with one or two specific episode references.

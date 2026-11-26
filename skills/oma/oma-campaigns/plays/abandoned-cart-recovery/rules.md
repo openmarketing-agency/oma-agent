@@ -5,7 +5,7 @@ A shopper leaves a jacket in the cart. An hour later they get an email showing t
 
 ## Rhythm
 1. Merchandiser sets the product rules; flow-writer writes the emails.
-2. After approval, the publisher builds the flow with consent and stop rules and turns it on.
+2. The publisher can build the flow with consent and stop rules without publication approval. Follow the campaign's publication mode before activating new outbound sends.
 3. Two tests a month: subject lines, timing, the objection answered, or the offer.
 4. Weekly review: recovery rate, revenue, unsubscribes and complaints.
 
@@ -17,7 +17,7 @@ A shopper leaves a jacket in the cart. An hour later they get an email showing t
 - One call to action per email.
 
 ## Definition of done
-- Every email in the flow is approved and built with consent rules, stop-on-purchase and unsubscribe.
+- Every email in the flow is built with consent rules, stop-on-purchase and unsubscribe. Activation follows the campaign's publication mode.
 - Test sends checked on desktop and mobile with real product data.
 - Flow turned on and its state recorded.
 

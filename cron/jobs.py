@@ -2197,6 +2197,10 @@ def resume_job(job_id: str) -> Optional[dict[str, Any]]:
 def trigger_job(job_id: str, extra_prompt: Optional[str] = None) -> Optional[dict[str, Any]]:
     """Schedule a job for the next tick (ID or name). ``extra_prompt`` is stamped as
     ``manual_run_prompt`` for that single fire only; ``mark_job_run`` clears it."""
+    from hermes_cli.oma_campaigns.admission import profile_cron_disabled
+
+    if profile_cron_disabled(_current_cron_store().jobs_file.parent.parent):
+        raise ValueError("Campaign cron is disabled in control mode.")
     job = resolve_job_ref(job_id)
     if not job:
         return None
@@ -2709,7 +2713,8 @@ def claim_job_for_fire(
     from hermes_cli.oma_campaigns.admission import campaign_cron_paused
 
     def apply(jobs, _i, job):
-        if campaign_cron_paused(_current_cron_store().jobs_file.parent.parent, job):
+        if campaign_cron_paused(_current_cron_store().jobs_file.parent.parent, job,
+                                manual=force or manual or extra_fire.queued(job)):
             return False
         if is_terminal_job(job) and not _is_recoverable_error_job(job):
             return False
@@ -3252,6 +3257,8 @@ def _get_due_jobs_locked(home: Path) -> list[dict[str, Any]]:
     """Inner implementation of get_due_jobs(); must be called with _jobs_lock held."""
     from hermes_cli.oma_campaigns.admission import campaign_cron_paused, profile_cron_disabled
 
+    if campaign_cron_paused(home):
+        return []
     raw_jobs = load_jobs()
     scan = _DueScan(raw_jobs, _hermes_now())
     scan.needs_save = _normalize_due_scan_records(raw_jobs)
@@ -3271,7 +3278,7 @@ def _get_due_jobs_locked(home: Path) -> list[dict[str, Any]]:
         # above repairs known shapes; this catches FUTURE variants so healthy siblings still
         # run/persist.
         try:
-            if restricted and campaign_cron_paused(home, job):
+            if restricted and campaign_cron_paused(home, job, manual=extra_fire.queued(job)):
                 continue
             if is_terminal_job(job) and not _is_recoverable_error_job(job):
                 continue

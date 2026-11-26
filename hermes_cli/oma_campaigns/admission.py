@@ -65,10 +65,10 @@ def profile_cron_disabled(home: Path) -> bool:
     return home.name in config.get("agents", []) and config.get("mode") == "control"
 
 
-def campaign_cron_paused(home: Path, job: dict | None = None) -> bool:
+def campaign_cron_paused(home: Path, job: dict | None = None, *, manual: bool = False) -> bool:
     if not profile_work_paused(home, cron=True):
         return False
-    if profile_work_paused(home) or not profile_cron_disabled(home):
+    if manual or profile_work_paused(home) or not profile_cron_disabled(home):
         return True
     from hermes_cli.oma_campaigns.analytics_cron import analyst_profile, is_managed_job
 

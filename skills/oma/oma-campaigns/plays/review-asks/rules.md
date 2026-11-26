@@ -4,7 +4,7 @@
 Every customer from last week gets the same short, friendly request with a direct link to leave a review, and one reminder. Every review gets a reply within two business days. The profile shows a new post every week. Ratings rise because more ordinary, satisfied customers speak up, not because unhappy ones are filtered out.
 
 ## Rhythm
-1. Monday: the orchestrator defines last week's cohort; the request-writer prepares the batch; it goes out after approval.
+1. Monday: the orchestrator defines last week's cohort; the request-writer prepares the batch, and the publisher follows the campaign's publication mode for outbound sends.
 2. Daily: new reviews get reply drafts; negative ones go to the owner too.
 3. Weekly: one profile post.
 4. Monthly: themes from reviews passed to the owner, such as wait times or billing confusion.

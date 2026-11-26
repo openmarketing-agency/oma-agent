@@ -39,4 +39,4 @@ plans:
 
 ## First week
 - The guest sheet with three topics and a bio.
-- Five researched shows and five pitches, sent after approval.
+- Five researched shows and five pitches, sent under the campaign's publication mode.

@@ -3,7 +3,7 @@
 Checked 2026-11-23. Covers newsletters, lifecycle email (welcome, abandoned cart, win-back) and one-to-one outreach.
 
 ## Who sends
-The publisher, through the connected sending service or mailbox, after approval of each template or sequence. Changes to a live sequence go through approval again.
+The publisher uses the authorized sending service or mailbox. New outbound sends follow the campaign's publication mode; preparing a draft or editing an existing authorized sequence without sending or activating it does not need publication approval.
 
 ## Consent
 - Marketing email goes only to people who agreed to receive it, or where the law allows email without prior consent, such as an existing customer and similar products in the UK and EU, with an easy opt-out in every message. Follow the strictest rule that applies to the recipient.

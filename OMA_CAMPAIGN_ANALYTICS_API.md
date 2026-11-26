@@ -66,7 +66,9 @@ Results are ordered by descending `id`. If there are more results, repeat the sa
 
 Send **no body and no query parameters**; an empty JSON object (`{}`) is not accepted. Browser calls must be same-origin.
 
-The request queues the managed analyst collector for the next scheduler tick. It does not change the job's hourly schedule. If a run is already queued or running, the request returns its current state instead of starting a duplicate. `202` confirms acceptance, not completion.
+For a running `approve` or `yolo` campaign, the request queues the managed analyst collector for the next scheduler tick. It does not change the job's hourly schedule. If a run is already queued or running, the request returns its current state instead of starting a duplicate. `202` confirms acceptance, not completion. In `control`, the collector still runs on its hourly schedule while the campaign is running, but this manual refresh request is rejected.
+
+The collector reads external metrics only through read tools exposed by the analyst profile's enabled `mcp_servers`, including an existing Composio connection. It matches Google properties to the workspace's verified website. If a declared Google source cannot be read or matched, the refresh is incomplete; this does not measure zero traffic. OMA publication counts come from the local campaign store.
 
 ### Response schema (`202`)
 
@@ -112,7 +114,7 @@ The console returns `{ "error": "..." }`; the private VM socket returns `{ "mess
 | `401 Unauthorized` | Console session is not signed in. |
 | `403 Forbidden` | Console rejected a cross-origin refresh request. |
 | `404 Not Found` | Campaign or route not found. |
-| `409 Conflict` | Refresh is blocked: the campaign is stopped, the analyst is not installed, or the managed job is missing or paused. |
+| `409 Conflict` | Refresh is blocked: the campaign is stopped or in `control`, the analyst is not installed, or the managed job is missing or paused. |
 | `422 Unprocessable Content` | Invalid observation filters or pagination, unexpected refresh input, or invalid campaign analytics configuration. |
 | `503 Service Unavailable` | Analytics storage or runtime is unavailable, the agent image lacks analytics support, or the collector could not be queued. |
 
@@ -120,6 +122,6 @@ The console returns `{ "error": "..." }`; the private VM socket returns `{ "mess
 
 - [Observation validation, filters, and pagination](hermes_cli/oma_campaigns/analytics.py#L116)
 - [Managed refresh and execution status](hermes_cli/oma_campaigns/analytics_cron.py#L52)
-- [Observation sources](hermes_cli/oma_campaigns/analytics_sources.py#L35)
+- [MCP report reads](hermes_cli/oma_campaigns/analytics_mcp.py)
 - Local sibling checkout: `openmarketing.agency/vm/workspace.py` (`campaign_analytics`, `WorkspaceHandler`)
 - Local sibling checkout: `openmarketing.agency/oma/app/api/campaigns/[id]/analytics/[[...action]]/route.ts`

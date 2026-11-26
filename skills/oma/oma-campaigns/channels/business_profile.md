@@ -3,7 +3,7 @@
 Checked 2026-11-24.
 
 ## Who publishes
-The publisher, through the Business Profile API: profile posts and replies to reviews, after approval. Review requests are sent by email or SMS to customers, never posted on the profile.
+The publisher uses the Business Profile API for profile posts and replies to reviews, following the campaign's publication mode. Review requests are sent by email or SMS to customers, never posted on the profile.
 
 ## Asking for reviews
 - Ask every customer in a defined cohort, for example every patient seen last week. Never ask only happy customers, and never discourage negative reviews.

@@ -39,5 +39,5 @@ plans:
 
 ## First week
 - Two briefs and two drafts: the first-payroll guide and the Gusto alternatives page.
-- Both published after approval, with indexing requested.
+- Both published under the campaign's publication mode, with indexing requested.
 - A Search Console baseline for the last three months, attached to the first review.

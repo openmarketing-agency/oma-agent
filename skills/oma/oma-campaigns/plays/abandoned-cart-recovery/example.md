@@ -37,5 +37,5 @@ plans:
 
 ## First week
 - The cart flow's product rules and three emails.
-- The flow built in Klaviyo, tested and switched on after approval.
+- The flow built in Klaviyo, tested and switched on under the campaign's publication mode.
 - A baseline of carts, recoveries and revenue for the last 30 days.

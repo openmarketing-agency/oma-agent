@@ -3,7 +3,7 @@
 Checked 2026-11-23.
 
 ## Who publishes
-The publisher, through the CMS or repository integration, after approval. Larger changes, such as new templates, navigation or pricing, go through review by a person before they ship.
+The publisher uses the authorized CMS or repository integration. A new public page follows the campaign's publication mode. An authorized edit to an existing live page, such as an excerpt, uses the verified target and does not need a separate publication approval. Keep the edit within the assigned scope.
 
 ## Rules
 - The search rules in `blog.md` apply to every page on the site.
