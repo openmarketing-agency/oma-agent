@@ -16,7 +16,7 @@ Discover, score, and profile the brand's competitors; collect their creatives an
 |---|---|
 | Source | Bundled (installed by default) |
 | Path | `skills/oma/oma-competitors` |
-| Version | `0.3.0` |
+| Version | `0.4.0` |
 | Author | Open Marketing Agency (OMA) |
 | License | MIT |
 | Platforms | linux, macos, windows |
@@ -146,9 +146,11 @@ Use [profile template](https://github.com/openmarketing-agency/oma-agent/blob/ma
 
 ### 7. Collect creatives
 
-Load [OMA Creatives](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-competitors/../oma-creatives/SKILL.md) with `skill_view` using `name: oma/oma-creatives`. Use the brand's baseline in `research/own/`, which [OMA Brand](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-competitors/../oma-brand/SKILL.md) collects before this skill runs. Run `oma-creatives` for `own` only when `research/own/creatives.md` is missing or was last collected more than 7 days ago. Then run it for each top-5 direct competitor, then for each reference. It collects the latest 25 plus the top 10 organic posts per platform and up to 25 ad concepts per ad library, with media, captions, posting times, metrics and landing pages, and writes each target's `creatives.md`. Wait for its validator to pass for each target.
+Each top-5 direct competitor and each reference gets a full [OMA Creatives](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-competitors/../oma-creatives/SKILL.md) collection: its `sources.yaml` (written from `profile.md` and `gtm.md`), organic posts, up to 20 ad concepts per library with media and landing pages, labels, `creatives.md`, and a passing creatives validator. During onboarding each target is two cards on the onboarding board (posts, then ads and summary), created by the discovery card; do not collect them inside another card. Outside onboarding, run `oma-creatives` for each target in turn.
 
-If `oma-creatives` is unavailable, record the gap in `index.yaml > coverage` (`source: oma_creatives`, `status: not_checked`) and continue. The Channels and Messaging sections of `gtm.md` then rely on profile pages only. Once `creatives.md` exists, use its winning patterns and caption patterns in `gtm.md` (What's working, Adaptable patterns).
+Never collect `own` here: [OMA Brand](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-competitors/../oma-brand/SKILL.md) owns the brand's baseline in `research/own/`. If it is missing, report the gap instead of collecting it.
+
+Once a target's `creatives.md` exists, use its winning patterns and caption patterns in `gtm.md` (What's working, Adaptable patterns). If `oma-creatives` is unavailable, record the gap in `index.yaml > coverage` (`source: oma_creatives`, `status: not_checked`); the Channels and Messaging sections of `gtm.md` then rely on profile pages only, and the validator fails until the collection exists.
 
 ### 8. Write the landscape
 
@@ -157,7 +159,7 @@ Write `research/competitors.md` from [landscape template](https://github.com/ope
 ### 9. Save and verify
 
 1. Write the per-competitor files first (after `oma-creatives` has finished), then `index.yaml`, then `competitors.md`, then update `config.yaml > research.competitors`.
-2. Run `<skill_dir>/scripts/validate_competitors.py <home>/oma/brand` with Python in the activated Hermes environment, which supplies its YAML parser. Fix every error and rerun until it passes. If that Python is unavailable, report that validation was not run.
+2. Run `<skill_dir>/scripts/validate_competitors.py <home>/oma/brand` with Python in the activated Hermes environment, which supplies its YAML parser. It also runs the creatives validator for the brand and every collected target, so a summary without a collection fails. Fix every error and rerun until it passes. If that Python is unavailable, report that validation was not run.
 3. Report the counts per tier, the direct competitors, the top 3 adaptable patterns, the important changes since the last run, and any blocked sources.
 
 ## Adapting, Not Copying

@@ -8,8 +8,10 @@ Save to `<target-root>/creatives.md`. Base it only on the collected records and 
 - **Last collected:** YYYY-MM-DD  ·  **Posts:** N across N platforms  ·  **Ad concepts:** N across N libraries  ·  **Winners:** N
 
 ## Coverage
-| Source | Status | Records | Note |
-| --- | --- | --- | --- |
+| Source | Status | Records | Visible | Note |
+| --- | --- | --- | --- | --- |
+
+Copy each source's `coverage.status` and note exactly; `limited` sources list their `visible_count`. Unsupported platforms from `sources.yaml` get a row marked `not_checked`.
 
 ## Organic by platform
 | Platform | Followers | Posts / week (90d) | Usual posting days and hours | Format mix | Median engagement | Winners |

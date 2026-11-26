@@ -1,11 +1,30 @@
 # Socials Procedure
 
+`collect.py organic` applies these rules; this page says what it collects and how to read the result.
+
 ## Selection (per platform, fixed)
 
 1. Take the latest 25 posts by `posted_at`, excluding pinned posts unless they fall inside the latest 25 by date.
-2. From posts in the last 90 days, take the top 10 by `engagement` (likes + comments + shares + saves, using whichever the platform shows).
-3. Combine both sets without duplicates, so each platform has 25 to 35 posts. A record in both sets gets `selected_by: [latest, top]`.
+2. From mature posts (older than 48 hours) in the last 90 days, take the top 10 by `engagement` (likes + comments + shares + saves, whichever the platform shows).
+3. Combine both sets without duplicates, so each platform has up to 35 posts in `posts`. A record in both sets gets `selected_by: [latest, top]`. Earlier records stay in `history`.
 4. Reposts and retweets without their own media or caption are skipped. Quote posts and duets count as posts.
+
+## What a logged-out visitor can see
+
+Collection never logs in. Where a platform stops the feed, the platform's coverage is `limited` with `visible_count`, and top posts are ranked among the visible ones only.
+
+| Platform | Route | Typical logged-out view |
+| --- | --- | --- |
+| instagram | Browser; each post's page metadata | About 9 to 12 latest posts, then a login dialog. Likes, comments, date, caption, image or video. |
+| tiktok | Browser for the profile list; each video's page data over HTTP | The full recent feed; exact time, plays, likes, comments, shares, saves; videos download. |
+| facebook | Browser; the page's own Close button on the login dialog | About 20 to 35 recent posts; reactions, comments, shares where shown. |
+| x | Browser; each post's page | About 5 latest posts; views, likes, reposts; the post time comes from its ID. |
+| linkedin | Browser; Dismiss on the sign-in prompt | About 8 to 18 company posts; reactions, comments; the time comes from the activity ID. |
+| youtube | Public RSS feed over HTTP | The latest 15 uploads with views and likes; comments are not in the feed. |
+| pinterest | Public RSS feed over HTTP | About 25 recent pins; save counts are not public, so no top pins. |
+| threads | Browser; each post's page | About 15 posts; views, likes, replies, reposts. |
+| bluesky | Public AppView API over HTTP | The full feed with likes, reposts, replies, quotes. |
+| reddit | Browser (the JSON API refuses logged-out requests) | The account's recent submissions with score and comments. |
 
 ## Per platform
 
@@ -36,8 +55,11 @@ account:
   posts_last_90d: 38
   captured_at: 2026-01-15T09:00:00Z
 coverage:
-  status: checked            # checked | blocked | not_found | not_checked
+  status: checked            # checked | limited | blocked | not_found | not_checked
+  date: 2026-01-15
   note: ""
+  visible_count: 12          # limited only: how many posts a logged-out visitor could see
+  proof: {url: https://www.instagram.com/example/, reason: login_limit, screenshot: research/competitors/<id>/socials/instagram/proof.png}
 posts:
   - id: c3xyz                # platform post id, slugified
     url: https://www.instagram.com/p/C3xyz/

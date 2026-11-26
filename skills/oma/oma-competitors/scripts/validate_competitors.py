@@ -8,6 +8,7 @@ evidence, file references, and creatives records. Exits 1 on any error.
 """
 import datetime as dt
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -88,9 +89,20 @@ def sort_key(c):
     return (-(c.get("total") or 0), -(c.get("mentions") or 0), c.get("id", ""))
 
 
-def check_creatives(root, rel, owner):
-    """Creatives are validated in depth by oma-creatives; here, check the summary exists."""
+CREATIVES_VALIDATOR = Path(__file__).resolve().parents[2] / "oma-creatives" / "scripts" / "validate_creatives.py"
+
+
+def check_creatives(root, rel, owner, target):
+    """A creatives.md file is not enough: the target's collection must pass the oma-creatives validator."""
     check_path(root, rel, f"{owner}.creatives")
+    if not CREATIVES_VALIDATOR.is_file():
+        err(f"{owner}: the oma-creatives validator was not found at {CREATIVES_VALIDATOR}")
+        return
+    done = subprocess.run([sys.executable, str(CREATIVES_VALIDATOR), str(root), target],
+                          capture_output=True, text=True, check=False, timeout=600)
+    if done.returncode != 0:
+        problems = [line for line in done.stdout.splitlines() if line.startswith("ERROR")][:5]
+        err(f"{owner}: creatives collection fails oma-creatives validation: " + "; ".join(problems or [done.stdout[-300:]]))
 
 
 def main(argv):
@@ -191,7 +203,7 @@ def main(argv):
             if cid in top:
                 for key in required:
                     if key == "creatives":
-                        check_creatives(root, c.get(key), f"competitor '{cid}'")
+                        check_creatives(root, c.get(key), f"competitor '{cid}'", cid)
                     else:
                         check_path(root, c.get(key), f"competitor '{cid}'.{key}")
 
@@ -204,7 +216,9 @@ def main(argv):
             err(f"reference '{rid}': already in competitors; a brand is one or the other")
         if not r.get("reason"):
             err(f"reference '{rid}': missing reason")
-        check_creatives(root, r.get("creatives"), f"reference '{rid}'")
+        check_creatives(root, r.get("creatives"), f"reference '{rid}'", rid)
+
+    check_creatives(root, "research/own/creatives.md", "the brand's own baseline", "own")
 
     for i, sq in enumerate(idx.get("status_quo") or []):
         if not sq.get("name"):
