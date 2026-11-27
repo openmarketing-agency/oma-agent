@@ -8,6 +8,8 @@
 
 The shared coordination skill is `campaign-orchestration` in OMA Agent. The [Humanizer package](write/humanizer/README.md) supplies the editorial pass for campaign writers.
 
+[`skills/analytics/`](skills/analytics/) contains the Analyst guides for GA4, Search Console, social media, and Composio. [`analytics-dataset`](skills/analytics/analytics-dataset/SKILL.md) documents the common observation format and save/read workflow. Setup adds missing packages to existing bundles without replacing local copies. The skills do not ship provider collectors.
+
 Docker and the OMA POSIX source installer seed this skills bundle at `$HERMES_HOME/oma-bundle` when missing (`/opt/data/oma-bundle` in Docker and `./oma-agent-data/oma-bundle` for a fresh direct install). Existing copies are preserved. Setup and upgrades add a missing Humanizer to `oma-bundle/skills/write/humanizer`. Campaign templates left on older volumes are ignored. For a manual checkout, run `python -m hermes_cli.oma_campaigns.standalone seed --install-dir .` from the repository root with the intended `HERMES_HOME`. This copies Humanizer from its source directory into the shared skill library that campaign roles can load.
 
 To add either collection to an existing bundle, copy `skills/marketingskills/` or `skills/social-media-skills/` as a new directory under `$HERMES_HOME/oma-bundle/skills/`. Leave the rest of the existing bundle intact.

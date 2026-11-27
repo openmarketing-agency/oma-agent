@@ -60,6 +60,34 @@ def test_startup_adopts_existing_profiles_and_bundles_default_only_skills(tmp_pa
     assert read_user_config_raw(tmp_path / "config.yaml")["model"] == "openrouter/test-model"
 
 
+def test_startup_provides_analytics_skills_to_an_existing_campaign_analyst(tmp_path, monkeypatch):
+    import json
+    from agent.runtime_scope import bind_profile_scope
+    from hermes_cli.oma_campaigns.standalone import seed_standalone_agents
+    from tools.skills_tool import skill_view
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    _profile(tmp_path, "openrouter/test-model", "Default persona")
+    analyst = _profile(tmp_path / "profiles" / "demo__analyst", "openrouter/test-model", "Analyst persona")
+    writer = _profile(tmp_path / "profiles" / "demo__writer", "openrouter/test-model", "Writer persona")
+    campaign = tmp_path / "oma/campaigns/demo"
+    campaign.mkdir(parents=True)
+    (campaign / "config.yaml").write_text(
+        "id: demo\ninstallation_state: installed\nagents: [demo__analyst, demo__writer]\n", encoding="utf-8",
+    )
+    (tmp_path / "oma-bundle/skills").mkdir(parents=True)
+    seed_standalone_agents(tmp_path, install_dir=Path(__file__).resolve().parents[2])
+
+    for name in ("analytics-dataset", "ga4-analytics", "google-search-analytics",
+                 "composio-analytics", "social-media-analytics"):
+        with bind_profile_scope(analyst, hydrate_secrets=False):
+            loaded = json.loads(skill_view(name, preprocess=False))
+            assert loaded["success"], loaded
+        with bind_profile_scope(writer, hydrate_secrets=False):
+            assert not json.loads(skill_view(name, preprocess=False))["success"]
+    assert (analyst / "SOUL.md").read_text(encoding="utf-8") == "Analyst persona"
+
+
 @pytest.mark.parametrize("existing_bundle", [False, True], ids=["fresh", "existing"])
 def test_startup_seeds_missing_humanizer_without_replacing_shared_skills(tmp_path, monkeypatch, existing_bundle):
     import json

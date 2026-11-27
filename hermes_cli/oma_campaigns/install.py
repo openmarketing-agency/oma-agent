@@ -344,7 +344,13 @@ def campaign_soul(soul: str, agent_id: str, orchestrator: str, agents: tuple[str
     )
     analyst_guidance = (
         "## Campaign analytics\n\n"
+        "Load `ga4-analytics`, `google-search-analytics`, `social-media-analytics`, or `composio-analytics` "
+        "for the source you need. "
         "Gather external analytics only with read-only tools from your configured MCP servers. "
+        f"Read saved observations first with `python -m hermes_cli.oma_campaigns analytics-read {campaign_id}`. "
+        f"Save verified new observations with `python -m hermes_cli.oma_campaigns analytics-save {campaign_id}` "
+        f"(JSON array on stdin). These commands use `{campaign_config.parent / 'data.sqlite3'}`; don't edit it directly. "
+        "Load `analytics-dataset` for the format and save/read workflow. The hourly refresh only counts local OMA publications. "
         "Report the metrics and periods you can verify. If the required property or metric cannot be read, report it as "
         "unavailable, not zero. If there is no usable MCP source for the required data, block only the work that needs it "
         "and name the property or read access needed.\n\n"
@@ -418,6 +424,8 @@ def _publish_profiles(campaign: Campaign, configs: dict[str, dict], paths: dict[
 def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
     """Add a missing analyst without reinstalling the roster; caller owns the install lock."""
     from hermes_cli.oma_campaigns.analytics_cron import ensure_job
+    from hermes_cli._startup_fast import project_root_str
+    from hermes_cli.oma_campaigns.bundle import seed_analytics_skills
     from hermes_cli.oma_campaigns.credentials import remove_retired_analytics_keys, retired_analytics_keys
 
     campaign_id = config["id"]
@@ -429,6 +437,7 @@ def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
     record_path, soul_path = _real_path(root / "config.yaml"), _real_path(root / "SOUL.md")
     if profile.exists() and not _profile_matches(home, agent_id, board, orchestrator):
         raise ValueError(f"{agent_id}: refusing to reuse an unrelated profile")
+    seed_analytics_skills(Path(project_root_str()) / "oma-bundle", home)
     root.mkdir(parents=True, mode=0o700, exist_ok=True)
     new_record = not record_path.is_file()  # config-reader: ok — authored OMA record existence only
     if new_record:
@@ -442,7 +451,7 @@ def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
     authored.pop("analytics_sources", None)
     if not soul_path.is_file():
         atomic_write_text(soul_path, f"You are the analyst for {config['name']}. Report measured observations. "
-                          "Do not publish, message accounts, or guess missing metrics. OMA manages your collector.\n",
+                          "Do not publish, message accounts, or guess missing metrics.\n",
                           create_mode=0o600)
     if not profile.exists():
         saved, credentials = snapshot(home, config)

@@ -11,53 +11,12 @@ from pathlib import Path
 
 import pytest
 
+from tests import oma_campaign_fixtures
 
-DEMO_AGENTS = ("demo__orchestrator", "demo__worker", "demo__publisher")
+bundle = oma_campaign_fixtures.bundle
+DEMO_AGENTS = oma_campaign_fixtures.DEMO_AGENTS
 DEMO_ROSTER = (*DEMO_AGENTS, "demo__analyst")
 BASE_TOOLSETS = {"file", "terminal", "web", "skills", "memory", "session_search", "browser"}
-
-
-@pytest.fixture
-def bundle(tmp_path, monkeypatch):
-    from hermes_cli import default_plugins
-    from hermes_cli.oma_campaigns import __main__ as cli
-
-    monkeypatch.setattr(default_plugins, "spawn_install", lambda _path: True)
-    home = tmp_path / ".hermes"
-    home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
-    monkeypatch.delenv("HERMES_KANBAN_DB", raising=False)
-    monkeypatch.delenv("HERMES_KANBAN_BOARD", raising=False)
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    source = home / "oma"
-    campaigns = source / "campaigns"
-    skills = home / "oma-bundle" / "skills"
-    team = campaigns / "demo"
-    team.mkdir(parents=True)
-    (team / "config.yaml").write_text(
-        "id: demo\nname: Demo\ndescription: Test team.\norchestrator: demo__orchestrator\n"
-        f"agents: [{', '.join(DEMO_AGENTS)}]\ngoals: [Measure demand]\nplans: [Review evidence]\n",
-        encoding="utf-8",
-    )
-    for agent_id in DEMO_AGENTS:
-        role = agent_id.removeprefix("demo__")
-        dependencies = "[shared]" if role == "orchestrator" else "[]"
-        candidate = source / "agents" / agent_id
-        candidate.mkdir(parents=True)
-        jobs = "[{id: sample, schedule: '1d', prompt: Review evidence.}]" if role == "orchestrator" else "[]"
-        (candidate / "config.yaml").write_text(
-            f"id: demo__{role}\nname: {role.title()}\ndescription: Test role.\ncampaign_id: demo\noma_skills: {dependencies}\n"
-            f"agent: {{enabled_toolsets: [file, kanban]}}\njobs: {jobs}\n", encoding="utf-8",
-        )
-        (candidate / "SOUL.md").write_text(f"I am the {role}.\n", encoding="utf-8")
-    for name in ("shared", "unused"):
-        skill = skills / "category" / name
-        skill.mkdir(parents=True)
-        (skill / "SKILL.md").write_text(f"---\nname: {name}\ndescription: Test skill.\n---\n\nContents.\n",
-                                       encoding="utf-8")
-        (skill / "support.txt").write_text("Support file.", encoding="utf-8")
-    return home, source, cli.main
 
 
 def test_create_campaign_provisions_a_paused_team_and_empty_board(bundle, capsys, tmp_path):
@@ -462,7 +421,8 @@ def test_campaign_souls_separate_authoring_publishing_and_analytics(bundle, caps
     assert "## Campaign publications\n" not in soul
     assert "publications save" not in soul
     analyst_soul = (home / "profiles/demo__analyst/SOUL.md").read_text(encoding="utf-8")
-    assert "## Campaign analytics\n" in analyst_soul
+    assert all(marker in analyst_soul for marker in ("## Campaign analytics\n", "analytics-dataset", "analytics-read demo",
+                                                   "analytics-save demo", str(home / "oma/campaigns/demo/data.sqlite3")))
     assert "## Campaign publications\n" not in analyst_soul
     assert "publications save" not in analyst_soul
     for role in ("orchestrator", "worker"):
@@ -551,10 +511,28 @@ def test_campaign_sync_removes_only_retired_analyst_options(bundle):
     ).read_text(encoding="utf-8")
 
 
-def test_campaign_analyst_refresh_runs_in_approve_and_saves_data(bundle):
+@pytest.fixture
+def analyst_turns(monkeypatch):
+    from cron import scheduler
+    from hermes_constants import get_hermes_home
+
+    turns = []
+
+    def run(job, *, extra_prompt=None, cancel_event=None, execution_id=None):
+        early, prompt = scheduler._prepare_job_prompt(job, job["id"], job["name"], extra_prompt, cancel_event)
+        assert early is None and prompt
+        turns.append((get_hermes_home(), execution_id, prompt))
+        return True, "Collected observations", "Collected observations", None
+
+    monkeypatch.setattr("cron.scheduler_authority.run_canonical_job", run)
+    return turns
+
+
+def test_campaign_analyst_refresh_runs_in_approve_and_saves_data(bundle, analyst_turns, monkeypatch):
     from agent.runtime_scope import bind_profile_scope
     from cron import scheduler
-    from cron.jobs import get_due_jobs, get_job, update_job, use_cron_store
+    from cron.jobs import get_due_jobs, get_job, list_jobs, parse_schedule, update_job, use_cron_store
+    from cron.scheduler_authority import run_canonical_job
     from hermes_cli.config import atomic_config_write
     from hermes_cli.oma_campaigns.analytics import AnalyticsError, list_analytics
     from hermes_cli.oma_campaigns.analytics_cron import JOB_ID, analytics_status, refresh_analytics
@@ -569,6 +547,8 @@ def test_campaign_analyst_refresh_runs_in_approve_and_saves_data(bundle):
     with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
         analyst_job = get_job(JOB_ID)
         assert analyst_job is not None
+        assert [job["id"] for job in list_jobs(include_disabled=True)] == [JOB_ID]
+        assert (analyst_job["schedule"], analyst_job["no_agent"]) == (parse_schedule("every 6h"), False)
         regular_slot = analyst_job["next_run_at"]
     with pytest.raises(AnalyticsError, match="Start the campaign"):
         refresh_analytics(home, "demo")
@@ -583,13 +563,25 @@ def test_campaign_analyst_refresh_runs_in_approve_and_saves_data(bundle):
     assert queued["run_id"] == initial["run_id"]
     assert refresh_analytics(home, "demo")["run_id"] == queued["run_id"]
     assert analytics_status(home, "demo")["state"] == "queued"
+
+    def run_with_status(job, **kwargs):
+        active = analytics_status(home, "demo")
+        assert active["running"] and active["run_id"] == kwargs["execution_id"]
+        assert refresh_analytics(home, "demo")["run_id"] == active["run_id"]
+        return run_canonical_job(job, **kwargs)
+
+    monkeypatch.setattr("cron.scheduler_authority.run_canonical_job", run_with_status)
     with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
         assert [row["id"] for row in get_due_jobs()] == [JOB_ID]
-        assert scheduler.tick(verbose=False, headless=True) == 1
+        assert scheduler.tick(verbose=False) == 1
+        assert scheduler.tick(verbose=False) == 0
     [row] = list_analytics(home, "demo", source="oma-publications", metric="drafts_created")["observations"]
     assert row["value"] == 1
     status = analytics_status(home, "demo")
     assert status["state"] == "idle" and not status["running"] and status["last_successful_refresh_at"]
+    assert refresh_analytics(home, "demo")["state"] == "queued"
+    with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
+        assert scheduler.tick(verbose=False) == 1
     assert main(["lifecycle", "demo", "paused"]) == 0
     assert main(["lifecycle", "demo", "resumed"]) == 0
     assert analytics_status(home, "demo")["state"] == "idle"
@@ -598,12 +590,13 @@ def test_campaign_analyst_refresh_runs_in_approve_and_saves_data(bundle):
         analyst_job = get_job(JOB_ID)
         assert analyst_job is not None and analyst_job["next_run_at"] == regular_slot
         update_job(JOB_ID, {"next_run_at": now().isoformat()})
-        assert scheduler.tick(verbose=False, headless=True) == 1
+        assert scheduler.tick(verbose=False) == 1
     assert len(list_analytics(home, "demo")["observations"]) == 1
+    assert [row[0] for row in analyst_turns] == [profile, profile, profile]
 
 
-@pytest.mark.parametrize("minutes_since_run, queues_catchup", [(180, True), (30, False)])
-def test_campaign_resume_catches_up_one_overdue_analyst_run(bundle, minutes_since_run, queues_catchup):
+@pytest.mark.parametrize("minutes_since_run, queues_catchup", [(420, True), (180, False)])
+def test_campaign_resume_catches_up_one_overdue_analyst_run(bundle, analyst_turns, minutes_since_run, queues_catchup):
     from datetime import UTC, datetime, timedelta
 
     from agent.runtime_scope import bind_profile_scope
@@ -621,23 +614,23 @@ def test_campaign_resume_catches_up_one_overdue_analyst_run(bundle, minutes_sinc
     profile = home / "profiles/demo__analyst"
     assert main(["lifecycle", "demo", "resumed"]) == 0
     with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
-        assert scheduler.tick(verbose=False, headless=True) == 1
+        assert scheduler.tick(verbose=False) == 1
     assert main(["lifecycle", "demo", "paused"]) == 0
     last_run = datetime.now(UTC) - timedelta(minutes=minutes_since_run)
-    next_slot = last_run + timedelta(hours=1)
+    next_slot = last_run + timedelta(hours=6)
     with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
         update_job(JOB_ID, {"last_run_at": last_run.isoformat(), "next_run_at": next_slot.isoformat()})
     assert main(["lifecycle", "demo", "resumed"]) == 0
     assert analytics_status(home, "demo")["state"] == ("queued" if queues_catchup else "idle")
     assert main(["lifecycle", "demo", "resumed"]) == 0  # Retrying Start must not add a run.
     with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
-        assert scheduler.tick(verbose=False, headless=True) == int(queues_catchup)
-        assert scheduler.tick(verbose=False, headless=True) == 0
+        assert scheduler.tick(verbose=False) == int(queues_catchup)
+        assert scheduler.tick(verbose=False) == 0
         assert len(list_executions(job_id=JOB_ID)) == 1 + int(queues_catchup)
         job = get_job(JOB_ID)
         assert job is not None
         if queues_catchup:
-            assert datetime.fromisoformat(job["next_run_at"]) - datetime.fromisoformat(job["last_run_at"]) == timedelta(hours=1)
+            assert datetime.fromisoformat(job["next_run_at"]) - datetime.fromisoformat(job["last_run_at"]) == timedelta(hours=6)
         else:
             assert job["next_run_at"] == next_slot.isoformat()
 
@@ -674,14 +667,13 @@ def test_campaign_control_removes_registered_cron_and_restores_operator_pause(bu
 
 
 @pytest.mark.parametrize("start_mode", ["approve", "control"])
-def test_campaign_control_runs_only_scheduled_managed_analytics(bundle, start_mode):
+def test_campaign_control_runs_analytics_only_after_refresh(bundle, analyst_turns, start_mode):
     from datetime import UTC, datetime
 
     from agent.runtime_scope import bind_profile_scope
     from cron import scheduler
     from cron.jobs import claim_job_for_fire, get_due_jobs, get_job, save_jobs, trigger_job, use_cron_store
     from hermes_cli.config import atomic_config_write
-    from hermes_cli.oma_campaigns.analytics import AnalyticsError
     from hermes_cli.oma_campaigns.analytics_cron import JOB_ID, analytics_status, refresh_analytics
     from hermes_cli.oma_campaigns.source import read_mapping
     from hermes_cli.oma_campaigns.sync import sync_campaign
@@ -704,8 +696,6 @@ def test_campaign_control_runs_only_scheduled_managed_analytics(bundle, start_mo
             save_jobs([], replace=True)
     assert main(["lifecycle", "demo", "resumed"]) == 0
     sync_campaign(home, "demo")
-    with pytest.raises(AnalyticsError, match="control mode"):
-        refresh_analytics(home, "demo")
     with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
         managed = get_job(JOB_ID)
         assert managed is not None and managed["created_at"] == original["created_at"]
@@ -720,11 +710,16 @@ def test_campaign_control_runs_only_scheduled_managed_analytics(bundle, start_mo
         assert not claim_job_for_fire(JOB_ID, manual=True)
         assert not claim_job_for_fire(ordinary["id"], force=True)
         assert not claim_job_for_fire(ordinary["id"])
+        assert get_due_jobs() == [] and scheduler.tick(verbose=False) == 0
+        queued = refresh_analytics(home, "demo")
+        assert queued["state"] == "queued" and refresh_analytics(home, "demo")["run_id"] == queued["run_id"]
+        sync_campaign(home, "demo")  # Sync must not cancel the operator's refresh.
         assert [job["id"] for job in get_due_jobs()] == [JOB_ID]
-        assert scheduler.tick(verbose=False, headless=True) == 1
-        assert scheduler.tick(verbose=False, headless=True) == 0
+        assert scheduler.tick(verbose=False) == 1
+        assert scheduler.tick(verbose=False) == 0
     status = analytics_status(home, "demo")
     assert status["state"] == "idle" and status["last_successful_refresh_at"]
+    assert len(analyst_turns) == 1
 
 
 def test_install_generated_records_without_bundle_campaigns(bundle, capsys):

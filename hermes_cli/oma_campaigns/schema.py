@@ -19,6 +19,9 @@ def _validator(kind: str) -> Draft202012Validator:
 
 
 def validate_record(kind: str, record: dict, context: str | Path) -> None:
+    if kind == "campaign" and record.get("installation_state") == "installed" and "analytics_datasets" in record:
+        # Keep installed PR #55 records usable without reading or rewriting the retired setting.
+        record = {key: value for key, value in record.items() if key != "analytics_datasets"}
     error = next(_validator(kind).iter_errors(record), None)
     if error is not None:
         # Validator messages can include entire sections, including credential values.

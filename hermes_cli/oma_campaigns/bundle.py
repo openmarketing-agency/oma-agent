@@ -4,7 +4,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from agent.skill_selection import OMA_DEFAULT_STARTER_SKILLS, OMA_MAINTENANCE_ONLY_SKILLS
+from agent.skill_selection import OMA_ANALYST_SKILLS, OMA_DEFAULT_STARTER_SKILLS, OMA_MAINTENANCE_ONLY_SKILLS
 from hermes_constants import get_default_hermes_root, get_hermes_home
 from tools.skill_usage import read_skill_name
 
@@ -64,6 +64,7 @@ def seed_bundle(source: Path, home: Path) -> None:
     destination = bundle_dir(home)
     if destination.exists():
         _seed_humanizer(source, destination)
+        seed_analytics_skills(source, home)
         return
     # Stage on the home filesystem so a failed copy never leaves a partial bundle.
     with tempfile.TemporaryDirectory(prefix=".oma-bundle-", dir=home) as staging:
@@ -77,6 +78,19 @@ def seed_bundle(source: Path, home: Path) -> None:
             staged.rename(destination)
         else:
             _seed_humanizer(source, destination)
+            seed_analytics_skills(source, home)
+
+
+def seed_analytics_skills(source: Path, home: Path) -> None:
+    """Add the managed Analyst packages without replacing existing skill copies."""
+    skills = bundle_dir(home) / "skills"
+    destination = skills / "analytics"
+    if skills.is_symlink() or destination.is_symlink():
+        raise ValueError("Refusing a symlinked OMA analytics skill destination")
+    for name in sorted(OMA_ANALYST_SKILLS):
+        package = source / "skills" / "analytics" / name
+        if (package / "SKILL.md").is_file():
+            _seed_package(package, destination / name)
 
 
 def seed_role_skills(install_dir: Path, home: Path) -> None:
