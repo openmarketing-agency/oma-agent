@@ -253,7 +253,10 @@ see which integrations serve those play channels, what they need to deliver work
 (for example image or video generation for Instagram), and complementary tools.
 The data lives in `hermes_cli/oma_campaigns/schemas/integration-needs.json`, and
 every suggested tool is a Composio toolkit. `validate campaign` lists unmet needs,
-and integrations no plan names, under `warnings` without failing.
+and integrations no plan names, under `warnings` without failing. `create` and
+`revise` add a provider for each unmet need, preferring one the brand already
+uses, with a plan line that names it and its fallback. The provider is saved in
+`integrations` like any other required connection.
 
 To add or remove a tool on an installed campaign, write a revised definition and
 run `python -m hermes_cli.oma_campaigns revise <id> <definition.yaml>`. Fields you

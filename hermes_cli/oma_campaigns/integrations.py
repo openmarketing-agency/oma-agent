@@ -1,6 +1,5 @@
 """Canonical OMA integrations, brand-derived candidates, and what each integration needs."""
 
-from collections import Counter
 from functools import lru_cache
 from importlib.resources import files
 import json
@@ -74,13 +73,6 @@ def _ranked(options: Iterable[str], preferred: set[str]) -> list[str]:
 def _categories(keys: Iterable[str]) -> list[str]:
     catalog, by_slug = integration_catalog(), _slug_categories()
     return list(dict.fromkeys(label for key in keys for label in by_slug.get(catalog[key]["composio"], ())))
-
-
-def _capability_category(capability: str) -> list[str]:
-    """The label most of a capability's providers share, so one suggestion covers it."""
-    providers = integration_needs()["capabilities"][capability]["providers"]
-    counts = Counter(label for key in providers for label in _categories([key]))
-    return [counts.most_common(1)[0][0]] if counts else []
 
 
 def _provided(selected: Iterable[str]) -> set[str]:
@@ -160,26 +152,65 @@ def _complements(selected: list[str], skip: set[str], observed: set[str]) -> dic
             for name, users in found.items()}
 
 
+def choose_providers(selected: Iterable[str], observed: set[str]) -> list[dict]:
+    """Pick providers until every need is met: one the brand shows first, then the one covering most needs."""
+    capabilities = integration_needs()["capabilities"]
+    current, chosen = list(selected), []
+    while needs := missing_needs(current):
+        covers: dict[str, list[dict]] = {}
+        for need in needs:
+            for key in dict.fromkeys(key for name in need["any_of"] for key in capabilities[name]["providers"]):
+                covers.setdefault(key, []).append(need)
+        order = list(covers)
+        best = max(order, key=lambda key: (key in observed, len(covers[key]), -order.index(key)))
+        current.append(best)
+        chosen.append({"id": best, "needs": covers[best]})
+    return chosen
+
+
+def _plan_for(pick: dict) -> str:
+    catalog = integration_catalog()
+    name, need = catalog[pick["id"]]["name"], pick["needs"][0]
+    users = ", ".join(dict.fromkeys(catalog[item["for"]]["name"] for item in pick["needs"]))
+    return f"Use {name} for what {users} needs: {need['why']} If {name} is unavailable: {need['fallback']}"
+
+
+def with_needed_tools(home: Path, record: dict) -> tuple[dict, list[str]]:
+    """Add a provider, and a plan naming it, for each integration need the record leaves unmet."""
+    chosen = choose_providers(record.get("integrations", ()), set(brand_candidates(home)["candidates"]))
+    if not chosen:
+        return record, []
+    added = [pick["id"] for pick in chosen]
+    plans = list(record.get("plans", []))
+    plans += [_plan_for(pick) for pick in chosen if not mentions(pick["id"], plans)]
+    revised = {**record, "integrations": [*record.get("integrations", []), *added], "plans": plans}
+    if "integration_categories" in record:
+        revised["integration_categories"] = list(dict.fromkeys([*record["integration_categories"], *_categories(added)]))
+    return revised, added
+
+
 def recommend(home: Path, ids: Iterable[str] = (), channels: Iterable[str] = ()) -> dict:
-    """Suggest integrations for a campaign: chosen ones, their unmet needs, and complements.
+    """Suggest integrations for a campaign: chosen ones, providers for their needs, and complements.
 
     ``channels`` are play channel IDs; a channel with one possible integration, or
     one the brand already shows, is selected, and the rest are returned as choices.
+    Each unmet need names the provider ``create`` and ``revise`` would add for it.
     """
     capabilities = integration_needs()["capabilities"]
     observed = set(brand_candidates(home)["candidates"])
     selected, choices, unmapped = _select(ids, channels, observed)
-    needs = [{**need, "options": {name: {"name": capabilities[name]["name"],
-                                         "providers": _ranked(capabilities[name]["providers"], observed)}
-                                  for name in need["any_of"]}}
-             for need in missing_needs(selected)]
-    needed = list(dict.fromkeys(name for need in needs for name in need["any_of"]))
-    categories = [*_categories(selected), *(label for name in needed for label in _capability_category(name))]
+    chosen = choose_providers(selected, observed)
+    needs = [{**need, "chosen": pick["id"],
+              "options": {name: {"name": capabilities[name]["name"],
+                                 "providers": _ranked(capabilities[name]["providers"], observed)}
+                          for name in need["any_of"]}}
+             for pick in chosen for need in pick["needs"]]
+    integrations = [*selected, *(pick["id"] for pick in chosen)]
     return {
-        "integrations": selected,
+        "integrations": integrations,
         "channel_choices": choices,
         "needs": needs,
-        "complements": _complements(selected, _provided(selected) | set(needed), observed),
-        "integration_categories": list(dict.fromkeys(categories)),
+        "complements": _complements(integrations, _provided(integrations), observed),
+        "integration_categories": _categories(integrations),
         "unmapped": unmapped,
     }

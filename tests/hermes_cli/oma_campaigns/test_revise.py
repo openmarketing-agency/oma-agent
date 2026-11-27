@@ -89,6 +89,21 @@ def test_revise_saves_covered_tools_and_wakes_a_running_orchestrator_once(campai
     assert task.assignee == "demo__orchestrator" and "removed reddit" in task.body
 
 
+def test_revise_adds_a_provider_for_a_new_tools_needs(campaign, capsys):
+    from hermes_cli.oma_campaigns.integrations import mentions
+    from hermes_cli.oma_campaigns.source import read_mapping
+
+    _, config, revised, main = campaign
+    plans = [*PLANS, "Post three Instagram carousels a week."]
+    code, result = _revise(main, capsys, revised, integrations=["reddit", "instagram"], plans=plans)
+    assert code == 0, result
+    [provider] = result["added_for_needs"]
+    assert result["added"] == ["instagram", provider]
+    saved = read_mapping(config)
+    assert saved["integrations"] == ["reddit", "instagram", provider]
+    assert saved["plans"][:2] == plans and mentions(provider, saved["plans"][2:])
+
+
 def test_revise_keeps_the_installed_roster_and_mode(campaign, capsys):
     _, _, revised, main = campaign
     code, error = _revise(main, capsys, revised, agents=["demo__orchestrator", "demo__publisher"])

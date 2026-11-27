@@ -20,6 +20,7 @@ from hermes_cli.config_defaults import DEFAULT_CONFIG
 from hermes_cli.config_home import OMA_CAMPAIGN_SKILL
 from hermes_cli.oma_campaigns.bundle import HUMANIZER_SKILL
 from hermes_cli.oma_campaigns.defaults import agent_defaults, snapshot
+from hermes_cli.oma_campaigns.integrations import with_needed_tools
 from hermes_cli.oma_campaigns.schema import validate_record
 from hermes_cli.oma_campaigns.role_skills import write_skill_inventory
 from hermes_cli.oma_campaigns.settings import (
@@ -495,6 +496,7 @@ def create(home: Path, definition: Path) -> dict:
     validate_record("campaign", config, definition)
     if fields := MANAGED_FIELDS & config.keys():
         raise ValueError(f"Campaign creation manages these fields: {', '.join(sorted(fields))}")
+    config, _ = with_needed_tools(home, config)
     return _install(home, config["id"], definition=config)
 
 

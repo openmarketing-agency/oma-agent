@@ -17,7 +17,7 @@ from hermes_cli.kanban_db_connect import connect_closing
 from hermes_cli.oma_campaigns.install import (
     MANAGED_FIELDS, _campaign_config_path, _campaigns_dir, _install_lock, _real_path, _status,
 )
-from hermes_cli.oma_campaigns.integrations import campaign_warnings, mentions
+from hermes_cli.oma_campaigns.integrations import campaign_warnings, mentions, with_needed_tools
 from hermes_cli.oma_campaigns.schema import validate_record
 from hermes_cli.oma_campaigns.source import DEFAULT_CAMPAIGN_MODE, read_mapping
 from hermes_cli.oma_campaigns.sync import sync_campaign
@@ -95,13 +95,17 @@ def revise(home: Path, campaign_id: str, definition: Path) -> dict:
         if _status(home, campaign_id, saved)["state"] != "installed":
             raise ValueError(f"Campaign {campaign_id!r} is not installed; use create for a new campaign")
         _check_unchanged(saved, proposed)
-        revised = {**saved, **proposed, "agents": saved["agents"]}
+        authored = {**saved, **proposed, "agents": saved["agents"]}
+        validate_record("campaign", authored, definition)
+        # Check the plans the user wrote: the plan lines added for needs name the tools they serve.
+        added, removed = _tool_change(saved, authored)
+        revised, needed = with_needed_tools(home, authored)
         validate_record("campaign", revised, definition)
-        added, removed = _tool_change(saved, revised)
+        added += [key for key in needed if key not in saved.get("integrations", [])]
         atomic_config_write(path, revised)
     synced = sync_campaign(home, campaign_id)
     return {
-        "id": campaign_id, "added": added, "removed": removed,
+        "id": campaign_id, "added": added, "removed": removed, "added_for_needs": needed,
         "updated_agents": synced["updated_agents"],
         "replan_task": _queue_replan(home, path, revised, added, removed),
         "warnings": campaign_warnings(revised),
