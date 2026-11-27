@@ -23,13 +23,14 @@ from hermes_cli.oma_campaigns.defaults import snapshot
 from hermes_cli.oma_campaigns.install import (
     HUMANIZER_DRAFT_GUIDANCE, _agent_data_dir, _campaign_config_path, _campaigns_dir,
     _install_lock, _status, campaign_soul, default_home,
-    ensure_analyst,
+    ensure_analyst, installed,
 )
 from hermes_cli.oma_campaigns.role_jobs import apply_role_jobs, plan_role_jobs
 from hermes_cli.oma_campaigns.role_skills import apply_role_skills, plan_role_skills
 from hermes_cli.oma_campaigns.schema import validate_record
 from hermes_cli.oma_campaigns.settings import (
-    apply_profile_settings, credential_keys, materialize_agent_settings, resolve_settings, settings_from,
+    apply_profile_settings, credential_keys, enforce_toolset_baseline, materialize_agent_settings,
+    mcp_toolset_names, resolve_settings, settings_from,
 )
 from hermes_cli.oma_campaigns.source import _member, read_mapping
 from hermes_constants import PROFILE_ID_RE, named_profile_is_live
@@ -188,6 +189,60 @@ def _plan_agent(home: Path, agent_id: str, env: dict[str, str], *, campaign: _Ca
                         if defaults.get("mode") != "control" and agent_id != f"{campaign_id}__analyst" else None)
 
 
+def _inherited_mcp_settings(native: dict, record: dict, campaign: _Campaign, agent_id: str) -> tuple[dict, dict]:
+    """Reconcile inherited names, leaving overrides to an explicit role or campaign sync."""
+    overrides = campaign.saved.get("mcp_servers", {}).keys() | record.get("mcp_servers", {}).keys()
+    previous = record.get("effective", {}).get("mcp_servers", {})
+    inherited = {name: server for name, server in campaign.resolved.get("mcp_servers", {}).items()
+                 if name not in overrides}
+    current = settings_from({"mcp_servers": native.get("mcp_servers", {})}, agent_id)["mcp_servers"]
+    removed = previous.keys() - inherited.keys() - overrides
+    servers = {**{name: server for name, server in current.items() if name not in removed}, **inherited}
+    updated = dict(native)
+    if servers != current:
+        if servers:
+            updated["mcp_servers"] = servers
+        else:
+            updated.pop("mcp_servers", None)
+        # Reconcile admitted MCP toolsets without applying pending role policy.
+        obsolete = set(mcp_toolset_names(native)) - set(mcp_toolset_names(updated))
+        agent = updated.get("agent", {})
+        policy = enforce_toolset_baseline(updated, agent_id)
+        updated["agent"] = {**agent, "enabled_toolsets": [name for name in policy["agent"]["enabled_toolsets"]
+                                                           if name not in obsolete]}
+    managed = {**{name: current[name] for name in overrides if name in current}, **inherited}
+    return updated, {"mcp_servers": managed} if managed else {}
+
+
+def _plan_inheritance(home: Path, agent_id: str, campaign: _Campaign) -> _AgentUpdate:
+    directory = record_dir(home, agent_id)
+    record_path = _member(directory, "config.yaml")
+    record, digest = _read_saved(record_path, agent_id, campaign.status["id"])
+    profile = profile_dir(home, agent_id)
+    native_path = _member(profile, "config.yaml")
+    before = config_version(native_path)
+    native = require_readable_config_before_write(native_path)
+    next_native, managed_mcp = _inherited_mcp_settings(native, record, campaign, agent_id)
+    stored = load_env_file(_member(profile, ".env"))
+    credentials = {}
+    if "model" not in record and "model" not in campaign.saved:
+        if "model" in campaign.resolved:
+            next_native["model"] = campaign.resolved["model"]
+        else:
+            next_native.pop("model", None)
+        inherited = {name: value for name, value in campaign.inherited_credential.items() if not stored.get(name)}
+        credentials = plan_credential_updates(profile, set(inherited), stored, inherited)
+    names, available = key_status(credential_keys(settings_from(next_native, agent_id)), {**stored, **credentials})
+    next_record = materialize_agent_settings(record, managed_mcp)
+    next_record.update({"all-keys": sorted(names), "available-keys": sorted(available)})
+    updated = tuple(key for key in ("model", "mcp_servers", "agent") if native.get(key) != next_native.get(key))
+    return _AgentUpdate(
+        agent_id, record_path, digest, native_path, before, next_record if next_record != record else None,
+        next_native, _read_soul(_member(directory, "SOUL.md")), _read_soul(_member(profile, "SOUL.md")),
+        None, updated, names, available, credentials, set(), None, None,
+    )
+
+
 def _verify_record(update: _AgentUpdate) -> None:
     authored_path = _member(update.record_path.parent, "config.yaml")
     with authored_path.open("rb") as stream:  # config-reader: ok — authored OMA record, not native config
@@ -255,6 +310,19 @@ def _publish_campaign_keys(campaign: _Campaign, pairs: list[tuple[set[str], set[
         atomic_config_write(campaign.path, {**campaign.saved, **summary})
 
 
+def _apply_campaign_plans(campaign: _Campaign, plans: list[_AgentUpdate]) -> list[str]:
+    for plan in plans:
+        _verify_plan(plan)
+    _verify_campaign(campaign)
+    updates = []
+    for plan in plans:
+        changed, _ = _apply(plan)
+        if changed or plan.record is not None:
+            updates.append(plan.agent_id)
+    _publish_campaign_keys(campaign, [(plan.all_keys, plan.available_keys) for plan in plans])
+    return updates
+
+
 def sync_campaign(home: Path, campaign_id: str, *, env: dict[str, str] | None = None) -> dict:
     require_file_tooling("OMA campaign settings sync")
     supplied = validate_sync_env(env) if env is not None else {}
@@ -264,15 +332,7 @@ def sync_campaign(home: Path, campaign_id: str, *, env: dict[str, str] | None = 
         campaign = _load_installed(home, campaign_path, campaign_id)
         agents = campaign.status["agents"]
         plans = [_plan_agent(home, agent_id, supplied, campaign=campaign) for agent_id in agents]
-        for plan in plans:
-            _verify_plan(plan)
-        _verify_campaign(campaign)
-        updates = []
-        for plan in plans:
-            changed, _ = _apply(plan)
-            if changed or plan.record is not None:
-                updates.append(plan.agent_id)
-        _publish_campaign_keys(campaign, [(plan.all_keys, plan.available_keys) for plan in plans])
+        updates = _apply_campaign_plans(campaign, plans)
         config = ensure_analyst(home, campaign_path, read_mapping(campaign_path))
         agents = config["agents"]
         message = f"updated {len(updates)} profile(s)" if updates else "no agent changes"
@@ -300,6 +360,21 @@ def _sync_campaign_agent(home: Path, agent_id: str, supplied: dict[str, str], re
     return {"id": agent_id, "revision": digest, "updated": changed}
 
 
+def _sync_default_inheritance(home: Path) -> list[str]:
+    updated = []
+    for status in installed(home):
+        if status["state"] != "installed":
+            continue
+        campaign_id = status["id"]
+        path = _campaign_config_path(_campaigns_dir(home), campaign_id)
+        with _install_lock(path):
+            campaign = _load_installed(home, path, campaign_id)
+            plans = [_plan_inheritance(home, member, campaign) for member in campaign.status["agents"]]
+            if _apply_campaign_plans(campaign, plans):
+                updated.append(campaign_id)
+    return updated
+
+
 def sync_agent(home: Path, agent_id: str, *, revision: str | None = None, env: dict[str, str] | None = None) -> dict:
     require_file_tooling("OMA agent sync")
     supplied = validate_sync_env(env) if env is not None else {}
@@ -310,7 +385,10 @@ def sync_agent(home: Path, agent_id: str, *, revision: str | None = None, env: d
         with _FileLock(_member(directory, ".sync.lock"), timeout=10):
             plan = _plan_agent(home, agent_id, supplied, revision=revision)
             changed, digest = _apply(plan)
-        return {"id": agent_id, "revision": digest, "updated": changed}
+            result = {"id": agent_id, "revision": digest, "updated": changed}
+            if agent_id == "default":
+                result["updated_campaigns"] = _sync_default_inheritance(home)
+        return result
     if not PROFILE_ID_RE.fullmatch(agent_id) or "__" not in agent_id:
         raise ValueError("Expected default, maintenance, or a canonical campaign agent ID")
     return _sync_campaign_agent(home, agent_id, supplied, revision)
