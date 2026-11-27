@@ -35,7 +35,7 @@ Design campaigns from the saved brand and marketing playbook. Creating a campaig
 
 ## When to Use
 
-- Create campaigns during onboarding, add a campaign, or revise its goals and plans.
+- Create campaigns during onboarding, add a campaign, or revise its goals, plans, and tools.
 - Inspect, provision, or start a saved campaign when requested.
 - Find an idea, worked play, or channel rule to guide campaign design.
 
@@ -55,6 +55,7 @@ Use `terminal` from the installed skill directory reported by `skill_view`. Run 
 | `recommend --channels <play channels> [--for <ids>]` | Pick integrations for the play's channels, list what they need (such as image or video generation for Instagram) and complementary tools. Suggestions only. |
 | `create <definition.yaml>` | Provision a new campaign, its team, and an empty Kanban board. Leaves it paused. |
 | `install <id>` | Provision a legacy saved definition as a paused campaign. |
+| `revise <id> <definition.yaml>` | Apply revised goals, plans, and tools to an installed campaign and sync its team. Refuses tool changes the plans don't cover. |
 | `configure <id>` | Fill missing routing on a verified installation; does not change its roster. |
 | `lifecycle <id> resumed` | Resume an installed campaign using its saved model. Does not verify connection access. |
 
@@ -86,6 +87,16 @@ Write new definitions outside `oma/campaigns/`, for example `oma/staging/<campai
 4. **Prepare the definition and team.** Write the staging definition, each `oma/agents/<agent-id>/config.yaml`, and its role-specific `SOUL.md`. Give everyone distinct outputs, an absolute `saves/` path, and only needed tools and skills. Give standing `kanban` access to the orchestrator only. Roles reading untrusted content do not get `terminal`. Use authorized channel tools for writes, never browser-driven publication. Publishers follow the [channel rules](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-campaigns/channels/README.md), verify the destination, and record the resulting URL or receipt. Apply human approval only to new publications in `approve` and `control`. For human-only channels, hand material to the authorized person rather than posting automatically.
 5. **Declare recurring work.** Follow [review signals](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-campaigns/references/review-signals.md). For active social and community accounts, start with **one lightweight activity check per hour** for new comments, replies, mentions, or tagged posts. Keep performance reporting weekly. Use the requested cadence and prefer reliable events when available. Scope checks to verified sources, act only on new items since the last successful checkpoint, cap work, and don't queue duplicates. The Comment-to-DM publisher can scan eligible keyword replies hourly; polling is not permission to send. Save existing `jobs` fields (`id`, `schedule`, `prompt`, plus `timezone` or `repeat` only as needed); otherwise `jobs: []`.
 6. **Validate and provision.** Run `campaign.py validate campaign <path>` and `validate agent <path>` in `terminal`. Resolve each `warnings` entry from campaign validation by adding a provider or planning the fallback. Read each persona back and check the roster, saves paths, integration IDs, suggested categories, and declared prompts. Complete missing role records before provisioning. Run `campaign.py create <definition.yaml>` for a new campaign. If the canonical config already exists and `status <id>` says to run `install`, use `install <id>` for that legacy definition instead. Reuse an already-installed campaign; report an incomplete installation as blocked rather than overwriting it. Read back `status <id>`: for a new installation, require `state: installed`, `lifecycle_state: paused`, the expected `campaign-<id>` board, and `present_profiles` matching the installed roster, including the managed analyst. Missing connections are start prerequisites, not reasons to stop at an uninstalled definition. If provisioning fails, report the error and don't claim the campaign was created.
+
+## Change a Campaign's Tools
+
+When the user adds or removes a tool on an installed campaign, revise the plans with it; a tool no plan names gets no work.
+
+1. Copy `oma/campaigns/<id>/config.yaml` to `oma/staging/<id>.yaml`. Fields you leave out keep their saved values; the roster and mode don't change here.
+2. Run `recommend --for <the new integrations>` and add one provider for each unmet need, such as image generation for Instagram.
+3. For each added tool, add a plan naming it, what it produces, the owning role, the cadence, and the fallback. Change `goals` only when what is measured changes. For each removed tool, rewrite or drop the plans that name it.
+4. Update the owning roles' records: the publisher's channels and `SOUL.md` for a new channel, the writer's `SOUL.md` and `oma_skills` for a new media tool, and an hourly activity job for a new social account per [review signals](https://github.com/openmarketing-agency/oma-agent/blob/main/skills/oma/oma-campaigns/references/review-signals.md).
+5. Run `validate`, then `revise <id> oma/staging/<id>.yaml`. It refuses an added tool no plan names and a removed tool a plan still names, syncs the team, and on a running campaign outside `control` queues one re-plan task for the orchestrator. Report `added`, `removed`, `replan_task`, and any `warnings`.
 
 ## Finish Campaign Copy
 

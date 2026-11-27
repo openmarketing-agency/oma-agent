@@ -9,8 +9,9 @@ from hermes_cli.oma_campaigns.analytics import campaign_dir, list_analytics
 from hermes_cli.oma_campaigns.analytics_cron import analytics_status
 from hermes_cli.oma_campaigns.analytics_sync.data import list_records
 from hermes_cli.oma_campaigns.install import configure, create, default_home, install, installed
-from hermes_cli.oma_campaigns.integrations import brand_candidates, needs_warnings, recommend
+from hermes_cli.oma_campaigns.integrations import brand_candidates, campaign_warnings, recommend
 from hermes_cli.oma_campaigns.lifecycle import set_lifecycle, set_mode
+from hermes_cli.oma_campaigns.revise import revise
 from hermes_cli.oma_campaigns.schema import KINDS, validate_record
 from hermes_cli.oma_campaigns.source import read_mapping
 
@@ -27,6 +28,9 @@ def main(argv=None) -> int:
     commands.add_parser("configure", help="Fill missing routing metadata for a verified installed campaign").add_argument("id")
     commands.add_parser("create", help="Create a paused campaign with its team and Kanban board").add_argument("path", type=Path)
     commands.add_parser("install", help="Provision a legacy saved campaign definition without starting it").add_argument("id")
+    revision = commands.add_parser("revise", help="Revise an installed campaign's goals, plans and tools, then sync it")
+    revision.add_argument("id")
+    revision.add_argument("path", type=Path)
     commands.add_parser("integrations", help="List brand-derived candidate integrations")
     recommendation = commands.add_parser(
         "recommend", help="Suggest integrations, what they need, and complementary tools for a campaign")
@@ -62,6 +66,7 @@ def main(argv=None) -> int:
         "configure": lambda home, args: configure(home, args.id),
         "create": lambda home, args: create(home, args.path),
         "install": lambda home, args: install(home, args.id),
+        "revise": lambda home, args: revise(home, args.id, args.path),
         "integrations": lambda home, args: brand_candidates(home),
         "recommend": lambda home, args: recommend(home, args.ids, args.channels),
         "analytics-status": lambda home, args: analytics_status(home, args.id),
@@ -79,7 +84,7 @@ def main(argv=None) -> int:
         if args.command == "validate":
             record = read_mapping(args.path)
             validate_record(args.kind, record, args.path)
-            warnings = needs_warnings(record) if args.kind == "campaign" else []
+            warnings = campaign_warnings(record) if args.kind == "campaign" else []
             print(json.dumps({"kind": args.kind, "valid": True, "warnings": warnings}))
             return 0
         result = handlers[args.command](default_home(), args)

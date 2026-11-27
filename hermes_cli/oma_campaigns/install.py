@@ -280,7 +280,8 @@ def _campaign_context_soul(config_path: Path) -> str:
     brand = oma / "brand" / "config.yaml"
     return (
         "## Your campaign context\n\n"
-        f"- Campaign: read `{config_path}` for your campaign's goals and plans.\n"
+        f"- Campaign: read `{config_path}` for your campaign's goals, plans, and `integrations`, the connected tools "
+        "the plans rely on. Find a listed tool's actions with Tool Search before deciding it is unavailable.\n"
         f"- Playbook: read `{playbook}` for the shared strategy.\n"
         f"- Brand: read `{brand}` for the shared brand context.\n"
         "- Design: before making a post, ad, image, or video, read the design system that the brand record "
@@ -340,6 +341,11 @@ def campaign_soul(soul: str, agent_id: str, orchestrator: str, agents: tuple[str
         "the essential prerequisite is still unresolved. Record what you tried and ask the person who can resolve it "
         "for the specific action the team cannot take. "
         "If board tools are unavailable in a task-scoped run, leave findings on your assigned card for the next board review.\n\n"
+        "## Keeping work matched to the campaign's tools\n\n"
+        "At each campaign board review, compare the campaign's `integrations` and `plans` with the open and recent "
+        "cards. When a listed tool's plan has no task, create one for the role that owns it, starting with the first "
+        "deliverable the plan names. Cancel or rewrite open cards that depend on a tool no longer listed. If a listed "
+        "tool is not reachable, note what connection is missing instead of planning work that needs it.\n\n"
         if agent_id == orchestrator else ""
     )
     analyst_guidance = (
@@ -479,12 +485,15 @@ def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
     return config
 
 
+MANAGED_FIELDS = frozenset({"installation_state", "lifecycle_state", "kanban_board", "kanban_board_name",
+                            "all-keys", "available-keys"})
+
+
 def create(home: Path, definition: Path) -> dict:
     """Create an installed, paused campaign from a definition outside the campaign registry."""
     config = read_mapping(_real_path(definition))
     validate_record("campaign", config, definition)
-    managed = {"installation_state", "lifecycle_state", "kanban_board", "kanban_board_name", "all-keys", "available-keys"}
-    if fields := managed & config.keys():
+    if fields := MANAGED_FIELDS & config.keys():
         raise ValueError(f"Campaign creation manages these fields: {', '.join(sorted(fields))}")
     return _install(home, config["id"], definition=config)
 

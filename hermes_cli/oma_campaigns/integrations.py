@@ -5,6 +5,7 @@ from functools import lru_cache
 from importlib.resources import files
 import json
 from pathlib import Path
+import re
 from typing import Iterable
 
 from hermes_cli.oma_campaigns.schema import validate_record
@@ -96,9 +97,30 @@ def missing_needs(selected: Iterable[str]) -> list[dict]:
             if not provided.intersection(need["any_of"])]
 
 
-def needs_warnings(record: dict) -> list[str]:
+def _terms(key: str) -> set[str]:
+    row = integration_catalog().get(key, {})
+    names = (key, key.replace("-", " "), row.get("name", ""), row.get("composio", "").replace("_", " "),
+             *row.get("aliases", ()))
+    return {name.strip().lower() for name in names if name and name.strip()}
+
+
+def mentions(key: str, texts: Iterable[str]) -> bool:
+    """Whether any text names the integration by its ID, display name, or Composio slug."""
+    pattern = "|".join(re.escape(term) for term in sorted(_terms(key), key=len, reverse=True))
+    found = re.compile(rf"(?<![a-z0-9])(?:{pattern})(?![a-z0-9])")
+    return any(found.search(text.lower()) for text in texts)
+
+
+def unplanned(record: dict) -> list[str]:
+    """Declared integrations that no plan names, so no agent is given work for them."""
+    plans = record.get("plans", ())
+    return [key for key in record.get("integrations", ()) if not mentions(key, plans)]
+
+
+def campaign_warnings(record: dict) -> list[str]:
     capabilities = integration_needs()["capabilities"]
-    warnings = []
+    warnings = [f"{key} is declared but no plan uses it: add a plan saying what it produces and which role owns it"
+                for key in unplanned(record)]
     for need in missing_needs(record.get("integrations", ())):
         names = " or ".join(capabilities[name]["name"].lower() for name in need["any_of"])
         warnings.append(f"{need['for']} needs {names}: {need['why']} Add one provider to integrations "

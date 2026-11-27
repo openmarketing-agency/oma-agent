@@ -51,7 +51,8 @@ def test_validate_campaign_warns_about_unmet_integration_needs(oma, capsys):
     tmp_path, main = oma
     definition = tmp_path / "demo.yaml"
     base = {"id": "demo", "name": "Demo", "description": "Test team.", "orchestrator": "demo__orchestrator",
-            "agents": ["demo__orchestrator", "demo__publisher"]}
+            "agents": ["demo__orchestrator", "demo__publisher"],
+            "plans": ["Post on Instagram, answer on Reddit, and make images with Higgsfield."]}
     for integrations, warned in ((["instagram", "reddit"], ["instagram"]), (["instagram", "higgsfield"], [])):
         atomic_config_write(definition, {**base, "integrations": integrations})
         assert main(["validate", "campaign", str(definition)]) == 0

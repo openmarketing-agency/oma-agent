@@ -252,8 +252,15 @@ Run `python -m hermes_cli.oma_campaigns recommend --channels instagram,blog` to
 see which integrations serve those play channels, what they need to deliver work
 (for example image or video generation for Instagram), and complementary tools.
 The data lives in `hermes_cli/oma_campaigns/schemas/integration-needs.json`, and
-every suggested tool is a Composio toolkit. `validate campaign` lists unmet needs
-under `warnings` without failing.
+every suggested tool is a Composio toolkit. `validate campaign` lists unmet needs,
+and integrations no plan names, under `warnings` without failing.
+
+To add or remove a tool on an installed campaign, write a revised definition and
+run `python -m hermes_cli.oma_campaigns revise <id> <definition.yaml>`. Fields you
+leave out keep their saved values. The command refuses an added integration that
+no plan names, a removed one that a plan still names, roster changes, and mode
+changes. It then syncs the team, and on a resumed campaign outside `control` it
+queues one re-plan task for the orchestrator.
 
 ### Shared brand and playbook
 
