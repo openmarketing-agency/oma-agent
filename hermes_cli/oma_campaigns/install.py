@@ -447,7 +447,7 @@ def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
         }, agent_id, orchestrator=False, campaign_id=campaign_id)
     else:
         _, authored = read_agent_record(home, campaign_id, agent_id)
-    retired_record = "analytics_sources" in authored
+    write_record = new_record or "analytics_sources" in authored
     authored.pop("analytics_sources", None)
     if not soul_path.is_file():
         atomic_write_text(soul_path, f"You are the analyst for {config['name']}. Report measured observations. "
@@ -474,8 +474,11 @@ def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
         provision_profile(ProfileCreateRequest(name=agent_id, alias=False, mirror_credentials=False,
                                                description=agent.description, soul=soul),
                           initialize=partial(_initialize, agent, configs[agent_id], credentials))
+        managed = materialize_agent_settings(authored, effective)
+        write_record |= managed != authored
+        authored = managed
     remove_retired_analytics_keys(profile, retired_analytics_keys(load_env_file(_real_path(profile / ".env"))))
-    if new_record or retired_record:
+    if write_record:
         atomic_config_replace(record_path, authored)
     if config.get("mode") == "control" and config.get("installation_state") == "installed":
         from hermes_cli.oma_campaigns.lifecycle import _control_cron

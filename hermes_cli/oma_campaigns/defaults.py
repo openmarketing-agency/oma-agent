@@ -8,7 +8,7 @@ from hermes_cli.auth import PROVIDER_REGISTRY, _IMPLICIT_ENV_VARS, _usable_decla
 from hermes_cli.config import read_user_config_raw, validate_env_var_name_for_write
 from hermes_cli.config_credential_values import refuse_redacted_env_value
 from hermes_cli.models import normalize_provider
-from hermes_cli.oma_campaigns.settings import ENV_REFERENCE, enforce_toolset_baseline
+from hermes_cli.oma_campaigns.settings import ENV_REFERENCE, enforce_toolset_baseline, resolve_settings, settings_from
 
 
 def _provider_keys(provider: str) -> tuple[str, ...]:
@@ -64,6 +64,11 @@ def _inherited_model(model: object, env_path: Path) -> tuple[object, dict[str, s
 def snapshot(home: Path, campaign: dict) -> tuple[dict, dict[str, str]]:
     """Read saved settings, not the current turn or the merged runtime defaults."""
     saved = read_user_config_raw(home / "config.yaml")
+    # Use raw definitions so `${VAR}` is resolved in the receiving profile,
+    # not expanded with the default profile's credentials during sync.
+    if "mcp_servers" in saved:
+        defaults = settings_from({"mcp_servers": saved["mcp_servers"]}, "default profile")
+        campaign = resolve_settings(defaults, campaign)
     agent = saved.get("agent")
     campaign_agent = campaign.get("agent", {})
     if isinstance(agent, dict) and agent.get("reasoning_effort") is not None and "reasoning_effort" not in campaign_agent:

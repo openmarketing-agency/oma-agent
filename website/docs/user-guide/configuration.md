@@ -154,9 +154,10 @@ Both apply these settings from the saved OMA records:
   If none of these sources supplies a campaign member's model, sync removes the
   stale native model. Standalone sync still leaves omitted settings alone.
   `effective.model` is not supported.
-- **MCP:** Campaign and agent `mcp_servers` combine by name. Replace an entire
-  named server or set `enabled: false` on that agent; `{}` adds no campaign
-  overrides. A standalone agent's explicit map replaces its native MCP map.
+- **MCP:** `mcp_servers` resolves by name: agent overrides campaign, which
+  overrides the saved `default` profile. Each entry replaces the entire named
+  server; `enabled: false` opts out at that level, and `{}` adds no overrides.
+  A standalone agent's explicit map replaces its native MCP map.
   `effective.mcp_servers` records what sync managed; don't edit it. Install and
   both sync paths add `mcp-<server-name>` to the profile's `agent.enabled_toolsets`
   for every enabled server, because an explicit allowlist is otherwise
@@ -187,9 +188,16 @@ Both apply these settings from the saved OMA records:
   Activate a desired job separately with native Hermes cron.
 
 Install and sync read missing campaign defaults from the saved `default` profile,
-not from the current chat. Only profiles inheriting that model can receive its
-matching saved API key. Sync uses the inherited key to fill a missing profile key;
-an explicitly supplied key takes precedence.
+not from the current chat. Running Agent Sync for `default` also refreshes inherited
+models and named MCP servers in installed campaigns, including paused campaigns.
+It doesn't apply pending campaign or agent overrides, personas, or schedules, or
+update `maintenance`. Saving settings alone does not propagate them.
+
+Only profiles inheriting the model can receive its matching saved API key. Sync
+uses that key to fill a missing profile key; an explicitly supplied key takes
+precedence. Keep MCP credentials in the target profiles' `.env` files and use
+`${KEY_NAME}` references in shared server definitions. Inheriting a server copies
+its definition, not `default`'s MCP environment values or trust decisions.
 
 Both commands accept an explicit JSON key map on `--env-stdin`. Campaign Sync
 saves each supplied value to every roster member's `.env`; Agent Sync saves it
