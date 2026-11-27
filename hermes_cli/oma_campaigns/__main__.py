@@ -5,6 +5,9 @@ import json
 import sys
 from pathlib import Path
 
+from hermes_cli.oma_campaigns.analytics import campaign_dir, list_analytics
+from hermes_cli.oma_campaigns.analytics_cron import analytics_status
+from hermes_cli.oma_campaigns.analytics_sync.data import list_records
 from hermes_cli.oma_campaigns.install import configure, create, default_home, install, installed
 from hermes_cli.oma_campaigns.integrations import brand_candidates
 from hermes_cli.oma_campaigns.lifecycle import set_lifecycle, set_mode
@@ -21,6 +24,20 @@ def main(argv=None) -> int:
     commands.add_parser("create", help="Create a paused campaign with its team and Kanban board").add_argument("path", type=Path)
     commands.add_parser("install", help="Provision a legacy saved campaign definition without starting it").add_argument("id")
     commands.add_parser("integrations", help="List brand-derived candidate integrations")
+    commands.add_parser("analytics-status", help="Read campaign analytics progress and coverage").add_argument("id")
+    records = commands.add_parser("analytics-records", help="Read saved detailed campaign analytics records")
+    records.add_argument("id")
+    records.add_argument("source")
+    records.add_argument("dataset")
+    records.add_argument("--before", type=int)
+    records.add_argument("--limit", type=int, default=50)
+    breakdown = commands.add_parser("analytics-breakdown", help="Read a saved campaign analytics breakdown")
+    breakdown.add_argument("id")
+    breakdown.add_argument("source")
+    breakdown.add_argument("breakdown")
+    breakdown.add_argument("--metric")
+    breakdown.add_argument("--before", type=int)
+    breakdown.add_argument("--limit", type=int, default=50)
     lifecycle = commands.add_parser("lifecycle", help="Pause or resume an installed campaign")
     lifecycle.add_argument("id")
     lifecycle.add_argument("state", choices=("paused", "resumed"))
@@ -38,6 +55,13 @@ def main(argv=None) -> int:
         "create": lambda home, args: create(home, args.path),
         "install": lambda home, args: install(home, args.id),
         "integrations": lambda home, args: brand_candidates(home),
+        "analytics-status": lambda home, args: analytics_status(home, args.id),
+        "analytics-records": lambda home, args: list_records(campaign_dir(home, args.id), source=args.source,
+                                                              dataset=args.dataset, before=args.before,
+                                                              limit=args.limit),
+        "analytics-breakdown": lambda home, args: list_analytics(
+            home, args.id, source=args.source, breakdown=args.breakdown, metric=args.metric,
+            before=args.before, limit=args.limit),
         "lifecycle": lambda home, args: set_lifecycle(home, args.id, args.state),
         "mode": lambda home, args: set_mode(home, args.id, args.mode),
     }

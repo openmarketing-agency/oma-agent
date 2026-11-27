@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS analytics_observations (
     UNIQUE (source, account, metric, period_start, period_end, dimensions)
 )
 """
+_BREAKDOWN = "json_extract(dimensions, '$.breakdown')"
 _COLUMNS = ("source", "account", "metric", "period_start", "period_end", "dimensions", "value", "unit")
 _REFRESH_SCHEMA = """
 CREATE TABLE IF NOT EXISTS analytics_refresh (
@@ -91,30 +92,36 @@ def _prepare(row: dict) -> tuple:
             start, end, _json(row["dimensions"]), _json(row["value"]), _label(row["unit"], empty=True))
 
 
-def save_observations(home: Path, campaign_id: str, rows: list[dict], *, refresh_complete: bool = False) -> int:
-    """Commit one collected batch; invalid rows cannot leave a partial write."""
-    directory = campaign_dir(home, campaign_id)
+def _store_observations(conn: sqlite3.Connection, rows, collected: str) -> int:
     prepared = [_prepare(row) for row in rows]
-    if not prepared and not refresh_complete:
-        return 0
-    collected = datetime.now(UTC).isoformat(timespec="microseconds")
-    with connect_campaign_data(directory, write=True) as conn:
-        conn.execute(_SCHEMA)
-        if refresh_complete:
-            conn.execute(_REFRESH_SCHEMA)
-            conn.execute("INSERT OR REPLACE INTO analytics_refresh VALUES (1, ?)", (collected,))
-        conn.executemany("""
-            INSERT INTO analytics_observations
-                (source, account, metric, period_start, period_end, dimensions, value, unit, collected_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (source, account, metric, period_start, period_end, dimensions)
-            DO UPDATE SET value=excluded.value, unit=excluded.unit, collected_at=excluded.collected_at
-        """, [(*row, collected) for row in prepared])
+    conn.execute(_SCHEMA)
+    conn.execute(f"CREATE INDEX IF NOT EXISTS analytics_by_breakdown ON analytics_observations ({_BREAKDOWN}, id)")
+    conn.executemany("""
+        INSERT INTO analytics_observations
+            (source, account, metric, period_start, period_end, dimensions, value, unit, collected_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (source, account, metric, period_start, period_end, dimensions)
+        DO UPDATE SET value=excluded.value, unit=excluded.unit, collected_at=excluded.collected_at
+    """, [(*row, collected) for row in prepared])
     return len(prepared)
 
 
-def _query_filters(query: dict) -> tuple[str, tuple]:
-    conditions, args = [], []
+def save_observations(home: Path, campaign_id: str, rows: list[dict], *, refresh_complete: bool = False) -> int:
+    """Commit one collected batch; invalid rows cannot leave a partial write."""
+    directory = campaign_dir(home, campaign_id)
+    if not rows and not refresh_complete:
+        return 0
+    collected = datetime.now(UTC).isoformat(timespec="microseconds")
+    with connect_campaign_data(directory, write=True) as conn:
+        if refresh_complete:
+            conn.execute(_REFRESH_SCHEMA)
+            conn.execute("INSERT OR REPLACE INTO analytics_refresh VALUES (1, ?)", (collected,))
+        return _store_observations(conn, rows, collected)
+
+
+def _query_filters(query: dict, breakdown: str | None) -> tuple[str, tuple]:
+    conditions = [f"{_BREAKDOWN} IS NULL"] if breakdown is None else [f"{_BREAKDOWN} = ?"]
+    args = [] if breakdown is None else [_label(breakdown)]
     for key, value in query.items():
         if value is None:
             continue
@@ -122,7 +129,7 @@ def _query_filters(query: dict) -> tuple[str, tuple]:
         args.append(_stamp(value) if key in ("start", "end") else value if key == "before" else _label(value))
     if query["start"] is not None and query["end"] is not None and _stamp(query["start"]) >= _stamp(query["end"]):
         raise AnalyticsError(422, "Analytics start must be before end.")
-    return " WHERE " + " AND ".join(conditions) if conditions else "", tuple(args)
+    return " WHERE " + " AND ".join(conditions), tuple(args)
 
 
 def _view(row: sqlite3.Row) -> dict:
@@ -140,19 +147,23 @@ def last_refresh(directory: Path) -> dict:
 
 def list_analytics(home: Path, campaign_id: str, *, source: str | None = None, account: str | None = None,
                    metric: str | None = None, start: str | None = None, end: str | None = None,
-                   before: int | None = None, limit: int = 50) -> dict:
+                   before: int | None = None, limit: int = 50, breakdown: str | None = None) -> dict:
     directory = campaign_dir(home, campaign_id)
     if type(limit) is not int or not 1 <= limit <= 100 or (
         before is not None and (type(before) is not int or not 0 < before < 2**53)
     ):
         raise AnalyticsError(422, "Invalid analytics page.")
-    where, args = _query_filters(dict(source=source, account=account, metric=metric, start=start, end=end, before=before))
+    where, args = _query_filters(
+        dict(source=source, account=account, metric=metric, start=start, end=end, before=before), breakdown)
     rows, freshness = [], None
     with connect_campaign_data(directory) as conn:
         if conn and conn.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='analytics_observations'").fetchone():
             rows = conn.execute(
                 "SELECT * FROM analytics_observations" + where + " ORDER BY id DESC LIMIT ?", (*args, limit + 1),
             ).fetchall()
-            freshness = conn.execute("SELECT MAX(collected_at) FROM analytics_observations").fetchone()[0]
+            scope = f"{_BREAKDOWN} IS NULL" if breakdown is None else f"{_BREAKDOWN} = ?"
+            freshness_args = () if breakdown is None else (breakdown,)
+            freshness = conn.execute(
+                f"SELECT MAX(collected_at) FROM analytics_observations WHERE {scope}", freshness_args).fetchone()[0]
     return {"campaign_id": campaign_id, "observations": [_view(row) for row in rows[:limit]],
             "last_collected_at": freshness, "next_cursor": rows[limit - 1]["id"] if len(rows) > limit else None}
