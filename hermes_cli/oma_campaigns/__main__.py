@@ -9,10 +9,14 @@ from hermes_cli.oma_campaigns.analytics import campaign_dir, list_analytics
 from hermes_cli.oma_campaigns.analytics_cron import analytics_status
 from hermes_cli.oma_campaigns.analytics_sync.data import list_records
 from hermes_cli.oma_campaigns.install import configure, create, default_home, install, installed
-from hermes_cli.oma_campaigns.integrations import brand_candidates
+from hermes_cli.oma_campaigns.integrations import brand_candidates, needs_warnings, recommend
 from hermes_cli.oma_campaigns.lifecycle import set_lifecycle, set_mode
 from hermes_cli.oma_campaigns.schema import KINDS, validate_record
 from hermes_cli.oma_campaigns.source import read_mapping
+
+
+def _csv(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 def main(argv=None) -> int:
@@ -24,6 +28,10 @@ def main(argv=None) -> int:
     commands.add_parser("create", help="Create a paused campaign with its team and Kanban board").add_argument("path", type=Path)
     commands.add_parser("install", help="Provision a legacy saved campaign definition without starting it").add_argument("id")
     commands.add_parser("integrations", help="List brand-derived candidate integrations")
+    recommendation = commands.add_parser(
+        "recommend", help="Suggest integrations, what they need, and complementary tools for a campaign")
+    recommendation.add_argument("--for", dest="ids", type=_csv, default=[], help="Comma-separated integration IDs")
+    recommendation.add_argument("--channels", type=_csv, default=[], help="Comma-separated play channel IDs")
     commands.add_parser("analytics-status", help="Read campaign analytics progress and coverage").add_argument("id")
     records = commands.add_parser("analytics-records", help="Read saved detailed campaign analytics records")
     records.add_argument("id")
@@ -55,6 +63,7 @@ def main(argv=None) -> int:
         "create": lambda home, args: create(home, args.path),
         "install": lambda home, args: install(home, args.id),
         "integrations": lambda home, args: brand_candidates(home),
+        "recommend": lambda home, args: recommend(home, args.ids, args.channels),
         "analytics-status": lambda home, args: analytics_status(home, args.id),
         "analytics-records": lambda home, args: list_records(campaign_dir(home, args.id), source=args.source,
                                                               dataset=args.dataset, before=args.before,
@@ -68,8 +77,10 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "validate":
-            validate_record(args.kind, read_mapping(args.path), args.path)
-            print(json.dumps({"kind": args.kind, "valid": True}))
+            record = read_mapping(args.path)
+            validate_record(args.kind, record, args.path)
+            warnings = needs_warnings(record) if args.kind == "campaign" else []
+            print(json.dumps({"kind": args.kind, "valid": True, "warnings": warnings}))
             return 0
         result = handlers[args.command](default_home(), args)
         print(json.dumps(result, indent=2))

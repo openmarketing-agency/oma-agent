@@ -248,6 +248,13 @@ record to suggest types of tools, including before choosing a connector. Use exa
 labels from `hermes_cli/oma_campaigns/schemas/composio-categories.json`. The list is
 optional, and does not connect accounts or replace the IDs in `integrations`.
 
+Run `python -m hermes_cli.oma_campaigns recommend --channels instagram,blog` to
+see which integrations serve those play channels, what they need to deliver work
+(for example image or video generation for Instagram), and complementary tools.
+The data lives in `hermes_cli/oma_campaigns/schemas/integration-needs.json`, and
+every suggested tool is a Composio toolkit. `validate campaign` lists unmet needs
+under `warnings` without failing.
+
 ### Shared brand and playbook
 
 The default profile manages one brand with `oma-brand` and one playbook with
