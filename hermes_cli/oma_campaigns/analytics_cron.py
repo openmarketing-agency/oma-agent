@@ -75,6 +75,7 @@ def _config(home: Path, campaign_id: str) -> tuple[Path, Path, dict]:
 def analytics_status(home: Path, campaign_id: str) -> dict:
     from cron.jobs import get_job, use_cron_store
     from hermes_cli.oma_campaigns.analytics import last_refresh
+    from hermes_cli.oma_campaigns.analytics_sync.data import coverage
 
     directory, profile, config = _config(home, campaign_id)
     with bind_profile_scope(profile, hydrate_secrets=False), use_cron_store(profile):
@@ -82,7 +83,7 @@ def analytics_status(home: Path, campaign_id: str) -> dict:
         status = _status(job if job and is_managed_job(profile, job) else None)
     if status["state"] == "queued" and config.get("lifecycle_state") != "resumed":
         status.update(state="idle", run_id=None)
-    return {"campaign_id": campaign_id, **status, **last_refresh(directory)}
+    return {"campaign_id": campaign_id, **status, **last_refresh(directory), "datasets": coverage(directory)}
 
 
 def refresh_analytics(home: Path, campaign_id: str) -> dict:
