@@ -193,18 +193,22 @@ models and named MCP servers in installed campaigns, including paused campaigns.
 It doesn't apply pending campaign or agent overrides, personas, or schedules, or
 update `maintenance`. Saving settings alone does not propagate them.
 
-Only profiles inheriting the model can receive its matching saved API key. Sync
-uses that key to fill a missing profile key; an explicitly supplied key takes
-precedence. Keep MCP credentials in the target profiles' `.env` files and use
-`${KEY_NAME}` references in shared server definitions. Inheriting a server copies
-its definition, not `default`'s MCP environment values or trust decisions.
+When a profile inherits the model or an enabled MCP server from `default`, OMA
+also copies its usable saved credentials from `default`'s `.env`. Sync replaces
+the corresponding values in the receiving profile's `.env`, even if they were
+already set. A campaign or agent override blocks automatic credential updates
+for that model or named server. If an override uses the same environment variable
+as an inherited setting, OMA leaves that variable alone. An absent or blank value
+on `default` does not erase a profile key. Keep MCP secrets in `.env` and use
+`${KEY_NAME}` references in server definitions; sync doesn't copy trust decisions.
 
 Both commands accept an explicit JSON key map on `--env-stdin`. Campaign Sync
-saves each supplied value to every roster member's `.env`; Agent Sync saves it
-only to the selected profile. Use Agent Sync for a credential meant for one
-agent. Other saved values stay unchanged and neither command imports ambient process
-variables. Keep `${KEY_NAME}` references in YAML and pass values only through a
-trusted server-side caller, never through command-line arguments. Restrict MCP
+saves each supplied value to every roster member's `.env`; Agent Sync explicitly
+saves it only to the selected profile. Explicit values win over inherited values
+on the receiving profile. When the target is `default`, its newly saved values
+can then propagate under the inheritance rules above. Neither command imports
+ambient process variables. Keep `${KEY_NAME}` references in YAML and pass values
+only through a trusted server-side caller, never through command-line arguments. Restrict MCP
 edits to trusted administrators: native stdio MCP entries can launch programs.
 
 After sync, the campaign and OMA agent configs contain two generated lists:

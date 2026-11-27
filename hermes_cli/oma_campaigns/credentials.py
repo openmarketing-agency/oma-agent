@@ -10,7 +10,7 @@ from agent.runtime_scope import bind_profile_scope
 from agent.secret_scope import _is_global_env, load_env_file
 from hermes_cli.config import remove_env_value, require_env_writable, save_env_value, validate_env_var_name_for_write
 from hermes_cli.config_credential_values import refuse_redacted_env_value
-from hermes_cli.oma_campaigns.install import _real_path
+from hermes_cli.oma_campaigns.source import _member
 
 _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _MAX_SYNC_ENV_BYTES = 256 * 1024
@@ -24,8 +24,8 @@ def retired_analytics_keys(values) -> set[str]:
 def remove_retired_analytics_keys(profile: Path, keys: set[str]) -> None:
     if not keys:
         return
-    env = _real_path(profile / ".env")
-    _real_path(profile / ".env.lock")
+    env = _member(profile, ".env")
+    _member(profile, ".env.lock")
     with bind_profile_scope(profile, hydrate_secrets=False):
         for key in sorted(keys):
             require_env_writable(key, "remove")
@@ -78,7 +78,7 @@ def plan_credential_updates(
         if value != stored.get(name):
             updates[name] = value
     if updates:
-        _real_path(profile / ".env.lock")
+        _member(profile, ".env.lock")
         with bind_profile_scope(profile, hydrate_secrets=False):
             for name, value in updates.items():
                 require_env_writable(name, "set")

@@ -454,7 +454,7 @@ def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
                           "Do not publish, message accounts, or guess missing metrics.\n",
                           create_mode=0o600)
     if not profile.exists():
-        saved, credentials = snapshot(home, config)
+        saved, inherited = snapshot(home, config)
         effective = resolve_settings(settings_from(saved, campaign_id), settings_from(authored, agent_id))
         policy = enforce_toolset_baseline({**authored, **effective}, agent_id)
         native = _with_kanban({**effective, "agent": policy["agent"], "tools": policy["tools"], "skills": {},
@@ -463,7 +463,7 @@ def ensure_analyst(home: Path, config_path: Path, config: dict) -> dict:
         camofox, skipped = _configure_camofox(home, configs)
         if new_record and agent_id in skipped:
             authored = _without_camofox(authored)
-        credentials = {**(credentials if "model" not in authored else {}), **camofox.get(agent_id, {})}
+        credentials = {**inherited.for_agent(config, authored), **camofox.get(agent_id, {})}
         saves, scratch = (_agent_data_dir(home, agent_id, part) for part in ("saves", "tmp"))
         saves.mkdir(exist_ok=True)
         scratch.mkdir(exist_ok=True)
@@ -532,11 +532,8 @@ def _install(home: Path, campaign_id: str, *, definition: dict | None = None) ->
         policies = _check_profiles(home, campaign)
         paths = {agent.id: (_agent_data_dir(home, agent.id, "saves"), _agent_data_dir(home, agent.id, "tmp"))
                  for agent in campaign.agents}
-        inherited = "model" not in config
-        resolved_campaign, model_credential = snapshot(home, config)
-        inherited = inherited and "model" in resolved_campaign
-        for name in model_credential:
-            require_env_writable(name, "set")
+        resolved_campaign, inherited = snapshot(home, config)
+        reports_keys = bool(inherited.mcp) or ("model" not in config and "model" in resolved_campaign)
         defaults = settings_from(resolved_campaign, campaign_id)
         effective = {agent.id: resolve_settings(defaults, settings_from(agent.config, agent.id))
                      for agent in campaign.agents}
@@ -558,8 +555,10 @@ def _install(home: Path, campaign_id: str, *, definition: dict | None = None) ->
                 orchestrator=agent.id == campaign.orchestrator, campaign=True,
             )
         camofox, skipped_camofox = _configure_camofox(home, configs)
-        credentials = {agent.id: {**(model_credential if "model" not in agent.config else {}),
+        credentials = {agent.id: {**inherited.for_agent(config, agent.config),
                                   **camofox.get(agent.id, {})} for agent in campaign.agents}
+        for name in {name for values in credentials.values() for name in values}:
+            require_env_writable(name, "set")
         if (board_dir := kanban_db.board_dir(board)).exists() or board_dir.is_symlink():
             raise ValueError(f"Kanban board {board!r} already exists; refusing to reuse an unrelated board")
         config.setdefault("integrations", [])
@@ -579,7 +578,7 @@ def _install(home: Path, campaign_id: str, *, definition: dict | None = None) ->
             updated = materialize_agent_settings({**agent_record, **policy}, settings)
             if agent_id in skipped_camofox:
                 updated = _without_camofox(updated)
-            if inherited:
+            if reports_keys:
                 required = credential_keys(settings)
                 available = required & credentials[agent_id].keys()
                 updated.update({"all-keys": sorted(required), "available-keys": sorted(available)})
@@ -588,7 +587,7 @@ def _install(home: Path, campaign_id: str, *, definition: dict | None = None) ->
             if updated != agent_record:
                 atomic_config_replace(path, updated)
         current = read_mapping(config_path)
-        if inherited:
+        if reports_keys:
             current.update({"all-keys": sorted(all_keys), "available-keys": sorted(all_keys - missing_keys)})
         current.setdefault("kanban_board_name", board_metadata["name"])
         current = ensure_analyst(home, config_path, current)

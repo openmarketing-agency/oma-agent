@@ -1,5 +1,7 @@
 """Exercise workspace defaults through native OMA campaign and agent sync."""
 
+import pytest
+
 from tests import oma_campaign_fixtures
 
 bundle = oma_campaign_fixtures.bundle
@@ -23,7 +25,7 @@ def test_campaign_sync_resolves_mcp_by_name_from_default_campaign_and_agent(bund
     assert main(["install", "demo"]) == 0
     capsys.readouterr()
     atomic_config_replace(home / "config.yaml", {"mcp_servers": root})
-    (home / ".env").write_text("ROOT_MCP_KEY=root-only-fixture\n", encoding="utf-8")
+    (home / ".env").write_text("ROOT_MCP_KEY=shared-mcp-fixture\n", encoding="utf-8")
 
     sync_campaign(home, "demo")
 
@@ -36,7 +38,7 @@ def test_campaign_sync_resolves_mcp_by_name_from_default_campaign_and_agent(bund
         assert "mcp-shared" in native["agent"]["enabled_toolsets"]
         assert ("mcp-docs" in native["agent"]["enabled_toolsets"]) == (member != "demo__worker")
         assert "ROOT_MCP_KEY" in authored["all-keys"]
-        assert "ROOT_MCP_KEY" not in authored["available-keys"]
+        assert "ROOT_MCP_KEY" in authored["available-keys"]
     assert read_mapping(campaign)["mcp_servers"] == team
     assert read_mapping(worker)["mcp_servers"] == role
 
@@ -105,3 +107,67 @@ def test_default_agent_sync_propagates_only_inherited_model_and_mcp(bundle, caps
     sync_standalone_agent(home, "default")
     assert read_user_config_raw(owner_profile / "config.yaml")["model"] == "campaign-model"
     assert read_user_config_raw(worker_profile / "config.yaml")["model"] == "worker-model"
+
+
+@pytest.mark.parametrize("sync_scope", ["default", "campaign", "agent"])
+def test_inherited_credentials_seed_and_rotate_without_overwriting_overrides(bundle, capsys, sync_scope):
+    from agent.secret_scope import load_env_file
+    from hermes_cli.config import atomic_config_replace
+    from hermes_cli.oma_campaigns.source import read_mapping
+    from hermes_cli.oma_campaigns.sync import sync_agent, sync_campaign
+
+    home, source, main = bundle
+    campaign = source / "campaigns/demo/config.yaml"
+    root_record = source / "agents/default/config.yaml"
+    root_record.parent.mkdir()
+    atomic_config_replace(root_record, {"id": "default", "name": "Default", "description": "Default agent",
+                                       "campaign_id": None})
+    model = {"default": "root-model", "provider": "custom", "api_key": "${MODEL_FIXTURE}"}
+    servers = {name: {"url": f"https://{name}.invalid/mcp", "headers": {"Authorization": f"Bearer ${{{key}}}"}}
+               for name, key in (("shared", "SHARED_FIXTURE"), ("extra", "EXTRA_FIXTURE"),
+                                 ("team", "TEAM_FIXTURE"), ("disabled", "DISABLED_FIXTURE"))}
+    servers["disabled"]["enabled"] = False
+    atomic_config_replace(home / "config.yaml", {"model": model, "mcp_servers": servers})
+    atomic_config_replace(campaign, {**read_mapping(campaign), "mcp_servers": {"team": servers["team"]}})
+    worker = source / "agents/demo__worker/config.yaml"
+    # The override uses the same environment name as a different inherited server.
+    role_server = {**servers["shared"], "url": "https://worker.invalid/mcp"}
+    atomic_config_replace(worker, {**read_mapping(worker), "model": {**model, "default": "worker-model"},
+                                   "mcp_servers": {"role-only": role_server}})
+    inherited_keys = {"MODEL_FIXTURE", "SHARED_FIXTURE", "EXTRA_FIXTURE"}
+    root_keys = inherited_keys | {"TEAM_FIXTURE", "DISABLED_FIXTURE", "UNRELATED_FIXTURE"}
+    (home / ".env").write_text("".join(f"{key}=original-fixture\n" for key in sorted(root_keys)), encoding="utf-8")
+    assert main(["install", "demo"]) == 0
+    capsys.readouterr()
+
+    profiles = home / "profiles"
+    owner_env = profiles / "demo__orchestrator/.env"
+    worker_env = profiles / "demo__worker/.env"
+    assert load_env_file(owner_env) == dict.fromkeys(inherited_keys, "original-fixture")
+    assert load_env_file(profiles / "demo__analyst/.env") == load_env_file(owner_env)
+    assert load_env_file(worker_env) == {"EXTRA_FIXTURE": "original-fixture"}
+    worker_env.write_text("EXTRA_FIXTURE=original-fixture\nMODEL_FIXTURE=worker-model-fixture\n"
+                          "SHARED_FIXTURE=worker-mcp-fixture\n", encoding="utf-8")
+    (home / ".env").write_text("".join(f"{key}=rotated-fixture\n" for key in sorted(root_keys)), encoding="utf-8")
+    if sync_scope == "default":
+        sync_agent(home, "default")
+    elif sync_scope == "campaign":
+        sync_campaign(home, "demo")
+    else:
+        sync_agent(home, "demo__orchestrator")
+        sync_agent(home, "demo__worker", env={"EXTRA_FIXTURE": "explicit-fixture"})
+
+    assert load_env_file(owner_env) == dict.fromkeys(inherited_keys, "rotated-fixture")
+    expected = "explicit-fixture" if sync_scope == "agent" else "rotated-fixture"
+    assert load_env_file(worker_env) == {"EXTRA_FIXTURE": expected, "MODEL_FIXTURE": "worker-model-fixture",
+                                        "SHARED_FIXTURE": "worker-mcp-fixture"}
+    output = capsys.readouterr()
+    assert "rotated-fixture" not in output.out + output.err
+
+    if sync_scope == "default":
+        atomic_config_replace(campaign, {**read_mapping(campaign), "model": {**model, "default": "team-model"}})
+        (home / ".env").write_text("MODEL_FIXTURE=new-root-model-fixture\nEXTRA_FIXTURE=\n", encoding="utf-8")
+        sync_agent(home, "default")
+        # A newly authored override blocks rotation, and a missing or blank root
+        # value never removes a key already saved in the profile.
+        assert load_env_file(owner_env) == dict.fromkeys(inherited_keys, "rotated-fixture")

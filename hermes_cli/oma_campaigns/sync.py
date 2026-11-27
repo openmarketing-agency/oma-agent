@@ -19,7 +19,7 @@ from hermes_cli.oma_campaigns.credentials import (
     apply_credential_updates, key_status, plan_credential_updates, read_sync_env, validate_sync_env,
     remove_retired_analytics_keys, retired_analytics_keys,
 )
-from hermes_cli.oma_campaigns.defaults import snapshot
+from hermes_cli.oma_campaigns.defaults import InheritedCredentials, snapshot
 from hermes_cli.oma_campaigns.install import (
     HUMANIZER_DRAFT_GUIDANCE, _agent_data_dir, _campaign_config_path, _campaigns_dir,
     _install_lock, _status, campaign_soul, default_home,
@@ -51,7 +51,7 @@ class _Campaign:
     saved: dict = field(repr=False)
     status: dict
     resolved: dict = field(repr=False)
-    inherited_credential: dict[str, str] = field(repr=False)
+    inherited_credentials: InheritedCredentials = field(repr=False)
 
     def render_soul(self, home: Path, agent_id: str, soul: str, *, humanize_drafts: bool) -> str:
         return campaign_soul(
@@ -170,8 +170,8 @@ def _plan_agent(home: Path, agent_id: str, env: dict[str, str], *, campaign: _Ca
     )
     stored = load_env_file(_member(profile, ".env"))
     retired = retired_analytics_keys(stored) if campaign and agent_id == f"{campaign_id}__analyst" else set()
-    if campaign and "model" not in record:
-        inherited = {name: value for name, value in campaign.inherited_credential.items() if not stored.get(name)}
+    if campaign:
+        inherited = campaign.inherited_credentials.for_agent(campaign.saved, record, native=next_native)
         env = {**inherited, **env}
     credentials = plan_credential_updates(profile, set(env), stored, env)
     required = credential_keys(settings_from(next_native, agent_id))
@@ -224,14 +224,13 @@ def _plan_inheritance(home: Path, agent_id: str, campaign: _Campaign) -> _AgentU
     native = require_readable_config_before_write(native_path)
     next_native, managed_mcp = _inherited_mcp_settings(native, record, campaign, agent_id)
     stored = load_env_file(_member(profile, ".env"))
-    credentials = {}
     if "model" not in record and "model" not in campaign.saved:
         if "model" in campaign.resolved:
             next_native["model"] = campaign.resolved["model"]
         else:
             next_native.pop("model", None)
-        inherited = {name: value for name, value in campaign.inherited_credential.items() if not stored.get(name)}
-        credentials = plan_credential_updates(profile, set(inherited), stored, inherited)
+    inherited = campaign.inherited_credentials.for_agent(campaign.saved, record, native=next_native)
+    credentials = plan_credential_updates(profile, set(inherited), stored, inherited)
     names, available = key_status(credential_keys(settings_from(next_native, agent_id)), {**stored, **credentials})
     next_record = materialize_agent_settings(record, managed_mcp)
     next_record.update({"all-keys": sorted(names), "available-keys": sorted(available)})
@@ -292,8 +291,8 @@ def _load_installed(home: Path, path: Path, campaign_id: str) -> _Campaign:
     if status["state"] != "installed":
         raise ValueError(f"Campaign {campaign_id!r} is not fully installed; no settings were synced")
     validate_record("campaign", saved, path)
-    resolved, inherited_credential = snapshot(home, saved)
-    return _Campaign(path, saved, status, resolved, inherited_credential)
+    resolved, inherited_credentials = snapshot(home, saved)
+    return _Campaign(path, saved, status, resolved, inherited_credentials)
 
 
 def _verify_campaign(campaign: _Campaign) -> None:
