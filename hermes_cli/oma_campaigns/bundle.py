@@ -40,17 +40,17 @@ def _seed_package(source: Path, package: Path) -> None:
 
 
 def _seed_humanizer(source: Path, bundle: Path) -> None:
-    package = source / "write" / HUMANIZER_SKILL
+    relative = Path("writing") / HUMANIZER_SKILL
+    package = source / "skills" / relative
     if not (package / "SKILL.md").is_file():
         return
     skills = bundle / "skills"
-    write = skills / "write"
-    if skills.is_symlink() or write.is_symlink():
+    destination = skills / relative
+    if skills.is_symlink() or destination.parent.is_symlink():
         return  # Keep operator-managed directories outside this additive seed.
-    destination = write / HUMANIZER_SKILL
     if destination.exists() or destination.is_symlink():
         return
-    # An operator may already have supplied this exact skill ID in another category.
+    # Preserve legacy and operator-supplied copies; duplicate IDs break resolution.
     for skill in skills.rglob("SKILL.md"):
         if skill.is_symlink() or any(part.startswith(".") for part in skill.relative_to(skills).parts):
             continue
@@ -70,7 +70,6 @@ def seed_bundle(source: Path, home: Path) -> None:
     with tempfile.TemporaryDirectory(prefix=".oma-bundle-", dir=home) as staging:
         staged = Path(staging) / destination.name
         shutil.copytree(source / "skills", staged / "skills", symlinks=True)
-        _seed_humanizer(source, staged)
         for filename in ("LICENSE", "README.md"):
             if (source / filename).is_file():
                 shutil.copy2(source / filename, staged / filename)

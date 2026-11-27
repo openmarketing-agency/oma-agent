@@ -98,7 +98,7 @@ def test_startup_seeds_missing_humanizer_without_replacing_shared_skills(tmp_pat
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     source = Path(__file__).resolve().parents[2]
     shared = tmp_path / "oma-bundle" / "skills"
-    package = shared / "write" / "humanizer"
+    package = shared / "writing" / "humanizer"
     custom = shared / "custom" / "editorial-notes" / "SKILL.md"
     custom_text = "---\nname: editorial-notes\n---\nKeep the team's editorial notes.\n"
     if existing_bundle:
@@ -123,7 +123,8 @@ def test_startup_seeds_missing_humanizer_without_replacing_shared_skills(tmp_pat
         assert custom.read_text(encoding="utf-8") == custom_text
 
 
-def test_startup_preserves_an_existing_humanizer_in_another_category(tmp_path, monkeypatch):
+@pytest.mark.parametrize("relative", ["write/humanizer", "custom/team-editor"], ids=["legacy", "custom"])
+def test_startup_preserves_an_existing_humanizer_in_another_category(tmp_path, monkeypatch, relative):
     import json
 
     from hermes_cli.oma_campaigns.standalone import seed_standalone_agents
@@ -131,7 +132,7 @@ def test_startup_preserves_an_existing_humanizer_in_another_category(tmp_path, m
 
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     shared = tmp_path / "oma-bundle" / "skills"
-    custom = shared / "custom" / "team-editor"
+    custom = shared / relative
     custom.mkdir(parents=True)
     custom_file = custom / "SKILL.md"
     custom_text = "---\nname: humanizer\n---\nFollow the team's editorial style.\n"
@@ -143,7 +144,7 @@ def test_startup_preserves_an_existing_humanizer_in_another_category(tmp_path, m
     assert loaded["success"], loaded
     assert Path(loaded["skill_dir"]) == custom
     assert custom_file.read_text(encoding="utf-8") == custom_text
-    assert not (shared / "write" / "humanizer").exists()
+    assert not (shared / "writing" / "humanizer").exists()
 
 
 def test_startup_seeds_each_standalone_record_from_its_native_starter(tmp_path, monkeypatch):
