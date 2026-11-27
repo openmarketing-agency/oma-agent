@@ -44,7 +44,7 @@ roster:
     per_run: One finished draft per task, either an article of 1,500 to 2,500 words, a comparison page, or a refresh with the changes marked, humanized and with title, meta description and image notes.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: true
-    skills: [copywriting, copy-editing, competitors, writing-style-and-tone]
+    skills: [copywriting, copy-editing, competitors, writing-style-and-tone, humanizer]
   - role: publisher
     does: Publishes approved drafts with metadata, schema and internal links, reads each page back, and records the live URL.
     per_run: Every approved draft published in the CMS with its slug, meta, schema and internal links, indexing requested, and the live URL recorded on the task.

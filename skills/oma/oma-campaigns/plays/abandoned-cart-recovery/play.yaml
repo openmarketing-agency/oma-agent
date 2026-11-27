@@ -37,7 +37,7 @@ roster:
     per_run: One finished email or test variant per task, with three subject lines, preview text, body, the product block layout and the call to action.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: false
-    skills: [emails, copywriting, marketing-psychology, writing-style-and-tone]
+    skills: [emails, copywriting, marketing-psychology, writing-style-and-tone, humanizer]
   - role: merchandiser
     does: Picks what each email shows from the store, such as the abandoned items, sizes in stock, reviews, fit notes and the best next product.
     per_run: The product rules for one flow, covering which items to show, stock and size checks, the review snippet to pull, and the cross-sell picks by category.

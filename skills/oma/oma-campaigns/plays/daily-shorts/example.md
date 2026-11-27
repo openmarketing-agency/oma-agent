@@ -36,7 +36,7 @@ plans:
 |---|---|---|---|
 | shorts__orchestrator | Next week's seven videos assigned to formats, review note on retention and trials | file, web, skills, memory, session_search, kanban, integrations | goals-and-kpis, content-calendar |
 | shorts__idea-scout | Seven ideas, each with its source question, hook and format | file, web, browser, skills, memory, kanban | trend-jacking, audience-research, content-research-and-sourcing |
-| shorts__scriptwriter | Seven scripts with two hooks, beats, on-screen text, shot list, caption and title | file, web, skills, memory, kanban | short-form-video-script, hook-writer, caption-writer |
+| shorts__scriptwriter | Seven scripts with two hooks, beats, on-screen text, shot list, caption and title | file, web, skills, memory, kanban | short-form-video-script, hook-writer, caption-writer, humanizer |
 | shorts__producer | One finished 9:16 video per script with captions and a thumbnail frame | file, terminal, web, skills, memory, kanban | captions-and-clipping, ai-video, ai-voiceover, thumbnail-design |
 | shorts__publisher | Approved videos uploaded with title, description, disclosures and tracked link, URLs recorded | file, web, skills, memory, kanban, integrations | none |
 

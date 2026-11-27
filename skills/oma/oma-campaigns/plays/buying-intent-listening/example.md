@@ -34,8 +34,8 @@ plans:
 |---|---|---|---|
 | listening__orchestrator | The day's picked threads assigned, next answer page chosen, review note | file, web, skills, memory, session_search, kanban, integrations | community-marketing, customer-research |
 | listening__scout | Up to 15 new threads with link, venue rules, age, need and fit | file, web, browser, skills, memory, kanban | reddit-marketing, audience-research |
-| listening__responder | A reply draft for every picked thread, useful on its own, disclosed | file, web, skills, memory, kanban | reply-and-comment-writer, reddit-marketing, writing-style-and-tone |
-| listening__answer-writer | One answer page per task with the full answer and examples | file, web, skills, memory, kanban | educational-content-and-how-to, copywriting, writing-style-and-tone |
+| listening__responder | A reply draft for every picked thread, useful on its own, disclosed | file, web, skills, memory, kanban | reply-and-comment-writer, reddit-marketing, writing-style-and-tone, humanizer |
+| listening__answer-writer | One answer page per task with the full answer and examples | file, web, skills, memory, kanban | educational-content-and-how-to, copywriting, writing-style-and-tone, humanizer |
 | listening__publisher | Permitted Reddit replies and answer pages published with URLs recorded; permitted manual fallback handed to Jordan | file, web, skills, memory, kanban, integrations | none |
 
 ## First week

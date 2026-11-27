@@ -37,13 +37,13 @@ roster:
     per_run: One finished keyword post per task, as a carousel with slide copy and image prompts or a Reel script with hook, shots and on-screen text, plus the caption with the keyword.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: true
-    skills: [carousel-writer, reels-script, caption-writer, hook-writer]
+    skills: [carousel-writer, reels-script, caption-writer, hook-writer, humanizer]
   - role: dm-writer
     does: Writes the private reply each commenter receives and the follow-up messages for people who answer.
     per_run: The complete message set for one keyword post, with the private reply, the delivery message with the resource link, and two follow-ups for questions and buying intent.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: true
-    skills: [social-selling-and-dm, copywriting, writing-style-and-tone]
+    skills: [social-selling-and-dm, copywriting, writing-style-and-tone, humanizer]
   - role: publisher
     does: Posts approved content, sends the private reply to each keyword commenter through the official API, continues conversations inside the messaging window, and hands anything unusual to a person.
     per_run: Approved posts published with URLs recorded, a private reply sent to every new keyword comment within the window, and conversations needing a person flagged.

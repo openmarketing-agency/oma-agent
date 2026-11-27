@@ -46,13 +46,13 @@ roster:
     per_run: A reply draft for every thread picked, each useful with the product removed, with disclosure where the product comes up and the best link.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: true
-    skills: [reply-and-comment-writer, reddit-marketing, writing-style-and-tone]
+    skills: [reply-and-comment-writer, reddit-marketing, writing-style-and-tone, humanizer]
   - role: answer-writer
     does: Turns the questions that keep coming up into complete answer pages that replies can link to.
     per_run: One answer page per task, covering the question, the full answer with examples, when to get help, and a call to action.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: true
-    skills: [educational-content-and-how-to, copywriting, writing-style-and-tone]
+    skills: [educational-content-and-how-to, copywriting, writing-style-and-tone, humanizer]
   - role: publisher
     does: Publishes replies and answer pages through authorized connectors under the campaign mode. If a reply cannot go through the connector, hands off where permitted.
     per_run: Published replies and answer pages with verified URLs, plus a reason or permitted handoff for each blocked reply.

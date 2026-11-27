@@ -44,13 +44,13 @@ roster:
     per_run: Five individual pitches for the shows researched, each naming the episodes it builds on and offering three topics, plus guest sheet updates.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: true
-    skills: [public-relations, cold-email, copywriting, writing-style-and-tone]
+    skills: [public-relations, cold-email, copywriting, writing-style-and-tone, humanizer]
   - role: prep-writer
     does: Prepares the guest for each recording and turns each aired episode into owned content.
     per_run: For each booked episode, a prep brief with host background, likely questions and three stories with numbers; for each aired episode, a recap post and three social snippets.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: true
-    skills: [podcast-and-audiograms, copywriting, educational-content-and-how-to, writing-style-and-tone]
+    skills: [podcast-and-audiograms, copywriting, educational-content-and-how-to, writing-style-and-tone, humanizer]
   - role: publisher
     does: Sends approved pitches from the guest's own mailbox, hands bookings to the guest, and publishes approved recap posts.
     per_run: Every approved pitch and follow-up sent and logged, each booking handed to the guest with the prep brief, and approved recaps published with URLs recorded.

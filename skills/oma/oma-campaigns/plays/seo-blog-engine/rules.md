@@ -7,7 +7,7 @@ Two useful articles go live every week, each answering one search intent better 
 1. Monday, orchestrator: pick next week's topics from the keyword map and Search Console, and queue them.
 2. Researcher: a brief per topic within a day.
 3. Writer: a draft per brief within two days.
-4. The publisher saves each new article and follows the campaign's publication mode before shipping it. Then request indexing and record the URL.
+4. The writer applies Humanizer and saves each finished article for the campaign's publication workflow. The publisher delivers the approved revision, requests indexing, and records the URL.
 5. Weekly review: compare 28-day windows, pick refreshes, adjust the map.
 
 ## Craft
@@ -19,7 +19,7 @@ Two useful articles go live every week, each answering one search intent better 
 - Comparison pages are honest about where the competitor is better.
 
 ## Definition of done
-- The draft matches its brief's intent and passes the humanizer.
+- Before handoff, the writer uses `humanizer` to polish the draft while preserving search intent, sourced claims, exact quotes, and links.
 - Every fact has a source, and nothing is invented.
 - Title, meta description, slug, schema and internal links are set.
 - Published, indexing requested, and the live URL recorded on the task.
