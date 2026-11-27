@@ -70,9 +70,11 @@ def campaign_cron_paused(home: Path, job: dict | None = None, *, manual: bool = 
         return False
     if manual or profile_work_paused(home) or not profile_cron_disabled(home):
         return True
+    from cron.extra_fire import queued
     from hermes_cli.oma_campaigns.analytics_cron import analyst_profile, is_managed_job
 
-    return not (analyst_profile(home) if job is None else is_managed_job(home, job))
+    # The profile's ticker may consume an explicit Refresh request, never a scheduled slot.
+    return not (analyst_profile(home) if job is None else queued(job) and is_managed_job(home, job))
 
 
 def board_work_paused(conn: sqlite3.Connection, *, task_id: str | None = None) -> bool:

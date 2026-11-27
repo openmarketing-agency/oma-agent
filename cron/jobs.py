@@ -2210,6 +2210,11 @@ def trigger_job(job_id: str, extra_prompt: Optional[str] = None) -> Optional[dic
             f"Cannot run: job '{name}' is {job.get('state')} (terminal). "
             f"Create a new occurrence with 'hermes cron resume {name} "
             "--run-now' or '--at <ISO-8601>'.")
+    return _queue_run_now(job, extra_prompt)
+
+
+def _queue_run_now(job: dict[str, Any], extra_prompt: Optional[str] = None) -> Optional[dict[str, Any]]:
+    """Persist an already-authorized run-now, preserving the regular occurrence."""
     manual_run_at = _hermes_now().isoformat()
     return update_job(job["id"], {
         "enabled": True,
@@ -2714,7 +2719,7 @@ def claim_job_for_fire(
 
     def apply(jobs, _i, job):
         if campaign_cron_paused(_current_cron_store().jobs_file.parent.parent, job,
-                                manual=force or manual or extra_fire.queued(job)):
+                                manual=force or manual):
             return False
         if is_terminal_job(job) and not _is_recoverable_error_job(job):
             return False
@@ -3278,7 +3283,7 @@ def _get_due_jobs_locked(home: Path) -> list[dict[str, Any]]:
         # above repairs known shapes; this catches FUTURE variants so healthy siblings still
         # run/persist.
         try:
-            if restricted and campaign_cron_paused(home, job, manual=extra_fire.queued(job)):
+            if restricted and campaign_cron_paused(home, job):
                 continue
             if is_terminal_job(job) and not _is_recoverable_error_job(job):
                 continue

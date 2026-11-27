@@ -19,6 +19,9 @@ OMA_DEFAULT_STARTER_SKILLS = frozenset({
 })
 OMA_DEFAULT_ONLY_SKILLS = OMA_RETIRED_SKILLS | OMA_DEFAULT_STARTER_SKILLS
 OMA_MAINTENANCE_ONLY_SKILLS = frozenset({"omactl"})
+OMA_ANALYST_SKILLS = frozenset({
+    "analytics-dataset", "ga4-analytics", "google-search-analytics", "composio-analytics", "social-media-analytics",
+})
 OMA_SKILL_INVENTORY = ".oma-managed.json"
 DEFAULT_ONLY_BUNDLED_SKILLS = frozenset({"open-webui"})
 
@@ -51,13 +54,19 @@ def profile_excluded_skills(home: Path | None = None, *, include_pruned: bool = 
     root = get_default_hermes_root(home=home).resolve()
     resolved = home.resolve()
     if resolved == root:
-        excluded = OMA_RETIRED_SKILLS | OMA_MAINTENANCE_ONLY_SKILLS
+        excluded = OMA_RETIRED_SKILLS | OMA_MAINTENANCE_ONLY_SKILLS | OMA_ANALYST_SKILLS
         starters = OMA_DEFAULT_STARTER_SKILLS
     elif resolved == root / "profiles" / "maintenance":
-        excluded = OMA_DEFAULT_ONLY_SKILLS | DEFAULT_ONLY_BUNDLED_SKILLS
+        excluded = OMA_DEFAULT_ONLY_SKILLS | DEFAULT_ONLY_BUNDLED_SKILLS | OMA_ANALYST_SKILLS
         starters = OMA_MAINTENANCE_ONLY_SKILLS
     else:
-        return OMA_DEFAULT_ONLY_SKILLS | OMA_MAINTENANCE_ONLY_SKILLS | DEFAULT_ONLY_BUNDLED_SKILLS
+        excluded = OMA_DEFAULT_ONLY_SKILLS | OMA_MAINTENANCE_ONLY_SKILLS | DEFAULT_ONLY_BUNDLED_SKILLS
+        if resolved.name.endswith("__analyst"):
+            from hermes_cli.oma_campaigns.analytics_cron import analyst_profile
+
+            if analyst_profile(resolved):
+                return excluded
+        return excluded | OMA_ANALYST_SKILLS
     # Old sync inventories could hide starters that are now independent of extras.
     return excluded | (_profile_pruned_skills(home) - starters) if include_pruned else excluded
 

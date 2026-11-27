@@ -18,12 +18,6 @@
     "goals": { "$ref": "#/$defs/text_list" },
     "plans": { "$ref": "#/$defs/text_list" },
     "integrations": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/properties/id" }, "description": "Integration IDs declared for workspace setup." },
-    "analytics_datasets": {
-      "type": "object",
-      "description": "Campaign-scoped, read-only dataset contracts for MCP tools with cursor pagination.",
-      "propertyNames": { "$ref": "#/properties/id" },
-      "additionalProperties": { "$ref": "#/$defs/analytics_dataset" }
-    },
     "integration_categories": {
       "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/text" },
       "description": "Suggested Composio toolkit category labels for tool discovery. Does not select or connect integrations."
@@ -45,35 +39,6 @@
     "playbook": { "description": "Legacy field; ignored. New records use the singleton playbook." }
   },
   "$defs": {
-    "analytics_dataset": {
-      "type": "object", "additionalProperties": false,
-      "required": ["integration", "server", "tool", "account", "arguments", "items", "record_id"],
-      "properties": {
-        "integration": { "$ref": "#/properties/id" },
-        "server": { "$ref": "#/$defs/analytics_label" },
-        "tool": { "$ref": "#/$defs/analytics_label" },
-        "account": { "$ref": "#/$defs/analytics_label" },
-        "arguments": { "type": "object" },
-        "items": { "$ref": "#/$defs/analytics_path" },
-        "record_id": { "$ref": "#/$defs/analytics_path" },
-        "pagination": {
-          "type": "object", "additionalProperties": false, "required": ["parameter"],
-          "properties": {
-            "kind": { "enum": ["cursor", "offset", "page"], "default": "cursor" },
-            "parameter": { "$ref": "#/$defs/analytics_label" },
-            "next": { "$ref": "#/$defs/analytics_path" },
-            "size_parameter": { "$ref": "#/$defs/analytics_label" }
-          },
-          "if": { "required": ["kind"], "properties": { "kind": { "enum": ["offset", "page"] } } },
-          "then": { "required": ["size_parameter"] },
-          "else": { "required": ["next"] }
-        }
-      }
-    },
-    "analytics_label": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "\\S" },
-    "analytics_path": {
-      "type": "string", "maxLength": 512, "pattern": "^[a-zA-Z0-9_-]+(?:[.][a-zA-Z0-9_-]+)*$"
-    },
     "text": { "type": "string", "pattern": "\\S" },
     "text_list": { "type": "array", "items": { "$ref": "#/$defs/text" } },
     "agent_id": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*__[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])" },

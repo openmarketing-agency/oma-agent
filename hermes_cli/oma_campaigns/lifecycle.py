@@ -16,7 +16,7 @@ from hermes_cli import kanban_db
 from hermes_cli.config import atomic_config_write, read_user_config_raw
 from hermes_cli.config_backend import require_file_tooling
 from hermes_cli.kanban_db_connect import _dispatch_tick_lock, connect_closing
-from hermes_cli.oma_campaigns.install import _campaign_config_path, _campaigns_dir, _install_lock, _status
+from hermes_cli.oma_campaigns.install import _campaign_config_path, _campaigns_dir, _install_lock, _status, ensure_analyst
 from hermes_cli.oma_campaigns.schema import validate_record
 from hermes_cli.oma_campaigns.source import DEFAULT_CAMPAIGN_MODE, _member, read_mapping
 from utils.files import atomic_json_write
@@ -84,7 +84,7 @@ def _prepare_profile_schedule(now: datetime) -> None:
             update_job(job["id"], {"next_run_at": next_run, "manual_run_at": None})
 
 
-def _control_cron(profiles: list[Path], *, park: bool) -> None:
+def _control_cron(profiles: list[Path], *, park: bool, discard_queued: bool = False) -> None:
     from hermes_cli.oma_campaigns.analytics_cron import is_managed_job
 
     for profile in profiles:
@@ -101,7 +101,7 @@ def _control_cron(profiles: list[Path], *, park: bool) -> None:
                 by_id = {job["id"]: job for job in [*parked, *jobs]}
                 retained = [dict(job) for job in by_id.values() if is_managed_job(profile, job)]
                 for job in retained:
-                    if queued(job):
+                    if discard_queued and queued(job):
                         # Discard a run-now queued before entering control, not its normal slot.
                         job["next_run_at"] = job.pop(RESTORE_KEY)
                         job.pop("manual_run_at", None)
@@ -142,7 +142,7 @@ def set_mode(home: Path, campaign_id: str, mode: str) -> dict:
         if mode == "control":
             # Block new registrations before taking the snapshot; this is retryable if parking fails.
             atomic_config_write(path, updated)
-            _control_cron(profiles, park=True)
+            _control_cron(profiles, park=True, discard_queued=config.get("mode") != "control")
         else:
             _control_cron(profiles, park=False)
             if config.get("mode") == "control" and status["state"] == "installed":
@@ -168,6 +168,8 @@ def _activate_new_jobs(profiles: list[Path]) -> None:
 
 
 def set_lifecycle(home: Path, campaign_id: str, target: str) -> dict:
+    from hermes_cli.oma_campaigns.analytics_cron import ensure_job
+
     require_file_tooling("OMA campaign lifecycle")
     if target not in {"paused", "resumed"}:
         raise ValueError("Campaign lifecycle state must be paused or resumed")
@@ -197,16 +199,18 @@ def set_lifecycle(home: Path, campaign_id: str, target: str) -> dict:
         model_id = model.get("default") if isinstance(model, dict) else model
         if not isinstance(model_id, str) or not model_id.strip():
             return {**result, "state": "paused", "missing_model": True}
+        analyst = home / "profiles" / f"{campaign_id}__analyst"
+        if analyst.name not in config["agents"]:
+            config = ensure_analyst(home, path, config)
+            profiles.append(analyst)
         mode = config.get("mode", DEFAULT_CAMPAIGN_MODE)
         if mode == "control":
             _control_cron(profiles, park=True)
-            from hermes_cli.oma_campaigns.analytics_cron import ensure_job
-
-            analyst = home / "profiles" / f"{campaign_id}__analyst"
-            if analyst in profiles:
-                ensure_job(analyst)
         else:
             _control_cron(profiles, park=False)
+        if analyst in profiles:
+            ensure_job(analyst)
+        if mode != "control":
             if mode in ("yolo", "approve"):
                 _activate_new_jobs(profiles)
             _prepare_recurring_jobs(profiles)

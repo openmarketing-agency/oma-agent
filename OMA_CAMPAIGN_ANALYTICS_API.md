@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | Read saved observations | `GET /api/campaigns/{id}/analytics` | `GET /workspace/campaigns/{id}/analytics` | `200 OK` |
 | Queue a refresh | `POST /api/campaigns/{id}/analytics/refresh` | `POST /workspace/campaigns/{id}/analytics/refresh` | `202 Accepted` |
-| Read collector status | `GET /api/campaigns/{id}/analytics/status` | `GET /workspace/campaigns/{id}/analytics/status` | `200 OK` |
+| Read Analyst refresh status | `GET /api/campaigns/{id}/analytics/status` | `GET /workspace/campaigns/{id}/analytics/status` | `200 OK` |
 
 ## Read saved observations
 
@@ -66,58 +66,38 @@ Results are ordered by descending `id`. If there are more results, repeat the sa
 
 Send **no body and no query parameters**; an empty JSON object (`{}`) is not accepted. Browser calls must be same-origin.
 
-For a running `approve` or `yolo` campaign, the request queues the managed analyst collector for the next scheduler tick. It does not change the job's hourly schedule. If a run is already queued or running, the request returns its current state instead of starting a duplicate. `202` confirms acceptance, not completion. In `control`, the collector still runs on its hourly schedule while the campaign is running, but this manual refresh request is rejected.
+For any running campaign, the request queues the managed Analyst job for the next scheduler tick. In `approve` and `yolo`, that job also runs every six hours, and manual refresh does not move a future scheduled slot. In `control`, no scheduled analytics runs occur; this endpoint is the only way to request one. If an analytics run is already queued or running, the request returns its current state without scheduling another run. `202` confirms acceptance, not completion.
 
-The collector reads external data through the Analyst profile's enabled MCP servers. It stores successful pages and their checkpoints together. A source error makes the overall refresh incomplete while other sources continue. OMA publication counts come from the campaign's local history.
+Both triggers refresh local OMA draft/publication counts and start a turn on the campaign's Analyst profile. The Analyst uses its analytics skills and authorized read-only integrations to collect and save verified measurements. Unavailable or partial sources are reported, not filled with zeros.
 
-### Sources, detail, and history
+### Sources and history
 
-The built-in Search Console and GA4 readers use the verified brand website to match properties. They collect daily totals and backfill report history in bounded pages across runs. Search Console adds page, query, country, and device breakdowns. GA4 adds page path, event name, country, device category, and session channel group. Coverage describes what the provider returned within its history, row limits, and scopes. For example, [Search Console can omit rows](https://developers.google.com/webmaster-tools/v1/how-tos/all-your-data). GA4 event-name breakdowns are aggregate reports.
+Every managed Analyst has access to the OMA analytics skills. They guide the Analyst to check saved measurements first, discover authorized read-only tools for any gaps, and save verified observations. A legacy dataset mapping on an installed campaign is ignored; connectors do not need to advertise analytics datasets.
 
-MCP servers can advertise multiple campaign datasets using two tools with `readOnlyHint: true`:
+- [`google-search-analytics`](oma-bundle/skills/analytics/google-search-analytics/SKILL.md) and [`ga4-analytics`](oma-bundle/skills/analytics/ga4-analytics/SKILL.md) explain which metrics to request, how to match the verified website to its property, and how to handle reporting limits. Either can use a native MCP connection or Composio.
+- [`composio-analytics`](oma-bundle/skills/analytics/composio-analytics/SKILL.md) explains how to discover read-only tools and schemas from connected integrations.
+- [`social-media-analytics`](oma-bundle/skills/analytics/social-media-analytics/SKILL.md) covers post counts, per-post performance, and replied, unreplied, and unknown audience-comment counts.
 
-- `oma_analytics_list_datasets(campaign_id, integrations)` returns `{"datasets": [{"integration": "...", "id": "...", "account_id": "..."}]}`. The server must enumerate only the campaign's authorized accounts and resources.
-- `oma_analytics_read_dataset(campaign_id, integration, dataset_id, account_id, limit, cursor?, checkpoint?)` returns `{"records": [{"id": "...", "data": {...}}], "next_cursor": "...", "checkpoint": "..."}`. Start with accessible history, return `next_cursor` to continue, and optionally return a `checkpoint` on the final page for incremental reads. A connector without a checkpoint can enumerate its cursor sequence again on later runs. Use stable string record IDs. Include date, timestamp, and breakdown fields in `data` where the provider exposes them.
-
-For an existing read-only MCP tool, add a dataset to the campaign's `config.yaml` and sync the campaign. The tool must have `readOnlyHint: true`. Use arguments that scope the request to the campaign's approved account or resources. Keep credentials in the connection configuration.
-
-```yaml
-integrations: [example-service]
-analytics_datasets:
-  team-events:
-    integration: example-service
-    server: example-service
-    tool: list_events
-    account: team-42
-    arguments: { team_id: team-42, limit: 50 }
-    items: response.events
-    record_id: id
-    pagination: { parameter: cursor, next: response.next_cursor }
-```
-
-Omit `pagination` for a tool that returns the full dataset in one response of up to 100 records. For offset or page-number pagination, set `kind` to `offset` or `page` and set `size_parameter` to the argument that supplies the page size. Set the size in `arguments` and use a maximum of 100 records per page.
-
-For Composio, the Analyst uses the campaign's saved `integrations` and the existing MCP connection. It calls [Search Tools](https://docs.composio.dev/toolkits/meta-tools/search_tools) for the connected toolkit, retrieves missing input schemas, and collects through the same session with [Multi Execute](https://docs.composio.dev/toolkits/meta-tools/multi_execute_tool). Composio collection needs no `analytics_datasets` entries. The collector accepts actions with a read-only tag or annotation, plus a set of documented read actions for router versions that omit tags. It supplies pagination parameters and can bind a required website argument from the verified brand website. Read actions that need another resource ID, an unsupported input, or a complete schema are shown in coverage. Results are saved under the action slug in lowercase with hyphens, such as `stripe-list-charges`. Provider search results and account scopes determine which reads are available. When the Analyst's active Composio connection differs from the campaign's saved connection, collection reports `connection_sync_required`.
-
-Use the campaign-local CLI to read details. The daily observations endpoint continues to return totals separately.
+The [`analytics-dataset` skill](oma-bundle/skills/analytics/analytics-dataset/SKILL.md) gives Analysts the observation format and save/read workflow. The Analyst's CLI reads and writes its own campaign's `data.sqlite3`. The default profile can also read saved observations. These commands do not contact providers.
 
 ```bash
 python -m hermes_cli.oma_campaigns analytics-status <id>
-python -m hermes_cli.oma_campaigns analytics-records <id> stripe stripe-list-charges
+python -m hermes_cli.oma_campaigns analytics-read <id> --source google-analytics --metric sessions
 python -m hermes_cli.oma_campaigns analytics-breakdown <id> google-search-console page --metric clicks
+python -m hermes_cli.oma_campaigns analytics-save <id> < observations.json
 ```
 
-The two data-read commands accept `--limit` and `--before` for cursor pagination.
+`analytics-read` supports `--source`, `--account`, `--metric`, `--start`, `--end`, `--breakdown`, `--limit`, and `--before`. The existing HTTP observations endpoint continues to return totals separately. `analytics-save` accepts 1–100 observations as a JSON array on stdin. Each row supplies `source`, `account`, `metric`, `period_start`, `period_end`, `value`, `unit`, and `dimensions`. Repeat saves update the same series and period. See each row's `collected_at` for external data freshness. No old saved observations are deleted.
 
 ### Response schema (`202`)
 
 ```ts
-type RefreshResponse = Omit<AnalyticsStatusResponse, "state" | "last_successful_refresh_at" | "datasets"> & {
+type RefreshResponse = Omit<AnalyticsStatusResponse, "state" | "last_successful_refresh_at"> & {
   state: "queued" | "running";
 };
 ```
 
-## Read collector status
+## Read Analyst refresh status
 
 `GET /api/campaigns/{id}/analytics/status`
 
@@ -134,26 +114,15 @@ interface AnalyticsStatusResponse {
   last_outcome: string | null; // previous cron outcome, e.g. "ok", "error", "cancelled"
   last_finished_at: string | null; // ISO timestamp
   last_successful_refresh_at: string | null; // UTC ISO timestamp
-  datasets: {
-    source: string;
-    server: string;
-    dataset: string;
-    account: string;
-    state: string;
-    last_successful_at: string | null;
-    requested_from: string | null;
-    checked_from: string | null;
-    collected_through: string | null;
-  }[];
 }
 ```
 
 - `queued`: Accepted and waiting to start. `running` is `false`.
-- `running`: The collector is executing. `running` is `true`.
+- `running`: The managed analytics execution is active on the Analyst profile. `running` is `true`. Unrelated Analyst chats are not tracked by this endpoint.
 - `idle`: The managed job exists, but no run is queued or running. This does not mean the campaign is started or the previous run succeeded.
 - `unavailable`: The managed analyst or its job is not available.
 
-Treat `run_id` as opaque: a queued refresh can return a timestamp that changes to an execution ID once it starts. Poll status after a `202`. When the run settles, use `last_outcome` for the previous result and `last_successful_refresh_at` for freshness. The latter advances after a cycle without a source failure. A dataset can still be `backfilling` across successful cycles. Check each dataset for its own state, including `current`, `read_error`, `connection_required`, `no_readable_tools`, and `read_inputs_required`. A partial failure can leave saved results available without advancing the campaign timestamp.
+Treat `run_id` as opaque: a queued refresh can return a timestamp that changes to an execution ID once it starts. Poll status after a `202`. `last_outcome` describes the completed cron run; `last_successful_refresh_at` is the local publication refresh timestamp. Use each external row's `collected_at` for its freshness: a finished run does not imply every provider returned data.
 
 ## Errors
 
@@ -164,14 +133,14 @@ The console returns `{ "error": "..." }`; the private VM socket returns `{ "mess
 | `401 Unauthorized` | Console session is not signed in. |
 | `403 Forbidden` | Console rejected a cross-origin refresh request. |
 | `404 Not Found` | Campaign or route not found. |
-| `409 Conflict` | Refresh is blocked: the campaign is stopped or in `control`, the analyst is not installed, or the managed job is missing or paused. |
-| `422 Unprocessable Content` | Invalid observation filters or pagination, unexpected refresh input, or invalid campaign analytics configuration. |
-| `503 Service Unavailable` | Analytics storage or runtime is unavailable, the agent image lacks analytics support, or the collector could not be queued. |
+| `409 Conflict` | Refresh is blocked: the campaign is stopped, the Analyst is not installed, or the managed job is missing or paused. |
+| `422 Unprocessable Content` | Invalid observation filters or pagination, or unexpected refresh input. |
+| `503 Service Unavailable` | Analytics storage or runtime is unavailable, the agent image lacks analytics support, or the Analyst job could not be queued. |
 
 ## Implementation references
 
 - [Observation validation, filters, and pagination](hermes_cli/oma_campaigns/analytics.py#L116)
 - [Managed refresh and execution status](hermes_cli/oma_campaigns/analytics_cron.py#L52)
-- [MCP report reads](hermes_cli/oma_campaigns/analytics_mcp.py)
+- [Analyst analytics skills](oma-bundle/skills/analytics/)
 - Local sibling checkout: `openmarketing.agency/vm/workspace.py` (`campaign_analytics`, `WorkspaceHandler`)
 - Local sibling checkout: `openmarketing.agency/oma/app/api/campaigns/[id]/analytics/[[...action]]/route.ts`

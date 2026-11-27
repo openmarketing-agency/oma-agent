@@ -2197,18 +2197,23 @@ def _prepare_job_prompt(
     """Run every pre-agent gate and build the prompt. Returns ``(early_result, prompt)``: an early
     result short-circuits ``run_job`` (no_agent job, empty payload, monitor gate, wake gate,
     injection block, empty prompt); otherwise ``prompt`` is set."""
-    from hermes_cli.oma_campaigns.analytics_cron import COLLECTOR, JOB_ID, run_managed_job
+    from hermes_cli.oma_campaigns.analytics_cron import JOB_ID, refresh_publications
 
-    if job_id == JOB_ID and job.get("script") == COLLECTOR:
+    if job_id == JOB_ID:
         from hermes_cli.oma_campaigns.analytics import AnalyticsError
 
         try:
-            count = run_managed_job(_get_hermes_home(), job, cancel_event)
+            refresh_publications(_get_hermes_home(), job, cancel_event)
         except AnalyticsError as exc:
             return (False, f"# {job_name}\n\n{exc}", SILENT_MARKER, str(exc)), None
         except (OSError, ValueError):
-            return (False, f"# {job_name}\n\nAnalytics collection failed.", SILENT_MARKER, "Analytics collection failed."), None
-        return (True, f"# {job_name}\n\nSaved {count} observations.", SILENT_MARKER, None), None
+            return (False, f"# {job_name}\n\nCould not refresh local publication counts.", SILENT_MARKER,
+                    "Could not refresh local publication counts."), None
+        if job.get("no_agent"):
+            error = "Sync the campaign to upgrade its Analyst job."
+            return (False, f"# {job_name}\n\n{error}", SILENT_MARKER, error), None
+        # Refresh always starts the same managed turn, not an editable per-fire task.
+        extra_prompt = None
     # Fail closed on a corrupt config.yaml: defaults would let auto-detection bill a provider the
     # user never chose. no_agent jobs are exempt. Escape hatch: HERMES_IGNORE_USER_CONFIG=1.
     if not job.get("no_agent"):
