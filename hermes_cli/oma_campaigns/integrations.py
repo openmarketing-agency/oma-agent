@@ -116,7 +116,7 @@ def campaign_warnings(record: dict) -> list[str]:
     for need in missing_needs(record.get("integrations", ())):
         names = " or ".join(capabilities[name]["name"].lower() for name in need["any_of"])
         warnings.append(f"{need['for']} needs {names}: {need['why']} Add one provider to integrations "
-                        f"(see `recommend --for {need['for']}`), or plan the fallback: {need['fallback']}")
+                        f"(see `required-tools --for {need['for']}`), or plan the fallback: {need['fallback']}")
     return warnings
 
 
@@ -140,11 +140,11 @@ def _select(ids: Iterable[str], channels: Iterable[str], observed: set[str]) -> 
     return list(dict.fromkeys(selected)), choices, list(dict.fromkeys(unmapped))
 
 
-def _complements(selected: list[str], skip: set[str], observed: set[str]) -> dict:
+def _optional(selected: list[str], skip: set[str], observed: set[str]) -> dict:
     capabilities, rows = integration_needs()["capabilities"], integration_needs()["integrations"]
     found: dict[str, list[str]] = {}
     for key in selected:
-        for name in rows.get(key, {}).get("complements", ()):
+        for name in rows.get(key, {}).get("optional", ()):
             if name not in skip:
                 found.setdefault(name, []).append(key)
     return {name: {"name": capabilities[name]["name"], "for": users,
@@ -152,11 +152,15 @@ def _complements(selected: list[str], skip: set[str], observed: set[str]) -> dic
             for name, users in found.items()}
 
 
-def choose_providers(selected: Iterable[str], observed: set[str]) -> list[dict]:
-    """Pick providers until every need is met: one the brand shows first, then the one covering most needs."""
+def choose_providers(selected: Iterable[str], observed: set[str], scope: Iterable[str] | None = None) -> list[dict]:
+    """Pick providers until every need is met: one the brand shows first, then the one covering most needs.
+
+    ``scope`` limits picking to the needs of those integrations.
+    """
     capabilities = integration_needs()["capabilities"]
     current, chosen = list(selected), []
-    while needs := missing_needs(current):
+    wanted = None if scope is None else set(scope)
+    while needs := [need for need in missing_needs(current) if wanted is None or need["for"] in wanted]:
         covers: dict[str, list[dict]] = {}
         for need in needs:
             for key in dict.fromkeys(key for name in need["any_of"] for key in capabilities[name]["providers"]):
@@ -175,9 +179,9 @@ def _plan_for(pick: dict) -> str:
     return f"Use {name} for what {users} needs: {need['why']} If {name} is unavailable: {need['fallback']}"
 
 
-def with_needed_tools(home: Path, record: dict) -> tuple[dict, list[str]]:
-    """Add a provider, and a plan naming it, for each integration need the record leaves unmet."""
-    chosen = choose_providers(record.get("integrations", ()), set(brand_candidates(home)["candidates"]))
+def with_needed_tools(home: Path, record: dict, scope: Iterable[str] | None = None) -> tuple[dict, list[str]]:
+    """Add a required provider, and a plan naming it, for each unmet need of ``scope`` (default: all)."""
+    chosen = choose_providers(record.get("integrations", ()), set(brand_candidates(home)["candidates"]), scope)
     if not chosen:
         return record, []
     added = [pick["id"] for pick in chosen]
@@ -189,8 +193,8 @@ def with_needed_tools(home: Path, record: dict) -> tuple[dict, list[str]]:
     return revised, added
 
 
-def recommend(home: Path, ids: Iterable[str] = (), channels: Iterable[str] = ()) -> dict:
-    """Suggest integrations for a campaign: chosen ones, providers for their needs, and complements.
+def required_tools(home: Path, ids: Iterable[str] = (), channels: Iterable[str] = ()) -> dict:
+    """The integrations a campaign requires: chosen ones plus a provider for each need, and optional extras.
 
     ``channels`` are play channel IDs; a channel with one possible integration, or
     one the brand already shows, is selected, and the rest are returned as choices.
@@ -210,7 +214,7 @@ def recommend(home: Path, ids: Iterable[str] = (), channels: Iterable[str] = ())
         "integrations": integrations,
         "channel_choices": choices,
         "needs": needs,
-        "complements": _complements(integrations, _provided(integrations), observed),
+        "optional": _optional(integrations, _provided(integrations), observed),
         "integration_categories": _categories(integrations),
         "unmapped": unmapped,
     }

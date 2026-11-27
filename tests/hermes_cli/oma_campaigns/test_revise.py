@@ -89,7 +89,7 @@ def test_revise_saves_covered_tools_and_wakes_a_running_orchestrator_once(campai
     assert task.assignee == "demo__orchestrator" and "removed reddit" in task.body
 
 
-def test_revise_adds_a_provider_for_a_new_tools_needs(campaign, capsys):
+def test_revise_adds_a_provider_for_a_new_tools_needs_and_respects_its_removal(campaign, capsys):
     from hermes_cli.oma_campaigns.integrations import mentions
     from hermes_cli.oma_campaigns.source import read_mapping
 
@@ -102,6 +102,13 @@ def test_revise_adds_a_provider_for_a_new_tools_needs(campaign, capsys):
     saved = read_mapping(config)
     assert saved["integrations"] == ["reddit", "instagram", provider]
     assert saved["plans"][:2] == plans and mentions(provider, saved["plans"][2:])
+
+    code, error = _revise(main, capsys, revised, integrations=["reddit", "instagram"], plans=saved["plans"])
+    assert code == 1 and f"{provider} was removed but a plan still uses it" in error
+    code, result = _revise(main, capsys, revised, integrations=["reddit", "instagram"], plans=plans)
+    assert code == 0, result
+    assert result["removed"] == [provider] and result["added_for_needs"] == []
+    assert read_mapping(config)["integrations"] == ["reddit", "instagram"]
 
 
 def test_revise_keeps_the_installed_roster_and_mode(campaign, capsys):

@@ -99,7 +99,8 @@ def revise(home: Path, campaign_id: str, definition: Path) -> dict:
         validate_record("campaign", authored, definition)
         # Check the plans the user wrote: the plan lines added for needs name the tools they serve.
         added, removed = _tool_change(saved, authored)
-        revised, needed = with_needed_tools(home, authored)
+        # Fill needs only for tools added now, so a provider the user removed stays removed.
+        revised, needed = with_needed_tools(home, authored, scope=added)
         validate_record("campaign", revised, definition)
         added += [key for key in needed if key not in saved.get("integrations", [])]
         atomic_config_write(path, revised)

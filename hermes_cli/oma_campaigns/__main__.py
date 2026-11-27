@@ -9,7 +9,7 @@ from hermes_cli.oma_campaigns.analytics import campaign_dir, list_analytics
 from hermes_cli.oma_campaigns.analytics_cron import analytics_status
 from hermes_cli.oma_campaigns.analytics_sync.data import list_records
 from hermes_cli.oma_campaigns.install import configure, create, default_home, install, installed
-from hermes_cli.oma_campaigns.integrations import brand_candidates, campaign_warnings, recommend
+from hermes_cli.oma_campaigns.integrations import brand_candidates, campaign_warnings, required_tools
 from hermes_cli.oma_campaigns.lifecycle import set_lifecycle, set_mode
 from hermes_cli.oma_campaigns.revise import revise
 from hermes_cli.oma_campaigns.schema import KINDS, validate_record
@@ -32,10 +32,10 @@ def main(argv=None) -> int:
     revision.add_argument("id")
     revision.add_argument("path", type=Path)
     commands.add_parser("integrations", help="List brand-derived candidate integrations")
-    recommendation = commands.add_parser(
-        "recommend", help="Suggest integrations, what they need, and complementary tools for a campaign")
-    recommendation.add_argument("--for", dest="ids", type=_csv, default=[], help="Comma-separated integration IDs")
-    recommendation.add_argument("--channels", type=_csv, default=[], help="Comma-separated play channel IDs")
+    required = commands.add_parser(
+        "required-tools", help="List the integrations a campaign requires, with a provider for each need")
+    required.add_argument("--for", dest="ids", type=_csv, default=[], help="Comma-separated integration IDs")
+    required.add_argument("--channels", type=_csv, default=[], help="Comma-separated play channel IDs")
     commands.add_parser("analytics-status", help="Read campaign analytics progress and coverage").add_argument("id")
     records = commands.add_parser("analytics-records", help="Read saved detailed campaign analytics records")
     records.add_argument("id")
@@ -68,7 +68,7 @@ def main(argv=None) -> int:
         "install": lambda home, args: install(home, args.id),
         "revise": lambda home, args: revise(home, args.id, args.path),
         "integrations": lambda home, args: brand_candidates(home),
-        "recommend": lambda home, args: recommend(home, args.ids, args.channels),
+        "required-tools": lambda home, args: required_tools(home, args.ids, args.channels),
         "analytics-status": lambda home, args: analytics_status(home, args.id),
         "analytics-records": lambda home, args: list_records(campaign_dir(home, args.id), source=args.source,
                                                               dataset=args.dataset, before=args.before,

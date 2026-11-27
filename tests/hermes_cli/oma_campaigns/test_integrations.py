@@ -1,4 +1,4 @@
-"""Integration recommendations: needs, complements and campaign validation warnings."""
+"""Required campaign tools: needs, chosen providers, optional extras and validation warnings."""
 
 import json
 from pathlib import Path
@@ -57,11 +57,11 @@ def test_needed_provider_prefers_one_the_brand_already_uses(oma):
     assert added == ["canva"]
 
 
-def test_recommend_adds_media_needs_that_a_provider_satisfies(oma, capsys):
+def test_required_tools_include_a_provider_for_each_need(oma, capsys):
     from hermes_cli.oma_campaigns.integrations import integration_catalog
 
     _, main = oma
-    assert main(["recommend", "--channels", "instagram,reddit,blog"]) == 0
+    assert main(["required-tools", "--channels", "instagram,reddit,blog"]) == 0
     result = json.loads(capsys.readouterr().out)
     assert set(result["integrations"]) == {"instagram", "reddit", "wordpress-com", need_provider(result)}
     assert result["channel_choices"] == {} and result["unmapped"] == []
@@ -73,10 +73,10 @@ def test_recommend_adds_media_needs_that_a_provider_satisfies(oma, capsys):
     assert providers and all(catalog[key]["composio"] for key in providers)
     assert "social media accounts" in result["integration_categories"]
 
-    assert main(["recommend", "--channels", "instagram", "--for", "higgsfield"]) == 0
+    assert main(["required-tools", "--channels", "instagram", "--for", "higgsfield"]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["needs"] == []
-    assert "image-generation" not in result["complements"]
+    assert "image-generation" not in result["optional"]
 
 
 def test_validate_campaign_warns_about_unmet_integration_needs(oma, capsys):
@@ -107,7 +107,7 @@ def test_integration_needs_name_only_composio_tools_and_play_channels():
              *(key for row in capabilities.values() for key in row["providers"]), *needs["integrations"]]
     assert all(catalog.get(key, {}).get("composio") for key in tools)
     for row in needs["integrations"].values():
-        used = [*row.get("complements", ()), *(name for need in row.get("needs", ()) for name in need["any_of"])]
+        used = [*row.get("optional", ()), *(name for need in row.get("needs", ()) for name in need["any_of"])]
         assert set(used) <= capabilities.keys()
     # A provider picked for a need must not bring needs of its own, or picking could go on forever.
     needed = {name for row in needs["integrations"].values() for need in row.get("needs", ()) for name in need["any_of"]}
