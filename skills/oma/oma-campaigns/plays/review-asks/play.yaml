@@ -38,19 +38,19 @@ roster:
     toolsets: [file, web, skills, memory, kanban, integrations]
     reads: [crm]
     untrusted_input: false
-    skills: [emails, copywriting]
+    skills: [emails, copywriting, humanizer]
   - role: reply-writer
     does: Drafts a reply to every new review, warm and specific without revealing anything the reviewer didn't say.
     per_run: A reply draft for every new review since the last run, with negative reviews flagged to the owner with a suggested private follow-up.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: true
-    skills: [reply-and-comment-writer, crisis-and-moderation, writing-style-and-tone]
+    skills: [reply-and-comment-writer, crisis-and-moderation, writing-style-and-tone, humanizer]
   - role: post-writer
     does: Writes the weekly Business Profile post about the team, a service, a seasonal reminder or an update.
     per_run: One Business Profile post with text, a photo brief and a call-to-action button.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: false
-    skills: [copywriting]
+    skills: [copywriting, humanizer]
   - role: publisher
     does: Sends approved requests by email, posts approved replies and profile posts through the Business Profile API, and records each one.
     per_run: Every approved request sent, every approved reply and post published, and each recorded with its link or send log.

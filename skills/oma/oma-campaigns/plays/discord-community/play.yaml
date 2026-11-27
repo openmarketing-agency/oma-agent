@@ -36,19 +36,19 @@ roster:
     per_run: An answer draft for every open question assigned, each linking the FAQ entry or doc it comes from, or flagged for the team.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: true
-    skills: [reply-and-comment-writer, writing-style-and-tone]
+    skills: [reply-and-comment-writer, writing-style-and-tone, humanizer]
   - role: knowledge-keeper
     does: Turns answered questions into FAQ entries and keeps them current when the product changes.
     per_run: New FAQ entries for questions answered twice or more, and corrections to entries that the latest release or patch made wrong.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: true
-    skills: [educational-content-and-how-to, copywriting]
+    skills: [educational-content-and-how-to, copywriting, humanizer]
   - role: events-host
     does: Plans and writes the weekly event, such as a challenge, a Q&A or a showcase, with its announcement, reminder and recap.
     per_run: The week's event with its announcement, reminder, rules, and a recap of the last event with winners or highlights.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: true
-    skills: [events, community-marketing, writing-style-and-tone]
+    skills: [events, community-marketing, writing-style-and-tone, humanizer]
   - role: publisher
     does: Posts approved answers, FAQ updates and event messages through the brand's bot in its own server, and records each message link.
     per_run: Every approved message posted in its channel through the bot with its link recorded, and FAQ pages updated on the site.

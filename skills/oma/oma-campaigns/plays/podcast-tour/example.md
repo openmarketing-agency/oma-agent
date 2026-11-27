@@ -33,8 +33,8 @@ plans:
 |---|---|---|---|
 | podcast-tour__orchestrator | Pipeline updated, next shows approved, review note | file, web, skills, memory, session_search, kanban, integrations | public-relations |
 | podcast-tour__show-researcher | Five qualified shows with host, audience, recent episodes, angle and contact | file, web, browser, skills, memory, kanban | public-relations, audience-research, podcast-and-audiograms |
-| podcast-tour__pitch-writer | Five individual pitches, plus guest sheet updates | file, web, skills, memory, kanban | public-relations, cold-email, copywriting, writing-style-and-tone |
-| podcast-tour__prep-writer | A prep brief per booking; a recap post and snippets per aired episode | file, web, skills, memory, kanban | podcast-and-audiograms, copywriting, educational-content-and-how-to, writing-style-and-tone |
+| podcast-tour__pitch-writer | Five individual pitches, plus guest sheet updates | file, web, skills, memory, kanban | public-relations, cold-email, copywriting, writing-style-and-tone, humanizer |
+| podcast-tour__prep-writer | A prep brief per booking; a recap post and snippets per aired episode | file, web, skills, memory, kanban | podcast-and-audiograms, copywriting, educational-content-and-how-to, writing-style-and-tone, humanizer |
 | podcast-tour__publisher | Approved pitches sent from Mara's mailbox, bookings handed to her, recaps published | file, web, skills, memory, kanban, integrations | none |
 
 ## First week

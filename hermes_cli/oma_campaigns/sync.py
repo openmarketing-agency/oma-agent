@@ -14,13 +14,15 @@ from hermes_cli.config import (
     atomic_config_replace, atomic_config_write, require_readable_config_before_write,
 )
 from hermes_cli.config_backend import config_version, require_file_tooling
+from hermes_cli.oma_campaigns.bundle import HUMANIZER_SKILL
 from hermes_cli.oma_campaigns.credentials import (
     apply_credential_updates, key_status, plan_credential_updates, read_sync_env, validate_sync_env,
     remove_retired_analytics_keys, retired_analytics_keys,
 )
 from hermes_cli.oma_campaigns.defaults import snapshot
 from hermes_cli.oma_campaigns.install import (
-    _agent_data_dir, _campaign_config_path, _campaigns_dir, _install_lock, _status, campaign_soul, default_home,
+    HUMANIZER_DRAFT_GUIDANCE, _agent_data_dir, _campaign_config_path, _campaigns_dir,
+    _install_lock, _status, campaign_soul, default_home,
     ensure_analyst,
 )
 from hermes_cli.oma_campaigns.role_jobs import apply_role_jobs, plan_role_jobs
@@ -50,11 +52,12 @@ class _Campaign:
     resolved: dict = field(repr=False)
     inherited_credential: dict[str, str] = field(repr=False)
 
-    def render_soul(self, home: Path, agent_id: str, soul: str) -> str:
+    def render_soul(self, home: Path, agent_id: str, soul: str, *, humanize_drafts: bool) -> str:
         return campaign_soul(
             soul, agent_id, self.status["orchestrator"], tuple(self.status["agents"]),
             self.status["kanban_board"], self.path,
             _agent_data_dir(home, agent_id, "saves"), _agent_data_dir(home, agent_id, "tmp"),
+            humanize_drafts=humanize_drafts,
         )
 
 
@@ -113,6 +116,17 @@ def _read_soul(path: Path) -> str | None:
     return path.read_text(encoding="utf-8-sig") if path.exists() else None
 
 
+def _legacy_writer_soul(native: str, agent_id: str, campaign_id: str, skills: list[str]) -> str:
+    """Reconcile the managed block even if an older writer only has a native persona."""
+    guidance = HUMANIZER_DRAFT_GUIDANCE.rstrip()
+    wants_guidance = HUMANIZER_SKILL in skills and agent_id not in (
+        f"{campaign_id}__publisher", f"{campaign_id}__analyst",
+    )
+    if guidance in native:
+        return native if wants_guidance else native.replace(f"\n\n{guidance}", "", 1).rstrip() + "\n"
+    return f"{native.rstrip()}\n\n{guidance}\n" if wants_guidance else native
+
+
 def _plan_agent(home: Path, agent_id: str, env: dict[str, str], *, campaign: _Campaign | None = None,
                 revision: str | None = None) -> _AgentUpdate:
     directory = record_dir(home, agent_id)
@@ -122,14 +136,20 @@ def _plan_agent(home: Path, agent_id: str, env: dict[str, str], *, campaign: _Ca
     source_soul = _read_soul(_member(directory, "SOUL.md"))
     if source_soul is not None and not source_soul.strip():
         raise ValueError(f"{agent_id}: SOUL.md is missing or empty")
-    rendered = campaign.render_soul(home, agent_id, source_soul) if campaign and source_soul is not None else source_soul
+    skills = record.get("oma_skills")
+    rendered = source_soul
+    if campaign and source_soul is not None:
+        rendered = campaign.render_soul(home, agent_id, source_soul, humanize_drafts=HUMANIZER_SKILL in (skills or ()))
     profile = profile_dir(home, agent_id)
     native_path = _member(profile, "config.yaml")
     before = config_version(native_path)
     native = require_readable_config_before_write(native_path)
     native_soul = _read_soul(_member(profile, "SOUL.md"))
-    if campaign and source_soul is None and not (native_soul or "").strip():
-        raise ValueError(f"{agent_id}: SOUL.md is missing or empty")
+    if campaign and source_soul is None:
+        if native_soul is None or not native_soul.strip():
+            raise ValueError(f"{agent_id}: SOUL.md is missing or empty")
+        if skills is not None:
+            rendered = _legacy_writer_soul(native_soul, agent_id, campaign.status["id"], skills)
     defaults = campaign.resolved if campaign else {}
     resolved = resolve_settings(settings_from(defaults, campaign_id or agent_id), settings_from(record, agent_id))
     next_native = {**native, **resolved}
@@ -163,7 +183,7 @@ def _plan_agent(home: Path, agent_id: str, env: dict[str, str], *, campaign: _Ca
     next_record["available-keys"] = sorted(available)
     return _AgentUpdate(agent_id, record_path, digest, native_path, before, next_record if next_record != record else None,
                         next_native, source_soul, native_soul, rendered, tuple(updated + profile_changes),
-                        names, available, credentials, retired, plan_role_skills(home, profile, record.get("oma_skills")),
+                        names, available, credentials, retired, plan_role_skills(home, profile, skills),
                         plan_role_jobs(profile, record.get("jobs"))
                         if defaults.get("mode") != "control" and agent_id != f"{campaign_id}__analyst" else None)
 

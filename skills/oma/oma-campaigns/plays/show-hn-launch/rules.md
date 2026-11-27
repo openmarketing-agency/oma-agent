@@ -14,6 +14,7 @@ A developer reads the README, runs the quickstart in under a minute, and sees it
 - The quickstart runs in a clean environment, tested by the demo-builder, not assumed.
 - Known limits go in the README and the fact sheet. Developers trust honest limits.
 - Release notes list breaking changes first.
+- Use `humanizer` on the README, release notes, blog post, and recap. The Show HN handoff remains a fact sheet for the maker.
 
 ## Readiness checklist
 - Quickstart passes in a fresh container on the documented platforms.

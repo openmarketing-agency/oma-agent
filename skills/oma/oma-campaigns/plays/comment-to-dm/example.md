@@ -32,8 +32,8 @@ plans:
 | Agent | Per run | Toolsets | Skills |
 |---|---|---|---|
 | routine-finder__orchestrator | Next three keyword posts planned, plus a review note on comments, replies and orders per post | file, web, skills, memory, session_search, kanban, integrations | social, offers, instagram-growth |
-| routine-finder__content-maker | One keyword carousel with slide copy and image prompts, or a Reel script, with caption | file, web, skills, memory, kanban | carousel-writer, reels-script, caption-writer, hook-writer |
-| routine-finder__dm-writer | The full message set for one post, plus the day's public comment replies | file, web, skills, memory, kanban | social-selling-and-dm, copywriting, writing-style-and-tone |
+| routine-finder__content-maker | One keyword carousel with slide copy and image prompts, or a Reel script, with caption | file, web, skills, memory, kanban | carousel-writer, reels-script, caption-writer, hook-writer, humanizer |
+| routine-finder__dm-writer | The full message set for one post, plus the day's public comment replies | file, web, skills, memory, kanban | social-selling-and-dm, copywriting, writing-style-and-tone, humanizer |
 | routine-finder__publisher | Approved posts published, a private reply to every new ROUTINE comment, conversations needing a person flagged | file, web, skills, memory, kanban, integrations | reply-and-comment-writer |
 
 ## First week

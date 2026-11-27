@@ -39,7 +39,7 @@ roster:
     per_run: One finished launch asset per task, such as the README rewrite, release notes, the Show HN fact sheet, the launch blog post or the recap.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: true
-    skills: [launch, copywriting, educational-content-and-how-to, writing-style-and-tone]
+    skills: [launch, copywriting, educational-content-and-how-to, writing-style-and-tone, humanizer]
   - role: demo-builder
     does: Builds the demo that proves the release works, from a clean environment, with real commands and real output.
     per_run: One runnable demo per task, such as a copy-paste quickstart verified in a fresh container, a terminal recording script, or a sample repository.

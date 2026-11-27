@@ -60,6 +60,64 @@ def test_startup_adopts_existing_profiles_and_bundles_default_only_skills(tmp_pa
     assert read_user_config_raw(tmp_path / "config.yaml")["model"] == "openrouter/test-model"
 
 
+@pytest.mark.parametrize("existing_bundle", [False, True], ids=["fresh", "existing"])
+def test_startup_seeds_missing_humanizer_without_replacing_shared_skills(tmp_path, monkeypatch, existing_bundle):
+    import json
+
+    from hermes_cli.oma_campaigns.standalone import seed_standalone_agents
+    from tools.skills_tool import skill_view
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    source = Path(__file__).resolve().parents[2]
+    shared = tmp_path / "oma-bundle" / "skills"
+    package = shared / "write" / "humanizer"
+    custom = shared / "custom" / "editorial-notes" / "SKILL.md"
+    custom_text = "---\nname: editorial-notes\n---\nKeep the team's editorial notes.\n"
+    if existing_bundle:
+        custom.parent.mkdir(parents=True)
+        custom.write_text(custom_text, encoding="utf-8")
+
+    seed_standalone_agents(tmp_path, install_dir=source)
+
+    loaded = json.loads(skill_view("humanizer", preprocess=False))
+    assert loaded["success"], loaded
+    assert loaded["name"] == "humanizer"
+    assert Path(loaded["skill_dir"]) == package
+    assert (package / "LICENSE").is_file()
+    assert not (tmp_path / "skills" / "humanizer").exists()
+
+    edited = package / "SKILL.md"
+    edited_text = edited.read_text(encoding="utf-8") + "\nKeep this local editorial instruction.\n"
+    edited.write_text(edited_text, encoding="utf-8")
+    seed_standalone_agents(tmp_path, install_dir=source)
+    assert edited.read_text(encoding="utf-8") == edited_text
+    if existing_bundle:
+        assert custom.read_text(encoding="utf-8") == custom_text
+
+
+def test_startup_preserves_an_existing_humanizer_in_another_category(tmp_path, monkeypatch):
+    import json
+
+    from hermes_cli.oma_campaigns.standalone import seed_standalone_agents
+    from tools.skills_tool import skill_view
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    shared = tmp_path / "oma-bundle" / "skills"
+    custom = shared / "custom" / "team-editor"
+    custom.mkdir(parents=True)
+    custom_file = custom / "SKILL.md"
+    custom_text = "---\nname: humanizer\n---\nFollow the team's editorial style.\n"
+    custom_file.write_text(custom_text, encoding="utf-8")
+
+    seed_standalone_agents(tmp_path, install_dir=Path(__file__).resolve().parents[2])
+
+    loaded = json.loads(skill_view("humanizer", preprocess=False))
+    assert loaded["success"], loaded
+    assert Path(loaded["skill_dir"]) == custom
+    assert custom_file.read_text(encoding="utf-8") == custom_text
+    assert not (shared / "write" / "humanizer").exists()
+
+
 def test_startup_seeds_each_standalone_record_from_its_native_starter(tmp_path, monkeypatch):
     from hermes_cli.config_home import seed_install_config
     from hermes_cli.oma_campaigns.standalone import main, sync_standalone_agent

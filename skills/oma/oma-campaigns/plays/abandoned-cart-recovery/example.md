@@ -31,7 +31,7 @@ plans:
 | Agent | Per run | Toolsets | Skills |
 |---|---|---|---|
 | cart-recovery__orchestrator | Next test picked with its hypothesis, plus a review note on recovery and revenue | file, web, skills, memory, session_search, kanban, integrations | emails, cro, analytics |
-| cart-recovery__flow-writer | One finished email or variant with three subject lines, body, product block and call to action | file, web, skills, memory, kanban | emails, copywriting, marketing-psychology, writing-style-and-tone |
+| cart-recovery__flow-writer | One finished email or variant with three subject lines, body, product block and call to action | file, web, skills, memory, kanban | emails, copywriting, marketing-psychology, writing-style-and-tone, humanizer |
 | cart-recovery__merchandiser | Product, stock and size rules for one flow, plus cross-sell picks | file, web, skills, memory, kanban, integrations | offers |
 | cart-recovery__publisher | Approved emails built in Klaviyo with consent and stop rules, test sends checked, flow switched on | file, web, skills, memory, kanban, integrations | emails |
 

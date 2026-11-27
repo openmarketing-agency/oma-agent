@@ -35,8 +35,8 @@ plans:
 |---|---|---|---|
 | search-ads__orchestrator | Spend against budget, cost per lead per ad group, changes proposed, review note | file, web, skills, memory, session_search, kanban, integrations | ads, conversion-tracking |
 | search-ads__keyword-planner | Ad groups with keywords, match types, negatives and estimated cost per click | file, web, skills, memory, kanban, integrations | ads, audience-research |
-| search-ads__ad-writer | Headlines, descriptions, sitelinks and callouts per ad group, claims checked | file, web, skills, memory, kanban | ad-creative, copywriting |
-| search-ads__landing-page-writer | A landing page per ad group with headline, proof, price and booking form | file, web, skills, memory, kanban | copywriting, cro |
+| search-ads__ad-writer | Headlines, descriptions, sitelinks and callouts per ad group, claims checked | file, web, skills, memory, kanban | ad-creative, copywriting, humanizer |
+| search-ads__landing-page-writer | A landing page per ad group with headline, proof, price and booking form | file, web, skills, memory, kanban | copywriting, cro, humanizer |
 | search-ads__publisher | Approved changes applied and logged, pages published, tracking confirmed | file, skills, memory, kanban, integrations | none |
 
 ## First week

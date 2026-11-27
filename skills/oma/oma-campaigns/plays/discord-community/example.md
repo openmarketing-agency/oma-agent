@@ -32,9 +32,9 @@ plans:
 | Agent | Per run | Toolsets | Skills |
 |---|---|---|---|
 | discord__orchestrator | Open questions assigned, FAQ topics and event chosen, escalations flagged, review note | file, web, skills, memory, session_search, kanban, integrations | community-marketing, customer-research |
-| discord__responder | Answer drafts for every assigned question, each linking its source | file, web, skills, memory, kanban | reply-and-comment-writer, writing-style-and-tone |
-| discord__knowledge-keeper | New FAQ entries for repeats, fixes for entries the patch broke | file, web, skills, memory, kanban | educational-content-and-how-to, copywriting |
-| discord__events-host | The week's event announcement, reminder, rules and last recap | file, web, skills, memory, kanban | events, community-marketing, writing-style-and-tone |
+| discord__responder | Answer drafts for every assigned question, each linking its source | file, web, skills, memory, kanban | reply-and-comment-writer, writing-style-and-tone, humanizer |
+| discord__knowledge-keeper | New FAQ entries for repeats, fixes for entries the patch broke | file, web, skills, memory, kanban | educational-content-and-how-to, copywriting, humanizer |
+| discord__events-host | The week's event announcement, reminder, rules and last recap | file, web, skills, memory, kanban | events, community-marketing, writing-style-and-tone, humanizer |
 | discord__publisher | Approved messages posted through the bot with links recorded | file, skills, memory, kanban, integrations | none |
 
 ## First week

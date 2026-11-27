@@ -32,7 +32,7 @@ plans:
 | Agent | Per run | Toolsets | Skills |
 |---|---|---|---|
 | launch-1-0__orchestrator | Readiness checklist updated with blockers and owners, next assets queued | file, web, skills, memory, session_search, kanban, integrations | launch, analytics |
-| launch-1-0__launch-writer | One finished asset per task: README, release notes, fact sheet, launch post or recap | file, web, skills, memory, kanban | launch, copywriting, educational-content-and-how-to, writing-style-and-tone |
+| launch-1-0__launch-writer | One finished asset per task: README, release notes, fact sheet, launch post or recap | file, web, skills, memory, kanban | launch, copywriting, educational-content-and-how-to, writing-style-and-tone, humanizer |
 | launch-1-0__demo-builder | One runnable demo: quickstart verified in a fresh container, recording script or sample repo | file, terminal, web, skills, memory, kanban | educational-content-and-how-to |
 | launch-1-0__publisher | Approved GitHub and site changes shipped with URLs; fact sheet handed to Priya; thread URL recorded | file, web, skills, memory, kanban, integrations | none |
 

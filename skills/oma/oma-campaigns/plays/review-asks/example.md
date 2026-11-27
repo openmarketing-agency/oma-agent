@@ -33,9 +33,9 @@ plans:
 | Agent | Per run | Toolsets | Skills |
 |---|---|---|---|
 | reviews__orchestrator | Last week's cohort defined, the batch queued, a review note on new reviews and themes | file, web, skills, memory, session_search, kanban, integrations | social-proof-and-testimonials |
-| reviews__request-writer | The week's batch: one request per patient and reminders for non-responders | file, web, skills, memory, kanban, integrations | emails, copywriting |
-| reviews__reply-writer | A reply draft for every new review; negative ones flagged to the owners | file, web, skills, memory, kanban | reply-and-comment-writer, crisis-and-moderation, writing-style-and-tone |
-| reviews__post-writer | One post per clinic with text, photo brief and booking button | file, web, skills, memory, kanban | copywriting |
+| reviews__request-writer | The week's batch: one request per patient and reminders for non-responders | file, web, skills, memory, kanban, integrations | emails, copywriting, humanizer |
+| reviews__reply-writer | A reply draft for every new review; negative ones flagged to the owners | file, web, skills, memory, kanban | reply-and-comment-writer, crisis-and-moderation, writing-style-and-tone, humanizer |
+| reviews__post-writer | One post per clinic with text, photo brief and booking button | file, web, skills, memory, kanban | copywriting, humanizer |
 | reviews__publisher | Approved requests sent, replies and posts published, each logged | file, web, skills, memory, kanban, integrations | none |
 
 ## First week

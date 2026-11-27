@@ -18,6 +18,7 @@ from hermes_cli.config_backend import require_file_tooling
 from hermes_cli.config_credential_values import refuse_redacted_env_value
 from hermes_cli.config_defaults import DEFAULT_CONFIG
 from hermes_cli.config_home import OMA_CAMPAIGN_SKILL
+from hermes_cli.oma_campaigns.bundle import HUMANIZER_SKILL
 from hermes_cli.oma_campaigns.defaults import agent_defaults, snapshot
 from hermes_cli.oma_campaigns.schema import validate_record
 from hermes_cli.oma_campaigns.role_skills import write_skill_inventory
@@ -292,8 +293,18 @@ def _campaign_context_soul(config_path: Path) -> str:
     )
 
 
+HUMANIZER_DRAFT_GUIDANCE = (
+    "## Before handing off public-facing copy\n\n"
+    f"Use `skill_view` to load `{HUMANIZER_SKILL}` before saving a finished draft or handing off finished copy. "
+    "Apply it in embedded mode after drafting and again after substantial copy revisions. "
+    "Use the campaign's saved brand voice and preserve verified claims, exact quotes and numbers, citations, links, "
+    "approved terminology, required disclosures, and channel limits. Add specifics only from the assignment or verified "
+    "sources. Return the finished copy through the assigned task or publication workflow.\n\n"
+)
+
+
 def campaign_soul(soul: str, agent_id: str, orchestrator: str, agents: tuple[str, ...], board: str,
-                  campaign_config: Path, saves: Path, scratch: Path) -> str:
+                  campaign_config: Path, saves: Path, scratch: Path, *, humanize_drafts: bool = False) -> str:
     campaign_context = _campaign_context_soul(campaign_config)
     campaign_id = campaign_config.parent.name
     analyst_id = f"{campaign_id}__analyst"
@@ -353,6 +364,9 @@ def campaign_soul(soul: str, agent_id: str, orchestrator: str, agents: tuple[str
         "republish, or send new content.\n\n"
         if agent_id == publisher_id else ""
     )
+    humanizer_guidance = (
+        HUMANIZER_DRAFT_GUIDANCE if humanize_drafts and agent_id not in (analyst_id, publisher_id) else ""
+    )
     authoring_guidance = (
         "## Campaign publications\n\n"
         "When assigned to prepare a post or reply, use the best available authorized resources and campaign context. "
@@ -375,7 +389,7 @@ def campaign_soul(soul: str, agent_id: str, orchestrator: str, agents: tuple[str
         f"{soul.rstrip()}\n\n{campaign_context}\n## Campaign Kanban board\n\n"
         f"Use only `{board}` for this campaign's Kanban work. {board_role}\n\n"
         f"{blocker_guidance}{blocker_review}"
-        f"{analyst_guidance}{authoring_guidance}{publisher_guidance}"
+        f"{analyst_guidance}{humanizer_guidance}{authoring_guidance}{publisher_guidance}"
         "## Campaign scratch directory\n\n"
         f"Use `{scratch}` for this profile's temporary campaign files.\n\n"
         "## Saved context\n\n"
@@ -393,7 +407,10 @@ def _publish_profiles(campaign: Campaign, configs: dict[str, dict], paths: dict[
         saves, scratch = paths[agent.id]
         scratch.mkdir(mode=0o700, parents=True, exist_ok=True)
         saves.mkdir(mode=0o700, parents=True, exist_ok=True)
-        soul = campaign_soul(agent.soul, agent.id, campaign.orchestrator, roster, board, campaign_config, saves, scratch)
+        soul = campaign_soul(
+            agent.soul, agent.id, campaign.orchestrator, roster, board, campaign_config, saves, scratch,
+            humanize_drafts=HUMANIZER_SKILL in agent.skills,
+        )
         request = ProfileCreateRequest(name=agent.id, alias=False, mirror_credentials=False,
                                        description=agent.description, soul=soul)
         provision_profile(request, initialize=partial(_initialize, agent, configs[agent.id], credentials[agent.id]))

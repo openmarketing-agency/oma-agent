@@ -44,7 +44,7 @@ roster:
     per_run: Seven scripts, each with two hook options, the beats, on-screen text, the shot list, caption, title and the call to action.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: false
-    skills: [short-form-video-script, hook-writer, caption-writer]
+    skills: [short-form-video-script, hook-writer, caption-writer, humanizer]
   - role: producer
     does: Turns approved scripts into finished vertical videos from screen recordings, product footage and licensed audio, with captions burned in.
     per_run: One finished video per script, 15 to 45 seconds, 9:16, captions on screen, AI voice labeled if used, plus a thumbnail frame.

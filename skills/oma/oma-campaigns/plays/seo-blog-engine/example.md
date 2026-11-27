@@ -37,7 +37,7 @@ plans:
 |---|---|---|---|
 | search__orchestrator | Next week's two topics and any refresh, queued as tasks, plus a five-line review note | file, web, skills, memory, session_search, kanban, integrations | content-strategy, seo-audit |
 | search__researcher | One brief per task: query, intent, what the top five miss, outline, sources, links, call to action | file, web, browser, skills, memory, kanban, integrations | seo-audit, competitors, ai-seo, programmatic-seo |
-| search__writer | One finished draft: a 1,500 to 2,500 word article, a comparison page or a marked-up refresh | file, web, skills, memory, kanban | copywriting, copy-editing, competitors, writing-style-and-tone |
+| search__writer | One finished draft: a 1,500 to 2,500 word article, a comparison page or a marked-up refresh | file, web, skills, memory, kanban | copywriting, copy-editing, competitors, writing-style-and-tone, humanizer |
 | search__publisher | Every approved draft live in WordPress with meta, schema and links, indexing requested, URL recorded | file, web, skills, memory, kanban, integrations | schema |
 
 ## First week

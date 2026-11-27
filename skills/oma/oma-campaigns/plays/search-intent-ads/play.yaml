@@ -46,13 +46,13 @@ roster:
     per_run: Headlines and descriptions for every ad group, with sitelinks and callouts, each claim checked against the brand record.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: false
-    skills: [ad-creative, copywriting]
+    skills: [ad-creative, copywriting, humanizer]
   - role: landing-page-writer
     does: Writes one landing page per ad group that makes the same promise as the ad and asks for one action.
     per_run: A landing page per new ad group, with headline, proof, price, next step and form, ready to publish.
     toolsets: [file, web, skills, memory, kanban]
     untrusted_input: false
-    skills: [copywriting, cro]
+    skills: [copywriting, cro, humanizer]
   - role: publisher
     does: Applies approved ad changes through the ad platform's API, publishes approved landing pages, and records what changed.
     per_run: Every approved change applied with a change log entry, every approved page published with its URL, and conversion tracking confirmed.

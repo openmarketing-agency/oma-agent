@@ -21,7 +21,7 @@ One video a day that someone in the audience would send to a friend: a real ques
 - Show the real product. No stock footage passed off as the product.
 
 ## Definition of done
-- Script approved, and every claim substantiated.
+- Before approval, the scriptwriter uses `humanizer` on the script and caption, then checks timing, substantiated claims, and required disclosures.
 - Video rendered with captions; audio licensed for commercial use.
 - AI and paid-promotion disclosures set where they apply.
 - Uploaded with title, description and tracked link; URL recorded.
