@@ -1288,7 +1288,7 @@ def test_campaign_helper_uses_installed_runtime(bundle, run_campaign_script):
     assert "not installed; run install demo" in result.stderr
     result = run_campaign_script(helper, "validate", "campaign", str(source / "campaigns" / "demo" / "config.yaml"))
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout) == {"kind": "campaign", "valid": True}
+    assert json.loads(result.stdout) == {"kind": "campaign", "valid": True, "warnings": []}
 
 
 def test_social_play_drafts_hourly_jobs_without_installing(bundle, run_campaign_script):

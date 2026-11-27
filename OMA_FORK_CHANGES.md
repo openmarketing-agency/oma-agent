@@ -185,6 +185,7 @@ The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) designs t
 | `list` / `status <id>` | Inspect campaign records and verify the board and profiles locally. |
 | `configure <id>` | Fill missing routing fields in the existing campaign config without reinstalling. |
 | `integrations` | List canonical integration candidates from saved brand evidence. |
+| `recommend` | Suggest integrations for play channels, their unmet needs and complementary tools. |
 | `lifecycle <id> paused` / `lifecycle <id> resumed` | Control campaign work. New campaigns start paused; resume requires a saved campaign model or one inherited from `default`. |
 | `mode <id> yolo\|approve\|control` | Change the saved automation policy of a stopped campaign. If omitted, the mode is `approve`. |
 
@@ -193,6 +194,8 @@ The bundled [`oma-campaigns` skill](skills/oma/oma-campaigns/SKILL.md) designs t
 The [OMA integration catalog](hermes_cli/oma_campaigns/schemas/integrations.json) maps stable IDs such as `google-analytics` to provider slugs. Campaign records keep a list of unique, well-formed integration IDs; use `integrations: []` when none are needed. Native sync and resume do not check catalog membership or contact Composio. The console checks accounts when creating a campaign MCP session.
 
 The [Composio category snapshot](hermes_cli/oma_campaigns/schemas/composio-categories.json) groups toolkit slugs by the exact category labels in Composio's public documentation catalog. Join on the `composio` slug, not the OMA ID. Campaigns can save those labels in the optional `integration_categories` list as suggestions. Categories do not replace `integrations`, change which IDs OMA accepts, or connect toolkits.
+
+The [integration needs map](hermes_cli/oma_campaigns/schemas/integration-needs.json) lists, for each integration, the capabilities it can't deliver without (Instagram needs image or video media) and the ones that help it, each with ranked Composio providers. It also maps play channels to integrations. `recommend --channels <ids> [--for <ids>]` selects integrations for a play, ranks providers the brand already shows first, and returns unmet needs, complements and category labels. `validate campaign` reports unmet needs as `warnings`; they never fail validation, because a brand may use approved existing assets.
 
 **Campaign defaults:** Install and sync resolve omitted model and reasoning settings from the saved `default` profile, not the current chat. Inherited values are written to the native profiles, not pinned in authored campaign or agent YAML. Only profiles inheriting that model can receive its matching saved API key, and sync does not overwrite an existing profile key unless one is explicitly supplied. Values already saved in campaign or agent records remain overrides until explicitly removed.
 
