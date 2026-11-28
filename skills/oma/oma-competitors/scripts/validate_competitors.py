@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """Validate OMA competitor research under <home>/oma/brand.
 
-Usage: python3 validate_competitors.py <path-to-oma/brand>
+Usage: python3 validate_competitors.py <path-to-oma/brand> [--full N] [--light N]
 
 Checks index.yaml structure, score totals, tier rules, depth caps and ordering,
 evidence, file references, and creatives records. Exits 1 on any error.
+``--full N`` / ``--light N``: how many top direct / indirect competitors carry ``full`` / ``light``
+depth (5 each by default); the rest must be ``index_only``. Onboarding's competitor stage uses
+``--full 5 --light 0``.
 """
+import argparse
 import datetime as dt
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -88,16 +93,63 @@ def sort_key(c):
     return (-(c.get("total") or 0), -(c.get("mentions") or 0), c.get("id", ""))
 
 
-def check_creatives(root, rel, owner):
-    """Creatives are validated in depth by oma-creatives; here, check the summary exists."""
+CREATIVES_VALIDATOR = Path(__file__).resolve().parents[2] / "oma-creatives" / "scripts" / "validate_creatives.py"
+
+
+def check_creatives(root, rel, owner, target):
+    """A creatives.md file is not enough: the target's collection must pass the oma-creatives validator."""
     check_path(root, rel, f"{owner}.creatives")
+    if not CREATIVES_VALIDATOR.is_file():
+        err(f"{owner}: the oma-creatives validator was not found at {CREATIVES_VALIDATOR}")
+        return
+    done = subprocess.run([sys.executable, str(CREATIVES_VALIDATOR), str(root), target],
+                          capture_output=True, text=True, check=False, timeout=600)
+    if done.returncode != 0:
+        problems = [line for line in done.stdout.splitlines() if line.startswith("ERROR")][:5]
+        err(f"{owner}: creatives collection fails oma-creatives validation: " + "; ".join(problems or [done.stdout[-300:]]))
+
+
+def check_depths(root, comps, caps):
+    """The top ``caps[tier]`` of each tier carry its depth and files; the rest stay index-only, in score order."""
+    for tier, depth, required in (("direct", "full", ("profile", "gtm", "creatives")),
+                                  ("indirect", "light", ("profile", "gtm"))):
+        ranked = sorted([c for c in comps if c.get("tier") == tier], key=sort_key)
+        cap = caps[tier]
+        top = {c.get("id") for c in ranked[:cap]}
+        for c in ranked:
+            cid = c.get("id")
+            if cid in top and c.get("depth") != depth:
+                err(f"competitor '{cid}': ranks in top {cap} {tier}, depth must be '{depth}'")
+            if cid not in top and c.get("depth") != "index_only":
+                err(f"competitor '{cid}': outside top {cap} {tier}, depth must be 'index_only'")
+            if cid not in top:
+                continue
+            for key in required:
+                if key == "creatives":
+                    check_creatives(root, c.get(key), f"competitor '{cid}'", cid)
+                else:
+                    check_path(root, c.get(key), f"competitor '{cid}'.{key}")
+
+
+def check_references(root, refs, competitor_ids):
+    if len(refs) > 3:
+        err(f"references: {len(refs)}, cap is 3")
+    for r in refs:
+        rid = r.get("id", "?")
+        if rid in competitor_ids:
+            err(f"reference '{rid}': already in competitors; a brand is one or the other")
+        if not r.get("reason"):
+            err(f"reference '{rid}': missing reason")
+        check_creatives(root, r.get("creatives"), f"reference '{rid}'", rid)
 
 
 def main(argv):
-    if len(argv) != 2:
-        print(__doc__)
-        return 2
-    root = Path(argv[1])
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("brand", type=Path)
+    parser.add_argument("--full", type=int, default=5, choices=range(6), metavar="0-5")
+    parser.add_argument("--light", type=int, default=5, choices=range(6), metavar="0-5")
+    args = parser.parse_args(argv[1:])
+    root = args.brand
     index_path = root / "research" / "competitors" / "index.yaml"
     if not index_path.is_file():
         print(f"ERROR: {index_path} not found")
@@ -177,34 +229,10 @@ def main(argv):
             if key in c:
                 as_date(c[key], f"{w}.{key}")
 
-    # Depth caps and deterministic ordering
-    for tier, depth, required in (("direct", "full", ("profile", "gtm", "creatives")),
-                                  ("indirect", "light", ("profile", "gtm"))):
-        ranked = sorted([c for c in comps if c.get("tier") == tier], key=sort_key)
-        top = {c.get("id") for c in ranked[:5]}
-        for c in ranked:
-            cid = c.get("id")
-            if cid in top and c.get("depth") != depth:
-                err(f"competitor '{cid}': ranks in top 5 {tier}, depth must be '{depth}'")
-            if cid not in top and c.get("depth") != "index_only":
-                err(f"competitor '{cid}': outside top 5 {tier}, depth must be 'index_only'")
-            if cid in top:
-                for key in required:
-                    if key == "creatives":
-                        check_creatives(root, c.get(key), f"competitor '{cid}'")
-                    else:
-                        check_path(root, c.get(key), f"competitor '{cid}'.{key}")
-
+    check_depths(root, comps, {"direct": args.full, "indirect": args.light})
     refs = idx.get("references") or []
-    if len(refs) > 3:
-        err(f"references: {len(refs)}, cap is 3")
-    for r in refs:
-        rid = r.get("id", "?")
-        if rid in ids:
-            err(f"reference '{rid}': already in competitors; a brand is one or the other")
-        if not r.get("reason"):
-            err(f"reference '{rid}': missing reason")
-        check_creatives(root, r.get("creatives"), f"reference '{rid}'")
+    check_references(root, refs, ids)
+    check_creatives(root, "research/own/creatives.md", "the brand's own baseline", "own")
 
     for i, sq in enumerate(idx.get("status_quo") or []):
         if not sq.get("name"):

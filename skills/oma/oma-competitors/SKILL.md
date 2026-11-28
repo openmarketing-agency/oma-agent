@@ -1,7 +1,7 @@
 ---
 name: oma-competitors
 description: Discover, score, and profile the brand's competitors; collect their creatives and tear down their GTM into adaptable patterns.
-version: 0.3.0
+version: 0.4.0
 author: Open Marketing Agency (OMA)
 license: MIT
 platforms: [linux, macos, windows]
@@ -55,7 +55,7 @@ research/
 
 - `index.yaml` is the source of truth. The Markdown files are views written from it plus evidence.
 - IDs are stable lowercase hyphenated slugs of the product name (`gamma`, `beautiful-ai`). If two names collide, append the domain TLD (`acme-io`). Never rename an existing ID.
-- In `config.yaml`, set `research.competitors` to `research/competitors.md` following the shared `brand.schema.json`. Do not add new config keys. The index is found by its fixed path.
+- In `config.yaml`, set `research.competitor_report` to `research/competitors.md` and `research.competitors` to the direct and indirect competitors as `{id, name, website, report}` entries (`report` is the competitor's `profile.md`), following the shared `brand.schema.json`. Do not add new config keys. The index is found by its fixed path.
 - Copy the shape of [index example](references/index-example.yaml). Never copy its values.
 
 ## How to Run
@@ -128,9 +128,11 @@ Use [profile template](references/profile-template.md) and [GTM template](refere
 
 ### 7. Collect creatives
 
-Load [OMA Creatives](../oma-creatives/SKILL.md) with `skill_view` using `name: oma/oma-creatives`. Use the brand's baseline in `research/own/`, which [OMA Brand](../oma-brand/SKILL.md) collects before this skill runs. Run `oma-creatives` for `own` only when `research/own/creatives.md` is missing or was last collected more than 7 days ago. Then run it for each top-5 direct competitor, then for each reference. It collects the latest 25 plus the top 10 organic posts per platform and up to 25 ad concepts per ad library, with media, captions, posting times, metrics and landing pages, and writes each target's `creatives.md`. Wait for its validator to pass for each target.
+Each top-5 direct competitor and each reference gets a full [OMA Creatives](../oma-creatives/SKILL.md) collection: its `sources.yaml` (written from `profile.md` and `gtm.md`), organic posts, up to 20 ad concepts per library with media and landing pages, labels, `creatives.md`, and a passing creatives validator. On the onboarding board, competitor research is a stage that runs only when the user asks for it: it researches only direct competitors, profiles the top five, collects their posts, and runs the validator with `--full 5 --light 0`. Their ads are collected in the separate ads stage. Outside onboarding, run `oma-creatives` for each target in turn.
 
-If `oma-creatives` is unavailable, record the gap in `index.yaml > coverage` (`source: oma_creatives`, `status: not_checked`) and continue. The Channels and Messaging sections of `gtm.md` then rely on profile pages only. Once `creatives.md` exists, use its winning patterns and caption patterns in `gtm.md` (What's working, Adaptable patterns).
+Never collect `own` here: [OMA Brand](../oma-brand/SKILL.md) owns the brand's baseline in `research/own/`. If it is missing, report the gap instead of collecting it.
+
+Once a target's `creatives.md` exists, use its winning patterns and caption patterns in `gtm.md` (What's working, Adaptable patterns). If `oma-creatives` is unavailable, record the gap in `index.yaml > coverage` (`source: oma_creatives`, `status: not_checked`); the Channels and Messaging sections of `gtm.md` then rely on profile pages only, and the validator fails until the collection exists.
 
 ### 8. Write the landscape
 
@@ -139,7 +141,7 @@ Write `research/competitors.md` from [landscape template](references/landscape-t
 ### 9. Save and verify
 
 1. Write the per-competitor files first (after `oma-creatives` has finished), then `index.yaml`, then `competitors.md`, then update `config.yaml > research.competitors`.
-2. Run `<skill_dir>/scripts/validate_competitors.py <home>/oma/brand` with Python in the activated Hermes environment, which supplies its YAML parser. Fix every error and rerun until it passes. If that Python is unavailable, report that validation was not run.
+2. Run `<skill_dir>/scripts/validate_competitors.py <home>/oma/brand` with Python in the activated Hermes environment, which supplies its YAML parser. It also runs the creatives validator for the brand and every collected target, so a summary without a collection fails. Fix every error and rerun until it passes. If that Python is unavailable, report that validation was not run.
 3. Report the counts per tier, the direct competitors, the top 3 adaptable patterns, the important changes since the last run, and any blocked sources.
 
 ## Adapting, Not Copying

@@ -164,7 +164,8 @@ function findVisualAssets() {
     const body = (document.body?.innerText || '').trim().slice(0, 2000);
     const meta = name => document.querySelector(`meta[property="${name}"]`)?.content;
     const images = selector => [...document.querySelectorAll(selector)].map(img => img.currentSrc || img.src);
-    const blocked = !!document.querySelector('#slardar-config, ._wafchallengeid, #challenge-running, #challenge-form')
+    // Not #slardar-config: ByteDance's monitoring config is on every normal TikTok page.
+    const blocked = !!document.querySelector('._wafchallengeid, #challenge-running, #challenge-form')
         || /^(just a moment|access denied|attention required|too many requests)\b/i.test(title)
         || /^(please wait\.{2,}|access denied|too many requests|you have been blocked)/i.test(body);
     const login_overlay = [...document.querySelectorAll('[role="dialog"], dialog[open]')]

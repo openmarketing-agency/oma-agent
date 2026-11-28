@@ -268,3 +268,114 @@ def test_camofox_fallback_is_for_unavailable_backends_not_blocked_sites(
     assert not output.exists()
     assert not any(call.args[1].endswith("/screenshot") for call in api.request.call_args_list)
     assert api.request.call_args.args == ("DELETE", f"http://camofox:9377/sessions/{tab.user}")
+
+
+class _FakeCamofox:
+    """Answers the Camofox REST calls the helper makes, with scripted page states."""
+
+    def __init__(self, camofox, visual, url, *, navigate, pages, settle_states=None, unsettled=None):
+        self.expr = {camofox["_SETTLE"]: "settle", visual["_INSPECT"]: "inspect",
+                     camofox["_LAYOUT"]: "layout", camofox["_LOAD_LAZY_MEDIA"]: "lazy"}
+        self.url, self.navigate, self.pages = url, navigate, list(pages)
+        self.settle_states = list(settle_states or [{"href": url, "ready": "complete"}])
+        self.settled = False
+        self.unsettled = unsettled
+
+    def _evaluate(self, expression):
+        kind = self.expr.get(expression)
+        if kind == "settle":
+            state = self.settle_states.pop(0) if len(self.settle_states) > 1 else self.settle_states[0]
+            self.settled = state.get("ready") == "complete"
+            return state
+        if kind == "inspect":
+            if not self.settled and self.unsettled is not None:
+                return self.unsettled
+            return self.pages.pop(0) if len(self.pages) > 1 else self.pages[0]
+        if kind == "layout":
+            return {"width": 1280, "height": 900, "viewportHeight": 900}
+        return True if kind == "lazy" else None
+
+    def request(self, method, endpoint, **kwargs):
+        reply = MagicMock(status_code=200)
+        reply.__enter__.return_value = reply
+        if endpoint.endswith("/tabs"):
+            reply.json.return_value = {"tabId": "tab-1"}
+        elif endpoint.endswith("/navigate"):
+            reply.json.return_value = self.navigate
+        elif endpoint.endswith("/evaluate"):
+            reply.json.return_value = {"result": self._evaluate(kwargs["json"]["expression"])}
+        elif endpoint.endswith("/screenshot"):
+            reply.iter_content.return_value = [_png(1280, 900)]
+        else:
+            reply.json.return_value = {"ok": True}
+        return reply
+
+
+def _png(width, height):
+    from io import BytesIO
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (width, height), "white").save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _run_fake(camofox_helper, visual_helper, tmp_path, url, **fake):
+    api = Mock()
+    api.request.side_effect = _FakeCamofox(camofox_helper, visual_helper, url, **fake).request
+    tab = camofox_helper["CamofoxTab"](api, "http://camofox:9377")
+    return camofox_helper["run"](tab, url, tmp_path / "capture", name="home", validate=Mock())
+
+
+def test_rendered_public_page_under_http_403_is_captured_not_blocked(camofox_helper, visual_helper, tmp_path):
+    """Meta's Ad Library serves its full public page with HTTP 403."""
+    url = "https://www.facebook.com/ads/library/"
+    page = {"url": url, "title": "Ad Library", "body": "Library ID: 123 Started running " * 20,
+            "images": [], "blocked": False}
+
+    result = _run_fake(camofox_helper, visual_helper, tmp_path, url,
+                       navigate={"url": url, "httpStatus": 403, "navigationOk": False}, pages=[page])
+
+    assert result["status"] != "blocked"
+    assert result["screenshots"]
+
+
+def test_denial_page_under_http_403_stays_blocked(camofox_helper, visual_helper, tmp_path):
+    url = "https://brand.example/"
+    page = {"url": url, "title": "Error", "body": "Forbidden", "images": [], "blocked": False}
+
+    result = _run_fake(camofox_helper, visual_helper, tmp_path, url,
+                       navigate={"url": url, "httpStatus": 403, "navigationOk": False}, pages=[page])
+
+    assert result["status"] == "blocked"
+    assert "403" in result["reason"]
+
+
+def test_page_is_read_after_a_post_navigation_reload_settles(camofox_helper, visual_helper, tmp_path):
+    """YouTube bounces through ?themeRefresh=1; reading mid-reload saw an empty body."""
+    url = "https://www.youtube.com/@brand"
+    loaded = {"url": url, "title": "Brand - YouTube", "body": "Brand 1.2K subscribers Videos",
+              "images": [], "blocked": False}
+    reloading = {**loaded, "body": ""}
+
+    result = _run_fake(camofox_helper, visual_helper, tmp_path, url,
+                       navigate={"url": url + "?themeRefresh=1", "httpStatus": 200},
+                       settle_states=[{"href": url + "?themeRefresh=1", "ready": "loading"},
+                                      {"href": url, "ready": "complete"}],
+                       pages=[loaded], unsettled=reloading)
+
+    assert result["status"] != "blocked"
+    assert result["screenshots"]
+
+
+def test_loading_screen_that_matches_a_denial_pattern_is_read_again(camofox_helper, visual_helper, tmp_path):
+    """TikTok shows "Please wait..." while its app boots; only a persisting challenge is a block."""
+    url = "https://www.tiktok.com/@brand"
+    loading = {"url": url, "title": "", "body": "Please wait...", "images": [], "blocked": True}
+    loaded = {"url": url, "title": "Brand | TikTok", "body": "Brand 970K Followers", "images": [], "blocked": False}
+
+    result = _run_fake(camofox_helper, visual_helper, tmp_path, url,
+                       navigate={"url": url, "httpStatus": 200}, pages=[loading, loaded])
+
+    assert result["status"] != "blocked"
+    assert result["screenshots"]

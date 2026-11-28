@@ -1,4 +1,4 @@
-"""The bundled onboarding workflow can load its four companion skills."""
+"""The bundled onboarding workflow can load every skill its board cards drive."""
 
 import json
 from pathlib import Path
@@ -20,7 +20,7 @@ def test_oma_onboarding_loads_with_its_workflow_skills(tmp_path, monkeypatch):
     assert OMA_SKILLS <= set(sync_skills(quiet=True)["copied"])
     onboarding = json.loads(skill_view("oma-onboarding"))
     assert onboarding["success"], onboarding
-    assert set(onboarding["related_skills"]) == ONBOARDING_COMPANIONS
+    assert set(onboarding["related_skills"]) == ONBOARDING_COMPANIONS | OMA_RESEARCH_SKILLS
     oma_dir = (tmp_path / "skills" / "oma").resolve()
     assert Path(onboarding["skill_dir"]).resolve() == oma_dir / "oma-onboarding"
     for name in ONBOARDING_COMPANIONS | OMA_RESEARCH_SKILLS:
@@ -28,6 +28,7 @@ def test_oma_onboarding_loads_with_its_workflow_skills(tmp_path, monkeypatch):
         assert loaded["success"], loaded
         assert Path(loaded["skill_dir"]).resolve() == oma_dir / name
     assert (oma_dir / "oma-campaigns" / "scripts" / "campaign.py").is_file()
+    assert (oma_dir / "oma-onboarding" / "scripts" / "board.py").is_file()
     assert not (tmp_path / "oma").exists()
 
 

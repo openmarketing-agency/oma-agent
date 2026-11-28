@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import runpy
 from tempfile import mkdtemp
+import time
 from typing import Any, cast
 from urllib.parse import quote, urlsplit
 from uuid import uuid4
@@ -36,6 +37,16 @@ _LOAD_LAZY_MEDIA = """(async () => {
     return true;
 })()"""
 _PNG_LIMIT = 64 * 1024 * 1024
+# Some sites bounce through a reload (YouTube) or a "Please wait..." loading screen (TikTok) after
+# navigation; read the page only once its address, title and amount of text stop changing.
+_SETTLE = """({href: location.href, ready: document.readyState, title: document.title,
+    text: Math.round((document.body?.innerText || '').length / 50)})"""
+_SETTLE_READS = 16
+# A challenge page persists; a loading screen that matched a denial pattern clears within seconds.
+_BLOCK_RECHECK_SECONDS = 3
+# Meta's Ad Library renders its full public page under HTTP 403, so a 4xx status alone is not a denial:
+# it counts only when the page rendered almost no text (an error or denial page).
+_DENIAL_TEXT_LIMIT = 200
 
 
 class CamofoxTab:
@@ -46,6 +57,7 @@ class CamofoxTab:
         self.path: str | None = None
         self.image: Image.Image | None = None
         self.size: dict | None = None
+        self.http_status = 0
 
     def request(self, method, path, *, data=None, params=None, screenshot=False, timeout=30):
         try:
@@ -82,13 +94,24 @@ class CamofoxTab:
         self.path = f"/tabs/{quote(tab_id, safe='')}"
         self.action("viewport", width=width, height=height)
         page = self.action("navigate", url=url)
-        if page.get("navigationOk") is False or page.get("ok") is False or (page.get("httpStatus") or 0) >= 400:
+        self.http_status = page.get("httpStatus") or 0
+        if page.get("ok") is False or (page.get("navigationOk") is False and self.http_status < 400):
             raise PageBlocked("The source returned an error or denied access")
         final_url = page.get("url")
         if not final_url or final_url == "about:blank":
             raise PageBlocked("The requested public page did not load")
         validate(final_url)
+        self.settle()
         return final_url
+
+    def settle(self):
+        previous = None
+        for _ in range(_SETTLE_READS):
+            state = self.js(_SETTLE)
+            if state == previous and (not isinstance(state, dict) or state.get("ready", "complete") == "complete"):
+                return
+            previous = state
+            time.sleep(0.5)
 
     def close(self):
         if self.path is not None:
@@ -144,8 +167,13 @@ def run(tab, url, output, *, name=None, inventory=None, approved_ids=(), width=1
             return value
 
         page = inspect(helper["_INSPECT"])
+        if page["blocked"]:
+            time.sleep(_BLOCK_RECHECK_SECONDS)
+            page = inspect(helper["_INSPECT"])
         if page["blocked"] or page.get("login_overlay"):
             return {"status": "blocked" if page["blocked"] else "login_overlay", "backend": "camofox"}
+        if tab.http_status >= 400 and len(str(page.get("body") or "").strip()) < _DENIAL_TEXT_LIMIT:
+            raise PageBlocked(f"The source returned HTTP {tab.http_status} and rendered no public content")
         tab.js(_LOAD_LAZY_MEDIA)
         if inventory is not None:
             assets = helper["stage_assets"](inventory, output, approved_ids, js=inspect, cdp=tab.cdp)
